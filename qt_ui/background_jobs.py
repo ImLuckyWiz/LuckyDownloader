@@ -112,13 +112,14 @@ class InfoRunner:
             try:
                 info = get_source_info(text)
                 clips, warn, loaded = [], "", False
-                if info.twitch_vod_id and client:
+                vod_id = getattr(info, "twitch_vod_id", None)
+                if vod_id and client:
                     try:
-                        clips = fetch_clips_for_vod(client, info.twitch_vod_id)
+                        clips = fetch_clips_for_vod(client, vod_id)
                         loaded = True
                     except Exception as e:  # noqa: BLE001
                         warn = f"Could not fetch clips: {e}"
-                elif info.twitch_vod_id:
+                elif vod_id:
                     warn = "Not signed in to Twitch: clips are not available (optional, see the Twitch API… button)."
                 _emit("info_ok", bridge, info, clips, loaded, warn)
             except Exception as e:  # noqa: BLE001

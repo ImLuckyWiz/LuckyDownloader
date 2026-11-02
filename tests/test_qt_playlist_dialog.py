@@ -155,3 +155,25 @@ def test_main_window_playlist_enqueue_flow(qtbot, monkeypatch, tmp_path, sample_
     assert len(win.tab_queue.items) == 2
     assert win.tab_queue.items[0].job.source.id == sample_playlist.entries[0].id
     assert win.tab_queue.items[1].job.source.id == sample_playlist.entries[1].id
+
+
+def test_info_runner_handles_playlist(qtbot, monkeypatch, sample_playlist):
+    from qt_ui.background_jobs import InfoRunner
+    from qt_ui.bridge import Bridge
+    bridge = Bridge()
+    runner = InfoRunner(bridge)
+
+    from core import source_info
+    monkeypatch.setattr(source_info, "get_source_info", lambda url: sample_playlist)
+
+    received_info = []
+    received_error = []
+    bridge.info_ok.connect(lambda info, clips, loaded, warn: received_info.append(info))
+    bridge.error.connect(lambda err: received_error.append(err))
+
+    runner.start("https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE", client=MagicMock())
+    qtbot.waitUntil(lambda: len(received_info) > 0 or len(received_error) > 0, timeout=3000)
+
+    assert len(received_error) == 0
+    assert len(received_info) == 1
+    assert received_info[0].id == sample_playlist.id

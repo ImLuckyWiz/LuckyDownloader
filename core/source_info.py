@@ -145,6 +145,7 @@ class PlaylistInfo:
     thumbnail: str = ""
     site: str = "generic"
     provider: Any | None = None
+    twitch_vod_id: str | None = None
 
     def has_capability(self, cap: Any) -> bool:
         if self.provider is not None:
