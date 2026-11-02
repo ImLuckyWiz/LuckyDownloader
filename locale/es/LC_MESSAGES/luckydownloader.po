@@ -3327,3 +3327,31 @@ msgstr "ej. 1-10, 15, 20-25"
 msgid "{count} items"
 msgstr "{count} elementos"
 
+#: qt_ui/playlist_dialog.py
+msgid "Thumbnail"
+msgstr "Miniatura"
+
+#: qt_ui/tabs/queue.py
+msgid "Are you sure you want to clear all jobs from the queue?"
+msgstr "¿Seguro que quieres vaciar todos los trabajos de la cola?"
+
+#: qt_ui/tabs/queue.py
+msgid ""
+"Are you sure you want to clear the entire queue?\n"
+"The running job will be stopped."
+msgstr ""
+"¿Seguro que quieres vaciar toda la cola?\n"
+"El trabajo en ejecución se detendrá."
+
+#: qt_ui/tabs/queue.py
+msgid "Clear all jobs from the queue"
+msgstr "Vaciar todos los trabajos de la cola"
+
+#: qt_ui/tabs/queue.py
+msgid "Clear queue"
+msgstr "Vaciar cola"
+
+#: qt_ui/tabs/queue.py
+msgid "Queue cleared."
+msgstr "Cola vaciada."
+

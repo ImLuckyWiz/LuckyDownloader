@@ -1068,6 +1068,7 @@ class MainWindow(QMainWindow):
         if self._shortcuts_dialog is not None:
             self._shortcuts_dialog.close()
         self.tab_search.shutdown()
+        self.tab_queue.shutdown()
         if self.settings:  # a window made without settings must not overwrite the saved file with nothing
             save_settings(self.settings)
         self._save_ui_state()

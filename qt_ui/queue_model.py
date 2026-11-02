@@ -243,6 +243,25 @@ class QueueModel(QAbstractTableModel):
         for iid in finished_iids:
             self.remove(iid)
 
+    def clear_all(self, keep_running: bool = False) -> list[str]:
+        """Atomically clear items from the queue. If keep_running is True, the running job is preserved."""
+        with self._lock:
+            if keep_running:
+                running = [i for i in self.items if i.status == "running"]
+                removed = [i.iid for i in self.items if i.status != "running"]
+                self.beginResetModel()
+                self.items = running
+                for idx, item in enumerate(self.items, start=1):
+                    item.row_number = idx
+                self.endResetModel()
+                return removed
+            else:
+                removed = [i.iid for i in self.items]
+                self.beginResetModel()
+                self.items.clear()
+                self.endResetModel()
+                return removed
+
     def summary(self) -> str:
         with self._lock:
             return queue_summary([i.status for i in self.items])

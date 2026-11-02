@@ -11,10 +11,12 @@
 
 from __future__ import annotations
 
+import queue
+import threading
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QItemSelectionModel, QModelIndex, QRect, QRectF, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QItemSelectionModel, QModelIndex, QObject, QRect, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap, QTextCharFormat, QTextCursor, QTextOption
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPlainTextEdit,
@@ -39,6 +41,56 @@ from qt_ui.widgets import Card, Collapsible, EmptyState, ScrollFrame
 HEADER_HEIGHT = 34  # the column headings; the empty-state message starts under them
 ROW_HEIGHT = 44
 LOG_COLOURS = {"stamp": MUTED, "muted": MUTED, "err": ERR, "warn": WARN, "ok": OK, "plain": FG}
+
+
+class QueueThumbFetcher(QObject):
+    """Background fetcher for queue item thumbnails."""
+
+    thumb_ready = Signal(str, str)  # (iid, file_path)
+
+    def __init__(self, parent: QObject | None = None):
+        super().__init__(parent)
+        self.jobs: queue.Queue = queue.Queue()
+        self.threads: list[threading.Thread] = []
+        self._stopped = False
+        self._lock = threading.Lock()
+
+    def submit(self, iid: str, url: str) -> None:
+        if not url:
+            return
+        with self._lock:
+            if self._stopped:
+                return
+            if not self.threads:
+                for _ in range(4):
+                    t = threading.Thread(target=self._work, daemon=True)
+                    t.start()
+                    self.threads.append(t)
+        self.jobs.put((iid, url))
+
+    def stop(self) -> None:
+        with self._lock:
+            self._stopped = True
+            n = len(self.threads)
+        for _ in range(n):
+            self.jobs.put(None)
+
+    def _work(self) -> None:
+        from luckytwitch_engine import fetch_thumbnail
+        while True:
+            item = self.jobs.get()
+            if item is None:
+                return
+            iid, url = item
+            with self._lock:
+                if self._stopped:
+                    return
+            try:
+                path = fetch_thumbnail(url)
+                if path and Path(path).is_file():
+                    self.thumb_ready.emit(iid, str(path))
+            except Exception:
+                continue
 
 
 class QueueRowDelegate(QStyledItemDelegate):
@@ -354,6 +406,8 @@ class QueueTab(QWidget):
         self.bridge.item.connect(self.set_item_status)
         self.bridge.progress.connect(self._on_progress)
         self.bridge.queue_done.connect(self.on_queue_done)
+        self._thumb_fetcher = QueueThumbFetcher(self)
+        self._thumb_fetcher.thumb_ready.connect(self._on_thumb_ready)
         self.refresh_summary()
         language_bus().changed.connect(self.refresh_language)
 
@@ -393,7 +447,8 @@ class QueueTab(QWidget):
         self.delegate = QueueRowDelegate(self.table, self)
         self.table.setItemDelegate(self.delegate)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.table.installEventFilter(self)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setShowGrid(False)
         self.table.setWordWrap(False)
@@ -457,8 +512,12 @@ class QueueTab(QWidget):
         self.clear_btn = QPushButton(t("Clear finished"))
         self.clear_btn.setIcon(icon("check", 15))
         self.clear_btn.clicked.connect(self.clear_finished)
+        self.clear_all_btn = QPushButton(t("Clear queue"))
+        self.clear_all_btn.setIcon(icon("x", 15))
+        self.clear_all_btn.setToolTip(t("Clear all jobs from the queue"))
+        self.clear_all_btn.clicked.connect(self.clear_all_jobs)
 
-        for b in (self.retry_btn, self.move_up_btn, self.move_down_btn, self.remove_btn, self.clear_btn):
+        for b in (self.retry_btn, self.move_up_btn, self.move_down_btn, self.remove_btn, self.clear_btn, self.clear_all_btn):
             buttons.addWidget(b)
 
         from core.ui_state import load_ui_state, save_ui_state
@@ -647,7 +706,26 @@ class QueueTab(QWidget):
         self.refresh_summary()
         language_bus().changed.connect(self.refresh_language)
         self.log(f"Queued: {label} ({n_parts} parts, {strat})")
+        if thumb is None:
+            self._ensure_thumbnail(item)
         return item
+
+    def _ensure_thumbnail(self, item: QueueItem) -> None:
+        src = getattr(getattr(item, "job", None), "source", None)
+        thumb_val = getattr(src, "thumbnail", "") or ""
+        if not thumb_val:
+            return
+        if Path(thumb_val).is_file():
+            pm = QPixmap(str(thumb_val))
+            if not pm.isNull():
+                self.model.set_thumbnail(item.iid, pm)
+        elif str(thumb_val).startswith("http"):
+            self._thumb_fetcher.submit(item.iid, str(thumb_val))
+
+    def _on_thumb_ready(self, iid: str, path: str) -> None:
+        pm = QPixmap(path)
+        if not pm.isNull():
+            self.model.set_thumbnail(iid, pm)
 
     def set_item_status(self, iid: str, status: str) -> None:
         self.model.set_status(iid, status)
@@ -667,9 +745,20 @@ class QueueTab(QWidget):
 
     set_running_progress = _on_progress
 
-    def selected_iid(self) -> str | None:
+    def selected_iids(self) -> list[str]:
+        if not self.table.selectionModel():
+            return []
         rows = self.table.selectionModel().selectedRows()
-        return self.model.index(rows[0].row(), 0).data(IID_ROLE) if rows else None
+        iids: list[str] = []
+        for idx in rows:
+            iid = self.model.index(idx.row(), 0).data(IID_ROLE)
+            if iid and iid not in iids:
+                iids.append(iid)
+        return iids
+
+    def selected_iid(self) -> str | None:
+        iids = self.selected_iids()
+        return iids[0] if iids else None
 
     def select_item(self, iid: str) -> None:
         row = self.model.row_of(iid)
@@ -715,21 +804,52 @@ class QueueTab(QWidget):
         return out
 
     def remove_selected(self) -> None:
-        iid = self.selected_iid()
-        if iid is None:
+        iids = self.selected_iids()
+        if not iids:
             return
-        it = self.model.find(iid)
-        if it and it.status == "running":
+        running = [iid for iid in iids if (it := self.model.find(iid)) and it.status == "running"]
+        if len(running) == len(iids):
             dialogs.info(self, t("Running"), t("Cancel the running job first."))
             return
-        self.model.remove(iid)
+        for iid in iids:
+            if iid not in running:
+                self.model.remove(iid)
         self.refresh_summary()
+        if self.table.selectionModel():
+            self.table.selectionModel().clearSelection()
         language_bus().changed.connect(self.refresh_language)
 
     def clear_finished(self) -> None:
         self.model.clear_finished()
         self.refresh_summary()
         language_bus().changed.connect(self.refresh_language)
+
+    def clear_all_jobs(self) -> None:
+        if not self.model.items:
+            return
+        running = self.model.running_item()
+        msg = (
+            t("Are you sure you want to clear the entire queue?\nThe running job will be stopped.")
+            if running is not None
+            else t("Are you sure you want to clear all jobs from the queue?")
+        )
+        if not dialogs.ask_yes_no(self, t("Clear queue"), msg):
+            return
+        if running is not None:
+            self.runner.cancel()
+        self.model.clear_all(keep_running=False)
+        self.refresh_summary()
+        self.status_message.emit(t("Queue cleared."))
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802
+        if watched is self.table and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+                self.remove_selected()
+                return True
+        return super().eventFilter(watched, event)
+
+    def shutdown(self) -> None:
+        self._thumb_fetcher.stop()
 
     # ---------------------------- running ---------------------------- #
     def set_running(self, running: bool) -> None:

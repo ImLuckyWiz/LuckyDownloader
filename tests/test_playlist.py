@@ -140,3 +140,25 @@ def test_build_generic_download_args_with_archive():
     assert "--download-archive" in args
     idx = args.index("--download-archive")
     assert args[idx + 1] == "/path/to/archive.txt"
+
+
+def test_parse_playlist_info_youtube_thumbnail_fallback():
+    # When yt-dlp flat playlist does not return thumbnail or thumbnails for an entry
+    data = {
+        "_type": "playlist",
+        "id": "PL123",
+        "title": "Sample Playlist",
+        "uploader": "Sample Channel",
+        "entries": [
+            {
+                "id": "dQw4w9WgXcQ",
+                "title": "Never Gonna Give You Up",
+                "duration": 213,
+                "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                # no thumbnail or thumbnails field
+            }
+        ],
+    }
+    pl = parse_playlist_info(data, "https://www.youtube.com/playlist?list=PL123")
+    assert pl.entries[0].thumbnail == "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+    assert pl.thumbnail == "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"

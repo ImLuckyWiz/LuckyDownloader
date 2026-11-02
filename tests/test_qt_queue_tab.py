@@ -13,14 +13,15 @@ import pytest
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
-from PySide6.QtCore import Qt  # noqa: E402
-from PySide6.QtGui import QColor, QTextCursor  # noqa: E402
+from PySide6.QtCore import QEvent, Qt  # noqa: E402
+from PySide6.QtGui import QColor, QPixmap, QTextCursor  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from core import palette, paths, status  # noqa: E402
 from core.settings import DEFAULTS  # noqa: E402
 from qt_ui import dialogs, queue_model, theme  # noqa: E402
 from qt_ui import main_window as mw  # noqa: E402
+from qt_ui.queue_model import QueueModel  # noqa: E402
 from qt_ui.tabs import queue as queue_tab  # noqa: E402
 from qt_ui.tabs.queue import QueueTab  # noqa: E402
 from qt_ui.widgets import Card  # noqa: E402
@@ -817,3 +818,99 @@ def test_retry_and_reorder_waiting_jobs(tab, qtbot, monkeypatch):
     allow_finish.set()
     qtbot.waitUntil(lambda: not tab.runner.is_running(), timeout=3000)
     assert order == [f"job-{b}", f"job-{a}", f"job-{c}"]
+
+
+def test_queue_model_clear_all(qtbot):
+    model = QueueModel()
+    model.add(object(), "Video 1", 1, "full video")
+    model.add(object(), "Video 2", 1, "full video")
+    model.add(object(), "Video 3", 1, "full video")
+    assert len(model.items) == 3
+
+    # With keep_running=True when Video 2 is running
+    model.items[1].status = "running"
+    removed = model.clear_all(keep_running=True)
+    assert len(removed) == 2
+    assert len(model.items) == 1
+    assert model.items[0].label == "Video 2"
+
+    # With keep_running=False
+    removed_all = model.clear_all(keep_running=False)
+    assert len(removed_all) == 1
+    assert len(model.items) == 0
+
+
+def test_queue_tab_clear_all_button(qtbot, monkeypatch):
+    tab = QueueTab()
+    qtbot.addWidget(tab)
+    tab.enqueue(object(), "Item 1", 1, "full video")
+    tab.enqueue(object(), "Item 2", 1, "full video")
+    assert len(tab.items) == 2
+
+    # User cancels clear confirmation dialog
+    monkeypatch.setattr("qt_ui.dialogs.ask_yes_no", lambda parent, title, msg: False)
+    tab.clear_all_jobs()
+    assert len(tab.items) == 2
+
+    # User confirms clear confirmation dialog
+    monkeypatch.setattr("qt_ui.dialogs.ask_yes_no", lambda parent, title, msg: True)
+    tab.clear_all_jobs()
+    assert len(tab.items) == 0
+
+
+def test_queue_tab_multi_selection_and_delete_key(qtbot):
+    from PySide6.QtCore import QItemSelectionModel
+    from PySide6.QtGui import QKeyEvent
+    tab = QueueTab()
+    qtbot.addWidget(tab)
+    i1 = tab.enqueue(object(), "Item 1", 1, "full video").iid
+    i2 = tab.enqueue(object(), "Item 2", 1, "full video").iid
+    i3 = tab.enqueue(object(), "Item 3", 1, "full video").iid
+    assert len(tab.items) == 3
+
+    # Multi-select row 0 and row 2 (Item 1 and Item 3)
+    sm = tab.table.selectionModel()
+    sm.select(tab.model.index(0, 0), QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
+    sm.select(tab.model.index(2, 0), QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
+    assert set(tab.selected_iids()) == {i1, i3}
+
+    # Simulate pressing Delete key
+    press_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Delete, Qt.KeyboardModifier.NoModifier)
+    tab.eventFilter(tab.table, press_event)
+    assert len(tab.items) == 1
+    assert tab.items[0].iid == i2
+
+
+def test_queue_tab_auto_thumbnail_fetch(qtbot, tmp_path):
+    class FakeSource:
+        thumbnail = ""
+
+    class FakeJob:
+        def __init__(self):
+            self.source = FakeSource()
+
+    tab = QueueTab()
+    qtbot.addWidget(tab)
+
+    # 1. Local file thumbnail
+    test_img = tmp_path / "thumb.png"
+    pm = QPixmap(10, 10)
+    pm.fill(Qt.GlobalColor.red)
+    pm.save(str(test_img))
+
+    job1 = FakeJob()
+    job1.source.thumbnail = str(test_img)
+    it1 = tab.enqueue(job1, "Local Thumb Job", 1, "full video")
+    assert it1.thumb is not None
+    assert isinstance(it1.thumb, QPixmap)
+
+    # 2. HTTP URL thumbnail fetched via thumb_ready
+    job2 = FakeJob()
+    job2.source.thumbnail = "https://example.com/fake.jpg"
+    it2 = tab.enqueue(job2, "Remote Thumb Job", 1, "full video")
+    assert it2.thumb is None  # Initial state before background fetch arrives
+
+    # When thumb_ready signal fires
+    tab._on_thumb_ready(it2.iid, str(test_img))
+    assert it2.thumb is not None
+    assert isinstance(it2.thumb, QPixmap)

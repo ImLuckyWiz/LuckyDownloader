@@ -5,10 +5,12 @@ configure shared download options, and enqueue them as individual jobs.
 
 from __future__ import annotations
 
+import queue
+import threading
 from pathlib import Path
 from typing import Sequence
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QObject, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
@@ -28,9 +30,59 @@ from qt_ui import dialogs
 from qt_ui.icons import icon
 from qt_ui.widgets import Card, ComboBox, Toggle
 
-THUMB_W = 72
-THUMB_H = 40
+THUMB_W = 64
+THUMB_H = 36
 CONFIRM_THRESHOLD = 50
+
+
+class DialogThumbLoader(QObject):
+    """Background loader for playlist dialog entry thumbnails."""
+
+    loaded = Signal(int, str)  # (row, path)
+
+    def __init__(self, parent: QObject | None = None):
+        super().__init__(parent)
+        self.jobs: queue.Queue = queue.Queue()
+        self.threads: list[threading.Thread] = []
+        self._stopped = False
+        self._lock = threading.Lock()
+
+    def submit(self, row: int, url: str) -> None:
+        if not url:
+            return
+        with self._lock:
+            if self._stopped:
+                return
+            if not self.threads:
+                for _ in range(4):
+                    t = threading.Thread(target=self._work, daemon=True)
+                    t.start()
+                    self.threads.append(t)
+        self.jobs.put((row, url))
+
+    def stop(self) -> None:
+        with self._lock:
+            self._stopped = True
+            n = len(self.threads)
+        for _ in range(n):
+            self.jobs.put(None)
+
+    def _work(self) -> None:
+        from luckytwitch_engine import fetch_thumbnail
+        while True:
+            item = self.jobs.get()
+            if item is None:
+                return
+            row, url = item
+            with self._lock:
+                if self._stopped:
+                    return
+            try:
+                path = fetch_thumbnail(url)
+                if path and Path(path).is_file():
+                    self.loaded.emit(row, str(path))
+            except Exception:
+                continue
 
 
 class PlaylistPickerDialog(QDialog):
@@ -52,6 +104,9 @@ class PlaylistPickerDialog(QDialog):
 
         self._items = playlist.entries
         self._checkboxes: list[QCheckBox] = []
+        self._thumb_labels: dict[int, QLabel] = {}
+        self._thumb_loader = DialogThumbLoader(self)
+        self._thumb_loader.loaded.connect(self._on_thumb_loaded)
 
         self._build_ui()
         self._populate_table()
@@ -129,10 +184,11 @@ class PlaylistPickerDialog(QDialog):
 
         # Items Table
         self.table = QTableWidget(self)
-        self.table.setColumnCount(5)
+        self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
             "",
             t("#"),
+            t("Thumbnail"),
             t("Title"),
             t("Duration"),
             t("Uploader"),
@@ -140,13 +196,16 @@ class PlaylistPickerDialog(QDialog):
         header_view = self.table.horizontalHeader()
         header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header_view.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        header_view.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header_view.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header_view.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        header_view.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         self.table.setColumnWidth(0, 42)
-        self.table.setColumnWidth(1, 48)
-        self.table.setColumnWidth(3, 80)
+        self.table.setColumnWidth(1, 44)
+        self.table.setColumnWidth(2, 78)
+        self.table.setColumnWidth(4, 76)
         self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(44)
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         root_lay.addWidget(self.table, 1)
@@ -238,6 +297,7 @@ class PlaylistPickerDialog(QDialog):
     def _populate_table(self) -> None:
         self.table.setRowCount(len(self._items))
         self._checkboxes = []
+        self._thumb_labels.clear()
 
         for row, item in enumerate(self._items):
             # Column 0: Checkbox widget
@@ -258,22 +318,68 @@ class PlaylistPickerDialog(QDialog):
             idx_item.setFlags(idx_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(row, 1, idx_item)
 
-            # Column 2: Title
+            # Column 2: Thumbnail widget
+            thumb_container = QWidget()
+            t_lay = QHBoxLayout(thumb_container)
+            t_lay.setContentsMargins(4, 3, 4, 3)
+            t_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl = QLabel(thumb_container)
+            lbl.setFixedSize(THUMB_W, THUMB_H)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setStyleSheet(f"background: {BG}; border-radius: 3px; border: 1px solid {BORDER};")
+            t_lay.addWidget(lbl)
+            self.table.setCellWidget(row, 2, thumb_container)
+            self._thumb_labels[row] = lbl
+
+            if item.thumbnail:
+                if Path(item.thumbnail).is_file():
+                    self._set_label_pixmap(lbl, item.thumbnail)
+                else:
+                    self._thumb_loader.submit(row, item.thumbnail)
+
+            # Column 3: Title
             title_item = QTableWidgetItem(item.title)
             title_item.setFlags(title_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(row, 2, title_item)
+            self.table.setItem(row, 3, title_item)
 
-            # Column 3: Duration
+            # Column 4: Duration
             dur_str = fmt_hms(item.duration) if item.duration > 0 else "--:--"
             dur_item = QTableWidgetItem(dur_str)
             dur_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             dur_item.setFlags(dur_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(row, 3, dur_item)
+            self.table.setItem(row, 4, dur_item)
 
-            # Column 4: Uploader
+            # Column 5: Uploader
             upl_item = QTableWidgetItem(item.uploader or self.playlist.uploader)
             upl_item.setFlags(upl_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(row, 4, upl_item)
+            self.table.setItem(row, 5, upl_item)
+
+    def _set_label_pixmap(self, lbl: QLabel, path: str) -> None:
+        pm = QPixmap(path)
+        if not pm.isNull():
+            scaled = pm.scaled(
+                THUMB_W, THUMB_H,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            lbl.setPixmap(scaled)
+
+    def _on_thumb_loaded(self, row: int, path: str) -> None:
+        lbl = self._thumb_labels.get(row)
+        if lbl is not None:
+            self._set_label_pixmap(lbl, path)
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        self._thumb_loader.stop()
+        super().closeEvent(event)
+
+    def reject(self) -> None:
+        self._thumb_loader.stop()
+        super().reject()
+
+    def accept(self) -> None:
+        self._thumb_loader.stop()
+        super().accept()
 
     def _update_selection_summary(self) -> None:
         selected_count = sum(1 for cb in self._checkboxes if cb.isChecked())

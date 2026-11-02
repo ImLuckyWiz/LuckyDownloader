@@ -478,6 +478,8 @@ def parse_playlist_info(info: dict, url: str) -> PlaylistInfo:
             thumbs = e["thumbnails"]
             if isinstance(thumbs, list) and thumbs:
                 ethumb = str(thumbs[-1].get("url") or "")
+        if not ethumb and eid and ("youtube" in site or "youtu" in url or "youtube" in eurl):
+            ethumb = f"https://i.ytimg.com/vi/{eid}/hqdefault.jpg"
 
         items.append(
             PlaylistItem(
@@ -490,6 +492,9 @@ def parse_playlist_info(info: dict, url: str) -> PlaylistInfo:
                 index=idx,
             )
         )
+
+    if not thumbnail and items and items[0].thumbnail:
+        thumbnail = items[0].thumbnail
 
     return PlaylistInfo(
         id=playlist_id,

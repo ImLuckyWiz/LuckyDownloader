@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 08:29-0300\n"
+"POT-Creation-Date: 2026-11-02 09:04-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -988,6 +988,10 @@ msgstr ""
 
 #: qt_ui/playlist_dialog.py
 msgid "Skip already downloaded videos"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "Thumbnail"
 msgstr ""
 
 #: qt_ui/playlist_dialog.py
@@ -2226,6 +2230,16 @@ msgid "4 parallel jobs"
 msgstr ""
 
 #: qt_ui/tabs/queue.py
+msgid "Are you sure you want to clear all jobs from the queue?"
+msgstr ""
+
+#: qt_ui/tabs/queue.py
+msgid ""
+"Are you sure you want to clear the entire queue?\n"
+"The running job will be stopped."
+msgstr ""
+
+#: qt_ui/tabs/queue.py
 msgid "Bandwidth limit passed to yt-dlp (--limit-rate)"
 msgstr ""
 
@@ -2247,11 +2261,19 @@ msgid "Cancelling…"
 msgstr ""
 
 #: qt_ui/tabs/queue.py
+msgid "Clear all jobs from the queue"
+msgstr ""
+
+#: qt_ui/tabs/queue.py
 msgid "Clear finished"
 msgstr ""
 
 #: qt_ui/tabs/queue.py
 msgid "Clear log"
+msgstr ""
+
+#: qt_ui/tabs/queue.py
+msgid "Clear queue"
 msgstr ""
 
 #: qt_ui/tabs/queue.py
@@ -2326,6 +2348,10 @@ msgstr ""
 
 #: qt_ui/tabs/queue.py
 msgid "Queue"
+msgstr ""
+
+#: qt_ui/tabs/queue.py
+msgid "Queue cleared."
 msgstr ""
 
 #: qt_ui/tabs/queue.py

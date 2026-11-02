@@ -177,3 +177,24 @@ def test_info_runner_handles_playlist(qtbot, monkeypatch, sample_playlist):
     assert len(received_error) == 0
     assert len(received_info) == 1
     assert received_info[0].id == sample_playlist.id
+
+
+def test_dialog_thumbnail_column_and_loader(qtbot, sample_playlist, tmp_path):
+    from PySide6.QtGui import QPixmap
+    dlg = PlaylistPickerDialog(sample_playlist)
+    qtbot.addWidget(dlg)
+    dlg.show()
+
+    assert dlg.table.columnCount() == 6
+    assert 0 in dlg._thumb_labels
+
+    # Create dummy image and trigger thumb loaded
+    test_img = tmp_path / "thumb_test.png"
+    pm = QPixmap(10, 10)
+    pm.fill(Qt.GlobalColor.blue)
+    pm.save(str(test_img))
+
+    dlg._on_thumb_loaded(0, str(test_img))
+    lbl = dlg._thumb_labels[0]
+    assert lbl.pixmap() is not None
+    assert not lbl.pixmap().isNull()
