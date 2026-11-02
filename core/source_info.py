@@ -169,7 +169,7 @@ def twitch_vod_id(url: str) -> str | None:
 YTDLP_MISSING = "yt-dlp is not installed yet (it is downloaded automatically on first run). Check your connection and restart."
 
 
-def get_source_info(text: str) -> SourceInfo:
+def get_source_info(text: str, cookies_browser: str | None = None) -> SourceInfo:
     import luckytwitch_engine
     find_tool = getattr(luckytwitch_engine, "find_tool", None)
     tool_env = getattr(luckytwitch_engine, "_tool_env", lambda: None)
@@ -183,7 +183,11 @@ def get_source_info(text: str) -> SourceInfo:
     ytdlp = find_tool("yt-dlp") if find_tool else None
     if not ytdlp:
         raise EngineError(YTDLP_MISSING)
-    cmd = [ytdlp, "--dump-single-json", "--no-warnings", "--skip-download"]
+    cmd = [ytdlp, "--dump-single-json", "--no-warnings", "--skip-download", "--remote-components", "ejs:github"]
+    from core.settings import load_settings
+    cb = cookies_browser if cookies_browser is not None else load_settings().get("cookies_from_browser")
+    if cb and str(cb).strip().lower() not in ("none", "disabled", ""):
+        cmd += ["--cookies-from-browser", str(cb).strip().lower()]
     if not twitch_vod_id(url):
         cmd.append("--flat-playlist")
     cmd.append(url)
@@ -203,6 +207,22 @@ def get_source_info(text: str) -> SourceInfo:
         raise EngineError(t("yt-dlp took too long to read that URL.")) from e
     except OSError as e:
         raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
+    if proc.returncode != 0 and "--remote-components" in proc.stderr:
+        cmd_fallback = [c for i, c in enumerate(cmd) if c != "--remote-components" and (i == 0 or cmd[i-1] != "--remote-components")]
+        try:
+            proc = subprocess.run(
+                cmd_fallback,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                stdin=subprocess.DEVNULL,
+                env=tool_env(),
+                creationflags=no_window,
+                timeout=180,
+            )
+        except Exception:
+            pass
     if proc.returncode != 0:
         from core.providers.generic import map_generic_error
         raise EngineError(map_generic_error(proc.stderr))
@@ -577,6 +597,7 @@ def build_generic_download_args(
         "--retries", "10",
         "--fragment-retries", "10",
         "--continue",
+        "--remote-components", "ejs:github",
     ]
     if threads > 1:
         args += ["--concurrent-fragments", str(max(1, threads))]

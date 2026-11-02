@@ -502,3 +502,31 @@ def test_generic_run_job_uses_generic_format_string_and_cookies(monkeypatch, tmp
     assert "format_id" in captured_kw
     assert captured_kw["format_id"] == "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b"
     assert captured_kw.get("cookies_browser") == "brave"
+
+
+def test_get_source_info_passes_cookies_and_remote_components(monkeypatch):
+    import subprocess
+    from core.source_info import get_source_info
+
+    captured_cmd = []
+
+    def fake_run(cmd, **kw):
+        captured_cmd.extend(cmd)
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=0,
+            stdout='{"id": "123", "title": "Test", "duration": 100, "uploader": "Me"}',
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr("luckytwitch_engine.find_tool", lambda name: "fake_ytdlp")
+
+    get_source_info("https://www.youtube.com/watch?v=123", cookies_browser="firefox")
+
+    assert "--cookies-from-browser" in captured_cmd
+    idx = captured_cmd.index("--cookies-from-browser")
+    assert captured_cmd[idx + 1] == "firefox"
+    assert "--remote-components" in captured_cmd
+    idx_rc = captured_cmd.index("--remote-components")
+    assert captured_cmd[idx_rc + 1] == "ejs:github"

@@ -76,7 +76,7 @@ class GenericProvider(Provider):
         if not ytdlp:
             raise EngineError(YTDLP_MISSING)
 
-        cmd = [ytdlp, "--dump-single-json", "--no-warnings", "--flat-playlist", "--skip-download"]
+        cmd = [ytdlp, "--dump-single-json", "--no-warnings", "--flat-playlist", "--skip-download", "--remote-components", "ejs:github"]
         from core.settings import load_settings
         cb = load_settings().get("cookies_from_browser")
         if cb and str(cb).strip().lower() not in ("none", "disabled", ""):
@@ -98,6 +98,23 @@ class GenericProvider(Provider):
             raise EngineError(t("yt-dlp took too long to read that URL.")) from e
         except OSError as e:
             raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
+
+        if proc.returncode != 0 and "--remote-components" in proc.stderr:
+            cmd_fallback = [c for i, c in enumerate(cmd) if c != "--remote-components" and (i == 0 or cmd[i-1] != "--remote-components")]
+            try:
+                proc = subprocess.run(
+                    cmd_fallback,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    stdin=subprocess.DEVNULL,
+                    env=_tool_env(),
+                    creationflags=_NO_WINDOW,
+                    timeout=180,
+                )
+            except Exception:
+                pass
 
         if proc.returncode != 0:
             raise EngineError(map_generic_error(proc.stderr))
