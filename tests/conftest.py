@@ -27,6 +27,7 @@ def _data_folder_in_tmp(request, tmp_path, monkeypatch):
     except ImportError:  # pragma: no cover
         return
     for name, leaf in (("SETTINGS_PATH", "luckytwitch_settings.json"), ("RECENT_PATH", "luckytwitch_recent.json"),
+                       ("RECENT_SEARCHES_PATH", "recent_searches.json"),
                        ("CONFIG_PATH", "config.json"), ("LINKS_DIR", "links"), ("BEAT_PATH", "running.beat"),
                        ("UI_STATE_PATH", "luckytwitch_ui.json"), ("UPDATE_STATE_PATH", "luckytwitch_update.json")):
         monkeypatch.setattr(paths, name, tmp_path / "data" / leaf)
@@ -55,11 +56,11 @@ def _collect_garbage_at_a_known_moment(request):
         from PySide6.QtCore import QEvent
         from PySide6.QtWidgets import QApplication
     except ImportError:  # pragma: no cover
-        return
+        pass
     import gc
 
     app = QApplication.instance()
     if app is not None:
-        app.processEvents()
         app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        app.processEvents()
     gc.collect()

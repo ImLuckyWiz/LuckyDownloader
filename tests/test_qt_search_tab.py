@@ -1013,3 +1013,99 @@ def test_spawn_avatar_fetch_downloads_profile_pictures_for_all_channels(qtbot, t
     assert not tab.results_model.index(1, 0).data(search_models.AVATAR_ROLE).isNull()
     assert ("users", {"id": ["10", "20"]}) in client.calls
 
+
+
+# ------------------------------------------------------------------ Phase 7: Browse Tab & Provider Selector
+def test_provider_selector_lists_only_browsable_providers(tab):
+    assert tab.provider_combo.isVisible()
+    items = [tab.provider_combo.itemData(i) for i in range(tab.provider_combo.count())]
+    assert "twitch" in items
+    assert "youtube" in items
+    assert "generic" not in items
+    assert tab.provider_combo.currentData() == "twitch"
+
+
+def test_provider_selector_hidden_when_only_one_provider_can_browse(monkeypatch):
+    from core import providers
+    from core.providers.twitch import TwitchProvider
+    monkeypatch.setattr(providers, "ALL_PROVIDERS", [TwitchProvider()])
+    single_tab = SearchTab()
+    try:
+        assert not single_tab.provider_combo.isVisible()
+        assert not single_tab.provider_label.isVisible()
+    finally:
+        single_tab.shutdown()
+
+
+def test_switching_to_youtube_provider_adapts_ui(tab):
+    tab.set_provider("youtube")
+    assert tab.current_provider_name() == "youtube"
+    assert tab.streamer_label.text() == "Search:"
+    assert "Search videos" in tab.search_edit.placeholderText()
+    assert not tab.type_combo.isVisible()
+    assert not tab.results_card.isVisible()
+    assert not tab.signin_bar.isVisible()
+    assert tab.search_btn.isEnabled()
+    assert tab.use_btn.text() == "Use this video"
+    assert tab.recent_card.title_label.text() == "Recent searches"
+
+
+def test_youtube_search_flow_and_use_video(qtbot, tab, monkeypatch):
+    from core.providers import YOUTUBE_PROVIDER
+    fake_results = [
+        {
+            "id": "yt1",
+            "title": "Python Tutorial 101",
+            "date": "2026-05-01",
+            "duration": 600.0,
+            "views": 50000,
+            "thumb": "",
+            "url": "https://www.youtube.com/watch?v=yt1",
+            "uploader": "LuckyDev",
+        }
+    ]
+    monkeypatch.setattr(YOUTUBE_PROVIDER, "search_videos", lambda query, limit=20: fake_results)
+    tab.set_provider("youtube")
+    tab.search_edit.setText("python tutorial")
+    tab.on_search()
+
+    qtbot.waitUntil(lambda: len(tab.sv_videos) == 1, timeout=3000)
+    assert tab.sv_videos[0]["title"] == "Python Tutorial 101"
+    assert "Python Tutorial 101" in tab.vod_model.index(0, 1).data()
+
+    # Selecting and using video emits vod_chosen
+    tab.select_vod(0)
+    with qtbot.waitSignal(tab.vod_chosen, timeout=1000) as sig:
+        tab.use_btn.click()
+    assert sig.args == ["https://www.youtube.com/watch?v=yt1"]
+
+
+def test_youtube_recent_searches_and_clear(qtbot, tab, monkeypatch, tmp_path):
+    from core.providers import YOUTUBE_PROVIDER
+    from core import paths
+    monkeypatch.setattr(paths, "RECENT_SEARCHES_PATH", tmp_path / "recent_searches.json")
+    monkeypatch.setattr(YOUTUBE_PROVIDER, "search_videos", lambda query, limit=20: [])
+
+    tab.set_provider("youtube")
+    tab.search_edit.setText("astronomy")
+    tab.on_search()
+    qtbot.waitUntil(lambda: not tab.sv_loading, timeout=3000)
+
+    assert any(c["name"] == "astronomy" for c in tab.recent_yt)
+    assert tab.recent_model.rowCount() >= 1
+
+    tab.clear_recent()
+    assert tab.recent_yt == []
+    assert tab.recent_model.rowCount() == 0
+
+
+def test_switching_back_to_twitch_restores_state(tab):
+    tab.set_provider("youtube")
+    assert not tab.type_combo.isVisible()
+
+    tab.set_provider("twitch")
+    assert tab.current_provider_name() == "twitch"
+    assert tab.streamer_label.text() == "Streamer:"
+    assert tab.type_combo.isVisible()
+    assert tab.results_card.isVisible()
+    assert tab.use_btn.text() == "Use this VOD"

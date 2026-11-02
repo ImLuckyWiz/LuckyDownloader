@@ -3,14 +3,18 @@ from __future__ import annotations
 import pytest
 
 from core.providers import (
+    ALL_PROVIDERS,
     Capability,
     GenericProvider,
     Provider,
     TwitchProvider,
+    YouTubeProvider,
     detect_source,
+    get_browsable_providers,
     is_twitch_source,
     is_web_url,
 )
+from core.providers.youtube import _format_yt_date, _parse_yt_entry
 from core.source_info import SourceInfo
 
 
@@ -20,6 +24,7 @@ from core.source_info import SourceInfo
 def test_provider_capabilities():
     twitch = TwitchProvider()
     assert twitch.name == "twitch"
+    assert twitch.display_name == "Twitch"
     assert twitch.has_capability(Capability.RESOLVE)
     assert twitch.has_capability(Capability.SEGMENTS)
     assert twitch.has_capability(Capability.TIMELINE)
@@ -30,6 +35,7 @@ def test_provider_capabilities():
 
     generic = GenericProvider()
     assert generic.name == "generic"
+    assert generic.display_name == "Generic"
     assert generic.has_capability(Capability.RESOLVE)
     assert not generic.has_capability(Capability.TIMELINE)
     assert not generic.has_capability(Capability.CHAT)
@@ -38,6 +44,49 @@ def test_provider_capabilities():
     assert not generic.has_capability(Capability.SUBSCRIBE)
     assert Capability.RESOLVE in generic
     assert Capability.TIMELINE not in generic
+
+    yt = YouTubeProvider()
+    assert yt.name == "youtube"
+    assert yt.display_name == "YouTube"
+    assert yt.has_capability(Capability.RESOLVE)
+    assert yt.has_capability(Capability.PLAYLIST)
+    assert yt.has_capability(Capability.BROWSE)
+    assert yt.has_capability(Capability.SUBSCRIBE)
+    assert not yt.has_capability(Capability.TIMELINE)
+    assert not yt.has_capability(Capability.CHAT)
+
+
+def test_get_browsable_providers():
+    browsable = get_browsable_providers()
+    names = [p.name for p in browsable]
+    assert "twitch" in names
+    assert "youtube" in names
+    assert "generic" not in names
+    for p in browsable:
+        assert p.has_capability(Capability.BROWSE)
+
+
+def test_youtube_entry_parsing():
+    entry = {
+        "id": "dQw4w9WgXcQ",
+        "title": "Never Gonna Give You Up",
+        "upload_date": "20091025",
+        "duration": 212,
+        "view_count": 1500000000,
+        "thumbnails": [{"url": "https://example.com/small.jpg"}, {"url": "https://example.com/large.jpg"}],
+        "uploader": "RickAstleyVEVO",
+    }
+    parsed = _parse_yt_entry(entry)
+    assert parsed["id"] == "dQw4w9WgXcQ"
+    assert parsed["title"] == "Never Gonna Give You Up"
+    assert parsed["date"] == "2009-10-25"
+    assert parsed["duration"] == 212.0
+    assert parsed["views"] == 1500000000
+    assert parsed["thumb"] == "https://example.com/large.jpg"
+    assert parsed["url"] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    assert parsed["uploader"] == "RickAstleyVEVO"
+    assert _format_yt_date("2026-10-01") == "2026-10-01"
+    assert _format_yt_date(None) == ""
 
 
 # --------------------------------------------------------------------------- #

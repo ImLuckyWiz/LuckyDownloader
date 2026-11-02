@@ -56,7 +56,7 @@ def test_window_title_size_and_minimum(win):
 
 
 def test_the_four_tabs_have_the_same_names_in_the_same_order(win):
-    assert win.tab_names() == ["Search", "Plan", "Options", "Queue & log"]
+    assert win.tab_names() == ["Browse", "Plan", "Options", "Queue & log"]
     assert [type(win.tabs.widget(i)) for i in range(4)] == [SearchTab, PlanTab, OptionsTab, QueueTab]
     # the ampersand shows as a real '&' (a single '&' would turn the next letter into a shortcut)
     assert win.tabs.tabText(3) == "Queue && log"

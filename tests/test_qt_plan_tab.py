@@ -113,7 +113,7 @@ def test_app_uses_the_plan_tab_mixin(win):
 
 
 def test_tabs_are_in_the_expected_order(win):
-    assert win.tab_names() == ["Search", "Plan", "Options", "Queue & log"]
+    assert win.tab_names() == ["Browse", "Plan", "Options", "Queue & log"]
 
 
 def test_plan_tab_has_its_widgets(win):

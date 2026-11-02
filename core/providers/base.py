@@ -32,6 +32,11 @@ class Provider(ABC):
         """Capability flags supported by this provider."""
         ...
 
+    @property
+    def display_name(self) -> str:
+        """Human-readable provider name for UI display."""
+        return self.name.capitalize()
+
     def has_capability(self, cap: Capability) -> bool:
         """Return True if the provider supports the given capability flag."""
         return bool(self.capabilities & cap)

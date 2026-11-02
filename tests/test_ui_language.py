@@ -27,7 +27,7 @@ def test_ui_language_persistence_and_live_switch(qtbot, tmp_path, monkeypatch):
     assert win.command_bar.prompt_label.text() == "URL o ID del VOD:"
     assert win.command_bar.info_btn.text() == "Obtener información"
     assert win.tab_queue.start_btn.text() == "Iniciar cola"
-    assert win.tabs.tabText(0) == "Buscar"
+    assert win.tabs.tabText(0) == "Explorar"
     assert win.tabs.tabText(3) == "Cola y registros"
 
     # 2. Live switch to English
@@ -39,7 +39,7 @@ def test_ui_language_persistence_and_live_switch(qtbot, tmp_path, monkeypatch):
     assert win.command_bar.prompt_label.text() == "VOD URL or ID:"
     assert win.command_bar.info_btn.text() == "Get info"
     assert win.tab_queue.start_btn.text() == "Start queue"
-    assert win.tabs.tabText(0) == "Search"
+    assert win.tabs.tabText(0) == "Browse"
     assert win.tabs.tabText(3) == "Queue && log"
 
     # 3. Live switch back to Spanish
@@ -49,7 +49,7 @@ def test_ui_language_persistence_and_live_switch(qtbot, tmp_path, monkeypatch):
     assert saved_st2.language == "es"
     assert win.command_bar.prompt_label.text() == "URL o ID del VOD:"
     assert win.tab_queue.start_btn.text() == "Iniciar cola"
-    assert win.tabs.tabText(0) == "Buscar"
+    assert win.tabs.tabText(0) == "Explorar"
 
     win.close()
 
@@ -81,7 +81,7 @@ def test_new_installs_follow_the_system_language(qtbot, tmp_path, monkeypatch):
     assert get_language() == "es"
     assert win.tab_options.lang_combo.currentData() == "auto"
     assert win.tab_options.lang_combo.itemText(0) == "Automático (sistema)"
-    assert win.tabs.tabText(0) == "Buscar"
+    assert win.tabs.tabText(0) == "Explorar"
     win.close()
 
 
@@ -108,7 +108,7 @@ def test_switching_needs_no_restart_and_shows_no_restart_notice(qtbot, tmp_path,
     win, _ = _window(qtbot, tmp_path, monkeypatch, language="en")
     combo = win.tab_options.lang_combo
     combo.setCurrentIndex(combo.findData("es"))
-    assert win.tabs.tabText(0) == "Buscar"
+    assert win.tabs.tabText(0) == "Explorar"
     assert shown == []
 
 

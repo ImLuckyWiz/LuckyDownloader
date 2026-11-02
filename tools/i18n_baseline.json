@@ -43,6 +43,7 @@
   "Streamer:",
   "VOD",
   "Video",
+  "{n} video",
   "yt-dlp: {line}"
  ],
  "untranslated": [],

@@ -29,13 +29,13 @@ from qt_ui.icons import icon
 from qt_ui.motion import Motion, animate_width
 
 # Logical tab order stays identical to Phases 1-8 so all 28 ``win.tabs`` call sites work unchanged:
-# 0 = Search, 1 = Plan, 2 = Options, 3 = Queue & log.
-# Visually on the rail: Search (0), Plan (1), Queue & log (3) sit at the top; Options (2) sits at the bottom.
+# 0 = Browse (formerly Search), 1 = Plan, 2 = Options, 3 = Queue & log.
+# Visually on the rail: Browse (0), Plan (1), Queue & log (3) sit at the top; Options (2) sits at the bottom.
 RAIL_VISUAL_ORDER = (0, 1, 3, 2)
 
 RAIL_ITEMS: dict[int, tuple[str, str, str, str]] = {
     # index: (key, glyph, label, icon_name)
-    0: ("search", "\u2315", "Search", "search"),
+    0: ("browse", "\u2315", "Browse", "search"),
     1: ("plan", "\u2702", "Plan", "scissors"),
     2: ("options", "\u2699", "Options", "sliders"),
     3: ("queue", "\u2630", "Queue & log", "list"),
@@ -141,6 +141,8 @@ class NavRail(QFrame):
         btn.clicked.connect(lambda _checked=False, i=idx: self.set_current_index(i, emit=True))
         self.buttons[idx] = btn
         self.buttons_by_key[key] = btn
+        if key == "browse":
+            self.buttons_by_key["search"] = btn
         return btn
 
     @property
@@ -202,9 +204,13 @@ class NavRail(QFrame):
         self.queue_count = max(0, int(count))
         self._refresh_labels()
 
-    def set_search_badge(self, active: bool) -> None:
+    def set_browse_badge(self, active: bool) -> None:
+        self.browse_badge = bool(active)
         self.search_badge = bool(active)
         self._refresh_labels()
+
+    def set_search_badge(self, active: bool) -> None:
+        self.set_browse_badge(active)
 
     def _refresh_labels(self) -> None:
         for idx, btn in self.buttons.items():
@@ -212,7 +218,7 @@ class NavRail(QFrame):
             display_label = t(label).replace("&", "&&")
             btn.setToolTip(t(label))
             badge = ""
-            if idx == 0 and getattr(self, "search_badge", False):
+            if idx == 0 and (getattr(self, "browse_badge", False) or getattr(self, "search_badge", False)):
                 badge = " \u25cf"
             elif idx == 1 and self.vod_loaded:
                 badge = " \u25cf"
@@ -665,7 +671,7 @@ class ShortcutsDialog(QDialog):
     def get_shortcuts(cls) -> list[tuple[str, str]]:
         return [
             ("Ctrl+L", t("Focus and select the VOD URL / ID bar")),
-            ("Ctrl+1 / 2 / 3 / 4", t("Switch to Search, Plan, Options, or Queue & log")),
+            ("Ctrl+1 / 2 / 3 / 4", t("Switch to Browse, Plan, Options, or Queue & log")),
             ("Ctrl+,", t("Open Options (Settings)")),
             ("Ctrl+Enter", t("Add current VOD to queue and start (on Plan)")),
             ("Ctrl+Shift+Enter", t("Add current VOD to queue without starting (on Plan)")),

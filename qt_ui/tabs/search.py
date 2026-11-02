@@ -27,7 +27,8 @@ from PySide6.QtWidgets import (
     QSizePolicy, QStackedWidget, QTableView, QToolButton, QVBoxLayout, QWidget,
 )
 
-from core.recent import load_recent, save_recent
+from core.recent import load_recent, save_recent, load_recent_searches, save_recent_searches
+from core.providers import get_browsable_providers
 from core.paths import MAX_RECENT
 from core.search import VIDEO_KINDS
 from core.i18n import N_, t, tn
@@ -128,6 +129,7 @@ class SearchTab(QWidget):
         self.reload_client = lambda: None
         # state of the search (names as in the tkinter app)
         self.recent = load_recent()
+        self.recent_yt = load_recent_searches()
         self.sv_channel: dict | None = None
         self.sv_results: list[dict] = []
         self.sv_query = ""  # what the last search looked for (to say «no streamers found for …»)
@@ -171,6 +173,19 @@ class SearchTab(QWidget):
     def _build_search_row(self) -> None:
         row = QHBoxLayout()
         row.setSpacing(8)
+        self.provider_label = QLabel(t("Provider:"))
+        row.addWidget(self.provider_label)
+        self.provider_combo = ComboBox()
+        for prov in get_browsable_providers():
+            self.provider_combo.addItem(prov.display_name, prov.name)
+        self.provider_combo.setSizeAdjustPolicy(ComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
+        row.addWidget(self.provider_combo)
+
+        has_multiple_browsable = len(get_browsable_providers()) > 1
+        self.provider_label.setVisible(has_multiple_browsable)
+        self.provider_combo.setVisible(has_multiple_browsable)
+
         self.streamer_label = QLabel(t("Streamer:"))
         row.addWidget(self.streamer_label)
         self.search_edit = QLineEdit()
@@ -348,12 +363,63 @@ class SearchTab(QWidget):
 
     def _tab_order(self) -> None:
         """The order the widgets were made in is the order of the keyboard: nothing decorative takes focus."""
-        chain = (self.search_edit, self.search_btn, self.signin_btn, self.results_view, self.recent_view,
-                 self.clear_recent_btn, self.type_combo, self.vod_table, self.more_btn, self.use_btn)
+        chain = [self.search_edit, self.search_btn]
+        if hasattr(self, "provider_combo") and self.provider_combo.isVisible():
+            chain.insert(0, self.provider_combo)
+        chain.extend([self.signin_btn, self.results_view, self.recent_view,
+                      self.clear_recent_btn, self.type_combo, self.vod_table, self.more_btn, self.use_btn])
         for a, b in zip(chain, chain[1:]):
             QWidget.setTabOrder(a, b)
 
     # ---------------------------- state ---------------------------- #
+    def current_provider_name(self) -> str:
+        if hasattr(self, "provider_combo"):
+            data = self.provider_combo.currentData()
+            if data:
+                return str(data)
+        return "twitch"
+
+    def set_provider(self, name: str) -> None:
+        if not hasattr(self, "provider_combo"):
+            return
+        idx = self.provider_combo.findData(name)
+        if idx >= 0:
+            self.provider_combo.setCurrentIndex(idx)
+
+    def _on_provider_changed(self, _idx: int = 0) -> None:
+        prov = self.current_provider_name()
+        is_twitch = (prov == "twitch")
+        if hasattr(self, "streamer_label") and self.streamer_label:
+            self.streamer_label.setText(t("Streamer:") if is_twitch else t("Search:"))
+        if hasattr(self, "search_edit") and self.search_edit:
+            self.search_edit.setPlaceholderText("" if is_twitch else t("Search videos or enter @channel…"))
+        if hasattr(self, "type_combo") and self.type_combo:
+            self.type_combo.setVisible(is_twitch)
+        if hasattr(self, "results_card") and self.results_card:
+            self.results_card.setVisible(is_twitch)
+        if hasattr(self, "recent_card") and self.recent_card and self.recent_card.title_label:
+            self.recent_card.title_label.setText(t("Recent streamers") if is_twitch else t("Recent searches"))
+        if hasattr(self, "use_btn") and self.use_btn:
+            self.use_btn.setText(t("Use this VOD") if is_twitch else t("Use this video"))
+        if hasattr(self, "use_hint") and self.use_hint:
+            self.use_hint.setText(t("Double-click a VOD to use it") if is_twitch else t("Double-click a video to use it"))
+
+        self.vod_model.clear()
+        self.sv_channel = None
+        self.sv_cursor = None
+        self.sv_query = ""
+
+        if is_twitch:
+            self.recent_model.set_channels(self.recent)
+            self.update_search_state()
+            self.set_title(t(START_TITLE))
+        else:
+            self.recent_model.set_channels(self.recent_yt)
+            self.signin_bar.setVisible(False)
+            self.search_btn.setEnabled(True)
+            self.set_title(t("Search YouTube for videos or channels."))
+            self.refresh_search_empty_states()
+
     @property
     def client(self):
         return self.get_client()
@@ -380,6 +446,11 @@ class SearchTab(QWidget):
 
     def update_search_state(self) -> None:
         """Show the «sign in» warning (and disable searching) while there is no Twitch session."""
+        if self.current_provider_name() != "twitch":
+            self.signin_bar.setVisible(False)
+            self.search_btn.setEnabled(True)
+            self.refresh_search_empty_states()
+            return
         signed_in = bool(self.client)
         self.signin_bar.setVisible(not signed_in)
         self.search_btn.setEnabled(signed_in)
@@ -392,43 +463,62 @@ class SearchTab(QWidget):
 
     def refresh_search_empty_states(self) -> None:
         """Show a friendly message over each list of the tab that has nothing in it (and only then)."""
-        # the VODs of the picked streamer
+        is_twitch = (self.current_provider_name() == "twitch")
+        # the VODs of the picked streamer / search
         if self.sv_videos:
             self.sv_empty.hide_message()
         elif self.sv_loading:
-            self.sv_empty.show_message(t("Loading VODs…"), t("One moment."))
-        elif not self.client and self.sv_channel is None:
+            msg = t("Loading VODs…") if is_twitch else t("Searching YouTube…")
+            self.sv_empty.show_message(msg, t("One moment."))
+        elif is_twitch and not self.client and self.sv_channel is None:
             self.sv_empty.show_message(
                 t("Sign in to browse VODs"),
                 t("Use the «Sign in…» button above. Or paste a VOD link at the top and press «Get info»: that works without signing in."))
-        elif self.sv_channel is None:
+        elif is_twitch and self.sv_channel is None:
             self.sv_empty.show_message(
                 t("Pick a streamer"),
                 t("Search for a name above, or choose one from your recent streamers. You can also paste a VOD link at the top and press «Get info»."))
-        else:
+        elif not is_twitch and self.sv_channel is None:
             self.sv_empty.show_message(
-                t("No {kind} found", kind=t(self.sv_type).lower()),
-                t("Twitch deletes VODs after a while, and some streamers don't save them. Try another kind of video in the list above."))
-        # the search results
-        if self.sv_results:
-            self.ch_empty.hide_message()
-        elif self.sv_query:
-            self.ch_empty.show_message(t("No streamers found for «{query}»", query=self.sv_query), t("Check the spelling."))
+                t("Search YouTube"),
+                t("Search for videos or enter a channel name or handle above."))
         else:
-            self.ch_empty.show_message("", t("Search results show up here."))
-        # the recent streamers
-        if self.recent:
+            if is_twitch:
+                self.sv_empty.show_message(
+                    t("No {kind} found", kind=t(self.sv_type).lower()),
+                    t("Twitch deletes VODs after a while, and some streamers don't save them. Try another kind of video in the list above."))
+            else:
+                self.sv_empty.show_message(
+                    t("No videos found"),
+                    t("Try a different search query or check the channel handle."))
+
+        # the search results
+        if is_twitch:
+            if self.sv_results:
+                self.ch_empty.hide_message()
+            elif self.sv_query:
+                self.ch_empty.show_message(t("No streamers found for «{query}»", query=self.sv_query), t("Check the spelling."))
+            else:
+                self.ch_empty.show_message("", t("Search results show up here."))
+
+        # the recent streamers / searches
+        active_recent = self.recent if is_twitch else self.recent_yt
+        if active_recent:
             self.recent_empty.hide_message()
         else:
-            self.recent_empty.show_message("", t("Streamers you open show up here."))
-        self.clear_recent_btn.setEnabled(bool(self.recent))
+            hint = t("Streamers you open show up here.") if is_twitch else t("Searches you run show up here.")
+            self.recent_empty.show_message("", hint)
+        self.clear_recent_btn.setEnabled(bool(active_recent))
 
     # ---------------------------- recent streamers ---------------------------- #
     def refresh_recent(self) -> None:
-        self.recent_model.set_channels(self.recent)
+        if self.current_provider_name() == "twitch":
+            self.recent_model.set_channels(self.recent)
+            if self.client and self.recent:
+                self._spawn_avatar_fetch(self.recent, for_results=False)
+        else:
+            self.recent_model.set_channels(self.recent_yt)
         self.refresh_search_empty_states()
-        if self.client and self.recent:
-            self._spawn_avatar_fetch(self.recent, for_results=False)
 
     def add_recent(self, ch: dict) -> None:
         entry = {"id": ch["id"], "login": ch.get("login", ""), "name": ch.get("name") or ch.get("login", "")}
@@ -436,9 +526,20 @@ class SearchTab(QWidget):
         save_recent(self.recent)
         self.refresh_recent()
 
+    def add_recent_yt(self, query: str) -> None:
+        entry = {"id": query, "login": query, "name": query}
+        self.recent_yt = ([entry] + [c for c in self.recent_yt if c["id"] != entry["id"]])[:MAX_RECENT]
+        save_recent_searches(self.recent_yt)
+        if self.current_provider_name() == "youtube":
+            self.refresh_recent()
+
     def clear_recent(self) -> None:
-        self.recent = []
-        save_recent(self.recent)
+        if self.current_provider_name() == "twitch":
+            self.recent = []
+            save_recent(self.recent)
+        else:
+            self.recent_yt = []
+            save_recent_searches(self.recent_yt)
         self.refresh_recent()
 
     # ---------------------------- searching ---------------------------- #
@@ -446,6 +547,35 @@ class SearchTab(QWidget):
         query = self.search_edit.text().strip()
         if not query:
             return
+        if self.current_provider_name() == "youtube":
+            self.sv_gen += 1
+            gen = self.sv_gen
+            self.sv_loading = True
+            self.sv_channel = {"id": query, "name": query}
+            self.vod_model.clear()
+            self.search_btn.setEnabled(False)
+            self.refresh_search_empty_states()
+            self.status_message.emit(t("Searching YouTube for «{query}»…", query=query))
+            self.set_title(t("YouTube: searching «{query}»…", query=query))
+            self.add_recent_yt(query)
+            bridge = self.bridge
+
+            def work_yt():
+                try:
+                    from core.providers import YOUTUBE_PROVIDER
+                    if query.startswith(("@", "http://", "https://", "youtube.com/")):
+                        videos, cursor = YOUTUBE_PROVIDER.fetch_channel_videos(query)
+                    else:
+                        videos = YOUTUBE_PROVIDER.search_videos(query)
+                        cursor = None
+                except Exception as e:
+                    bridge.videos_err.emit(gen, str(e))
+                    return
+                bridge.videos_ok.emit(gen, videos, cursor)
+
+            threading.Thread(target=work_yt, daemon=True).start()
+            return
+
         if not self.client:
             self.update_search_state()
             self.status_message.emit(t("Sign in with Twitch to search (use the «Sign in…» button)."))
@@ -504,6 +634,11 @@ class SearchTab(QWidget):
         view, other = (self.results_view, self.recent_view) if from_results else (self.recent_view, self.results_view)
         rows = view.selectionModel().selectedRows()
         if not rows:
+            return
+        if self.current_provider_name() == "youtube":
+            ch = self.recent_yt[rows[0].row()]
+            self.search_edit.setText(ch["name"])
+            self.on_search()
             return
         ch = (self.sv_results if from_results else self.recent)[rows[0].row()]
         other.selectionModel().clearSelection()
@@ -597,6 +732,16 @@ class SearchTab(QWidget):
         self.more_btn.setEnabled(bool(cursor))
         name = self.sv_channel["name"]
         self.refresh_search_empty_states()
+        if self.current_provider_name() == "youtube":
+            self.search_btn.setEnabled(True)
+            self.status_message.emit(t("YouTube search complete."))
+            n = len(self.sv_videos)
+            if n == 0:
+                self.set_title(t("No videos found for «{query}»", query=name))
+            else:
+                vid_txt = tn("{n} video", "{n} videos", n)
+                self.set_title(f"{name}  ·  {vid_txt}")
+            return
         if not self.sv_videos:
             self.set_title(t("{name}: no {kind} found", name=name, kind=t(self.sv_type).lower()))
         else:
@@ -609,6 +754,8 @@ class SearchTab(QWidget):
         if gen != self.sv_gen:
             return
         self.sv_loading = False
+        if self.current_provider_name() == "youtube":
+            self.search_btn.setEnabled(True)
         self.refresh_search_empty_states()
         self.set_title(t("Could not load the VODs."))
         self.status_message.emit(t("Could not load the VODs."))
@@ -637,7 +784,10 @@ class SearchTab(QWidget):
     def use_selected_vod(self) -> None:
         video = self.selected_video()
         if video is None:
-            dialogs.info(self, t("Select a VOD"), t("Select a VOD in the list first."))
+            is_twitch = (self.current_provider_name() == "twitch")
+            title = t("Select a VOD") if is_twitch else t("Select a video")
+            msg = t("Select a VOD in the list first.") if is_twitch else t("Select a video in the list first.")
+            dialogs.info(self, title, msg)
             return
         self.vod_chosen.emit(video["url"])
 
@@ -702,8 +852,13 @@ class SearchTab(QWidget):
 
     def refresh_language(self) -> None:
         """Update SearchTab text labels dynamically when language changes."""
+        if hasattr(self, "provider_label") and self.provider_label:
+            self.provider_label.setText(t("Provider:"))
+        is_twitch = (self.current_provider_name() == "twitch")
         if hasattr(self, "streamer_label") and self.streamer_label:
-            self.streamer_label.setText(t("Streamer:"))
+            self.streamer_label.setText(t("Streamer:") if is_twitch else t("Search:"))
+        if hasattr(self, "search_edit") and self.search_edit:
+            self.search_edit.setPlaceholderText("" if is_twitch else t("Search videos or enter @channel…"))
         if hasattr(self, "search_btn") and self.search_btn:
             self.search_btn.setText(t("Search"))
         if hasattr(self, "signin_label") and self.signin_label:
@@ -717,7 +872,7 @@ class SearchTab(QWidget):
                 self.results_card.subtitle_label.setText(t("● = live now"))
         if hasattr(self, "recent_card") and self.recent_card:
             if self.recent_card.title_label:
-                self.recent_card.title_label.setText(t("Recent streamers"))
+                self.recent_card.title_label.setText(t("Recent streamers") if is_twitch else t("Recent searches"))
             if self.recent_card.subtitle_label:
                 self.recent_card.subtitle_label.setText(t("The ones you opened lately"))
         if hasattr(self, "clear_recent_btn") and self.clear_recent_btn:
@@ -736,9 +891,9 @@ class SearchTab(QWidget):
         if hasattr(self, "more_btn") and self.more_btn:
             self.more_btn.setText(t("Load more"))
         if hasattr(self, "use_hint") and self.use_hint:
-            self.use_hint.setText(t("Double-click a VOD to use it"))
+            self.use_hint.setText(t("Double-click a VOD to use it") if is_twitch else t("Double-click a video to use it"))
         if hasattr(self, "use_btn") and self.use_btn:
-            self.use_btn.setText(t("Use this VOD"))
+            self.use_btn.setText(t("Use this VOD") if is_twitch else t("Use this video"))
         if hasattr(self, "type_combo") and self.type_combo:
             cur_data = self.type_combo.currentData()
             self.type_combo.blockSignals(True)
@@ -752,14 +907,21 @@ class SearchTab(QWidget):
         if hasattr(self, "vod_model") and self.vod_model:
             self.vod_model.refresh_language()
         if self.sv_channel is None and not self.sv_videos:
-            self.set_title(t(START_TITLE))
+            self.set_title(t(START_TITLE) if is_twitch else t("Search YouTube for videos or channels."))
         elif self.sv_channel and not self.sv_videos and not self.sv_loading:
-            self.set_title(t("{name}: no {kind} found", name=self.sv_channel["name"], kind=t(self.sv_type).lower()))
+            if is_twitch:
+                self.set_title(t("{name}: no {kind} found", name=self.sv_channel["name"], kind=t(self.sv_type).lower()))
+            else:
+                self.set_title(t("No videos found for «{query}»", query=self.sv_channel["name"]))
         elif self.sv_channel and self.sv_videos:
             n = len(self.sv_videos)
-            vod_txt = tn("{n} VOD", "{n} VODs", n)
-            more_txt = f"  ·  {t('more available')}" if self.sv_cursor else ""
-            self.set_title(f"{self.sv_channel['name']}  ·  {vod_txt}{more_txt}")
+            if is_twitch:
+                vod_txt = tn("{n} VOD", "{n} VODs", n)
+                more_txt = f"  ·  {t('more available')}" if self.sv_cursor else ""
+                self.set_title(f"{self.sv_channel['name']}  ·  {vod_txt}{more_txt}")
+            else:
+                vid_txt = tn("{n} video", "{n} videos", n)
+                self.set_title(f"{self.sv_channel['name']}  ·  {vid_txt}")
         self.refresh_search_empty_states()
         if hasattr(self, "vod_grid") and self.vod_grid:
             self.vod_grid.viewport().update()
@@ -795,6 +957,10 @@ def _fetch_channel_avatars(client, channels: list[dict], on_avatar_cb, is_active
                         on_avatar_cb(uid, str(path))
     except Exception:
         pass
+
+
+BrowseTab = SearchTab
+__all__ = ["BrowseTab", "SearchTab"]
 
 
 

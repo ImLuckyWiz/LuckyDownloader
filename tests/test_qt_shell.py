@@ -132,7 +132,7 @@ def test_nav_rail_switches_pages_and_expands_and_collapses(win, qtbot):
     # Expand and collapse rail
     qtbot.mouseClick(rail.toggle_btn, Qt.MouseButton.LeftButton)
     assert rail.expanded and rail.width() == NavRail.EXPANDED_WIDTH
-    assert "Search" in rail.buttons[0].text()
+    assert "Browse" in rail.buttons[0].text()
     assert "Options" in rail.buttons[2].text()
 
     qtbot.mouseClick(rail.toggle_btn, Qt.MouseButton.LeftButton)

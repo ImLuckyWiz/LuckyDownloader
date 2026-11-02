@@ -3,6 +3,6 @@
 from qt_ui.tabs.options import OptionsTab
 from qt_ui.tabs.plan import PlanTab
 from qt_ui.tabs.queue import QueueTab
-from qt_ui.tabs.search import SearchTab
+from qt_ui.tabs.search import BrowseTab, SearchTab
 
-__all__ = ["SearchTab", "PlanTab", "OptionsTab", "QueueTab"]
+__all__ = ["BrowseTab", "SearchTab", "PlanTab", "OptionsTab", "QueueTab"]

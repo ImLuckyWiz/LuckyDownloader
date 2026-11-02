@@ -25,7 +25,7 @@ import weblink
 from core import paths, updates
 from core.providers import Capability, detect_source
 from core.config import make_client
-from core.i18n import LANG_AUTO, t
+from core.i18n import LANG_AUTO, N_, t
 from core.options import build_filter, build_options, flag, num
 from core.settings import DEFAULTS, save_settings
 from core.ui_state import UIState, load_ui_state, save_ui_state
@@ -34,7 +34,7 @@ from qt_ui import dialogs, i18n_qt, notify
 from qt_ui.background_jobs import InfoRunner, SavedChatRunner, ToolsRunner, UpdateCheckRunner, UpdateDownloadRunner
 from qt_ui.bridge import Bridge
 from qt_ui.shell import CommandBar, NavRail, PageStack, ShortcutsDialog, VodStrip
-from qt_ui.tabs import OptionsTab, PlanTab, QueueTab, SearchTab
+from qt_ui.tabs import BrowseTab, OptionsTab, PlanTab, QueueTab, SearchTab
 from qt_ui.theme import dark_titlebar
 from qt_ui.titlebar import CustomTitleBar
 from qt_ui.twitch_dialog import TwitchDialog
@@ -42,7 +42,7 @@ from qt_ui.twitch_dialog import TwitchDialog
 WINDOW_TITLE = "LuckyDownloader"
 START_SIZE = (1040, 860)
 MIN_SIZE = (950, 560)
-TAB_NAMES = ("Search", "Plan", "Options", "Queue & log")
+TAB_NAMES = (N_("Browse"), N_("Plan"), N_("Options"), N_("Queue & log"))
 READY_TEXT = "Ready. Paste a VOD URL or ID and press «Get info»."
 
 _VOD_URL_RE = re.compile(r"(?:(?:https?://)?(?:www\.|m\.)?twitch\.tv/(?:videos/\d+|\w+/v/\d+)|luckydownloader://\S+|luckytwitch://\S+)", re.I)
@@ -259,10 +259,11 @@ class MainWindow(QMainWindow):
         tabs_lay.setSpacing(0)
 
         self.tabs = PageStack(self.rail, parent=tabs_box)
-        self.tab_search, self.tab_plan, self.tab_options, self.tab_queue = (
-            SearchTab(self.bridge), PlanTab(self.settings, self.bridge), OptionsTab(self.settings), QueueTab(self.bridge),
+        self.tab_browse, self.tab_plan, self.tab_options, self.tab_queue = (
+            BrowseTab(self.bridge), PlanTab(self.settings, self.bridge), OptionsTab(self.settings), QueueTab(self.bridge),
         )
-        for widget, name in zip((self.tab_search, self.tab_plan, self.tab_options, self.tab_queue), TAB_NAMES):
+        self.tab_search = self.tab_browse
+        for widget, name in zip((self.tab_browse, self.tab_plan, self.tab_options, self.tab_queue), TAB_NAMES):
             self.tabs.addTab(widget, _tab_text(name))
         self.tabs.currentChanged.connect(self._on_tab_changed)
         tabs_lay.addWidget(self.tabs)
@@ -326,7 +327,7 @@ class MainWindow(QMainWindow):
         queue.model.modelReset.connect(self._sync_queue_badge)
         queue.blocked_reason = _weak(self.queue_blocked_reason)
         queue.output_dir = _weak(self.output_dir)
-        search = self.tab_search
+        search = self.tab_browse
         search.get_client = _weak(self.get_client)
         search.reload_client = _weak(self.reload_client)
         search.status_message.connect(self.set_status)
@@ -346,7 +347,7 @@ class MainWindow(QMainWindow):
         plan = self.tab_plan
         plan.add_requested.connect(self.add_to_queue)
         plan.clip_download_requested.connect(self.download_clips)
-        plan.search_requested.connect(self.show_search_tab)
+        plan.search_requested.connect(self.show_browse_tab)
         plan.paste_requested.connect(self.paste_vod_from_clipboard)
         plan.strategy_changed.connect(self._on_plan_strategy_changed)
         plan.title_changed.connect(self._on_plan_title_changed)
@@ -384,8 +385,8 @@ class MainWindow(QMainWindow):
             self.tab_queue.refresh_language()
         if hasattr(self, "tab_options") and hasattr(self.tab_options, "refresh_language"):
             self.tab_options.refresh_language()
-        if hasattr(self, "tab_search") and hasattr(self.tab_search, "refresh_language"):
-            self.tab_search.refresh_language()
+        if hasattr(self, "tab_browse") and hasattr(self.tab_browse, "refresh_language"):
+            self.tab_browse.refresh_language()
 
     # ---------------------------- keyboard & UI state (B8, B9) ---------------------------- #
     def _setup_shortcuts(self) -> None:
@@ -523,7 +524,7 @@ class MainWindow(QMainWindow):
                 if getattr(self, "title_bar", None) is not None:
                     self.title_bar.update_maximized_state(True)
         if self.client is None:
-            if has_saved and state.active_tab in TAB_NAMES and state.active_tab != "Search":
+            if has_saved and state.active_tab in (*TAB_NAMES, "Search") and state.active_tab not in ("Browse", "Search"):
                 self.tabs.setCurrentIndex(TAB_NAMES.index(state.active_tab))
             else:
                 self.tabs.setCurrentWidget(self.tab_plan)
@@ -666,15 +667,18 @@ class MainWindow(QMainWindow):
         return self.settings.get("out_dir", "")
 
     def _on_tab_changed(self, index: int) -> None:
-        if index == 0 and hasattr(self, "tab_search"):
-            self.tab_search.search_edit.setFocus()
-            self.tab_search.search_edit.selectAll()
+        if index == 0 and hasattr(self, "tab_browse"):
+            self.tab_browse.search_edit.setFocus()
+            self.tab_browse.search_edit.selectAll()
+
+    def show_browse_tab(self) -> None:
+        self.tabs.setCurrentWidget(self.tab_browse)
+        if hasattr(self, "tab_browse"):
+            self.tab_browse.search_edit.setFocus()
+            self.tab_browse.search_edit.selectAll()
 
     def show_search_tab(self) -> None:
-        self.tabs.setCurrentWidget(self.tab_search)
-        if hasattr(self, "tab_search"):
-            self.tab_search.search_edit.setFocus()
-            self.tab_search.search_edit.selectAll()
+        self.show_browse_tab()
 
     def show_plan_tab(self) -> None:
         self.tabs.setCurrentWidget(self.tab_plan)

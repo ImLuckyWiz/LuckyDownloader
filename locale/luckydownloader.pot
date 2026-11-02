@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 10:55-0300\n"
+"POT-Creation-Date: 2026-11-02 11:54-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -76,7 +76,7 @@ msgstr ""
 msgid "Could not get the playlist address: {error}"
 msgstr ""
 
-#: core/download.py core/providers/generic.py core/source_info.py
+#: core/download.py core/providers/generic.py core/providers/youtube.py core/source_info.py
 #, python-brace-format
 msgid ""
 "Could not run yt-dlp:\n"
@@ -284,8 +284,12 @@ msgstr ""
 msgid "yt-dlp returned unreadable data for that URL."
 msgstr ""
 
-#: core/providers/generic.py core/source_info.py
+#: core/providers/generic.py core/providers/youtube.py core/source_info.py
 msgid "yt-dlp took too long to read that URL."
+msgstr ""
+
+#: core/providers/youtube.py
+msgid "Could not parse yt-dlp output."
 msgstr ""
 
 #: core/source_info.py
@@ -651,6 +655,10 @@ msgstr ""
 msgid "All queued downloads have finished."
 msgstr ""
 
+#: qt_ui/main_window.py
+msgid "Browse"
+msgstr ""
+
 #: qt_ui/main_window.py qt_ui/update_dialog.py
 msgid "Busy"
 msgstr ""
@@ -777,8 +785,16 @@ msgstr ""
 msgid "Open folder"
 msgstr ""
 
+#: qt_ui/main_window.py
+msgid "Options"
+msgstr ""
+
 #: qt_ui/main_window.py qt_ui/tabs/plan.py
 msgid "Paste a VOD and press «Get info» first."
+msgstr ""
+
+#: qt_ui/main_window.py
+msgid "Plan"
 msgstr ""
 
 #: qt_ui/main_window.py
@@ -803,6 +819,10 @@ msgstr ""
 
 #: qt_ui/main_window.py qt_ui/tabs/plan.py
 msgid "Press «Get info» first."
+msgstr ""
+
+#: qt_ui/main_window.py
+msgid "Queue & log"
 msgstr ""
 
 #: qt_ui/main_window.py
@@ -1197,7 +1217,7 @@ msgid "Signed in to Twitch API (click to manage credentials)"
 msgstr ""
 
 #: qt_ui/shell.py
-msgid "Switch to Search, Plan, Options, or Queue & log"
+msgid "Switch to Browse, Plan, Options, or Queue & log"
 msgstr ""
 
 #: qt_ui/shell.py
@@ -2461,6 +2481,10 @@ msgid "Double-click a VOD to use it"
 msgstr ""
 
 #: qt_ui/tabs/search.py
+msgid "Double-click a video to use it"
+msgstr ""
+
+#: qt_ui/tabs/search.py
 msgid "Filter titles…"
 msgstr ""
 
@@ -2491,6 +2515,15 @@ msgid "No streamers found for «{query}»."
 msgstr ""
 
 #: qt_ui/tabs/search.py
+msgid "No videos found"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+#, python-brace-format
+msgid "No videos found for «{query}»"
+msgstr ""
+
+#: qt_ui/tabs/search.py
 #, python-brace-format
 msgid "No {kind} found"
 msgstr ""
@@ -2508,11 +2541,27 @@ msgid "Pin streamer to Watch List"
 msgstr ""
 
 #: qt_ui/tabs/search.py
+msgid "Provider:"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Recent searches"
+msgstr ""
+
+#: qt_ui/tabs/search.py
 msgid "Recent streamers"
 msgstr ""
 
 #: qt_ui/tabs/search.py
 msgid "Results"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Search YouTube"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Search YouTube for videos or channels."
 msgstr ""
 
 #: qt_ui/tabs/search.py
@@ -2530,7 +2579,32 @@ msgid "Search for a streamer, or pick one from your recent list."
 msgstr ""
 
 #: qt_ui/tabs/search.py
+msgid "Search for videos or enter a channel name or handle above."
+msgstr ""
+
+#: qt_ui/tabs/search.py
 msgid "Search results show up here."
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Search videos or enter @channel…"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Search:"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Searches you run show up here."
+msgstr ""
+
+#: qt_ui/tabs/search.py
+#, python-brace-format
+msgid "Searching YouTube for «{query}»…"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Searching YouTube…"
 msgstr ""
 
 #: qt_ui/tabs/search.py
@@ -2544,6 +2618,14 @@ msgstr ""
 
 #: qt_ui/tabs/search.py
 msgid "Select a VOD in the list first."
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Select a video"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Select a video in the list first."
 msgstr ""
 
 #: qt_ui/tabs/search.py
@@ -2591,6 +2673,10 @@ msgid "Toggle watch list pin for streamer"
 msgstr ""
 
 #: qt_ui/tabs/search.py
+msgid "Try a different search query or check the channel handle."
+msgstr ""
+
+#: qt_ui/tabs/search.py
 msgid ""
 "Twitch deletes VODs after a while, and some streamers don't save them. Try another kind of video "
 "in the list above."
@@ -2608,6 +2694,19 @@ msgstr ""
 
 #: qt_ui/tabs/search.py
 msgid "Use this VOD"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Use this video"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "YouTube search complete."
+msgstr ""
+
+#: qt_ui/tabs/search.py
+#, python-brace-format
+msgid "YouTube: searching «{query}»…"
 msgstr ""
 
 #: qt_ui/tabs/search.py
@@ -2635,6 +2734,13 @@ msgstr[1] ""
 #, python-brace-format
 msgid "{n} streamer found. Pick one to see their VODs."
 msgid_plural "{n} streamers found. Pick one to see their VODs."
+msgstr[0] ""
+msgstr[1] ""
+
+#: qt_ui/tabs/search.py
+#, python-brace-format
+msgid "{n} video"
+msgid_plural "{n} videos"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -3152,21 +3258,6 @@ msgstr ""
 #. indirect: reached through a variable or a helper (tab names, option titles, add_row...)
 #: core/status.py qt_ui/queue_model.py qt_ui/queue_runner.py qt_ui/tabs/queue.py
 msgid "queued"
-msgstr ""
-
-#. indirect: reached through a variable or a helper (tab names, option titles, add_row...)
-#: core/ui_state.py qt_ui/main_window.py qt_ui/shell.py
-msgid "Plan"
-msgstr ""
-
-#. indirect: reached through a variable or a helper (tab names, option titles, add_row...)
-#: qt_ui/main_window.py qt_ui/shell.py
-msgid "Options"
-msgstr ""
-
-#. indirect: reached through a variable or a helper (tab names, option titles, add_row...)
-#: qt_ui/main_window.py qt_ui/shell.py
-msgid "Queue & log"
 msgstr ""
 
 #. indirect: reached through a variable or a helper (tab names, option titles, add_row...)

@@ -28,3 +28,26 @@ def save_recent(items: list[dict]) -> None:
         paths.RECENT_PATH.write_text(json.dumps(items, indent=2, ensure_ascii=False), encoding="utf-8")
     except OSError:
         pass
+
+
+def load_recent_searches() -> list[dict]:
+    """Recent generic/YouTube searches or channels: [{id, login, name}]."""
+    try:
+        data = json.loads(paths.RECENT_SEARCHES_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    out = []
+    for c in data:
+        if isinstance(c, dict) and c.get("name"):
+            name = str(c["name"])
+            out.append({"id": str(c.get("id") or name), "login": str(c.get("login") or name), "name": name})
+    return out[:paths.MAX_RECENT]
+
+
+def save_recent_searches(items: list[dict]) -> None:
+    try:
+        paths.RECENT_SEARCHES_PATH.write_text(json.dumps(items, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
