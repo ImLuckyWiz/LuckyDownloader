@@ -31,13 +31,28 @@ def user_data_dir() -> Path:
         base = Path.home() / "Library" / "Application Support"
     else:
         base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+    return base / "LuckyDownloader"
+
+
+def legacy_user_data_dir() -> Path:
+    """Legacy per-user folder used by LuckyTwitch (v1.x/v2.x prior to rebrand)."""
+    if sys.platform == "win32":
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
     return base / "LuckyTwitch"
 
 
-TOOLS_DIR = Path(os.environ.get("LUCKYTWITCH_TOOLS_DIR") or user_data_dir() / "tools")
+TOOLS_DIR = Path(
+    os.environ.get("LUCKYDOWNLOADER_TOOLS_DIR")
+    or os.environ.get("LUCKYTWITCH_TOOLS_DIR")
+    or user_data_dir() / "tools"
+)
 EXE = ".exe" if sys.platform == "win32" else ""
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-USER_AGENT = "LuckyTwitch/1.0 (+https://github.com/yt-dlp/yt-dlp)"
+USER_AGENT = "LuckyDownloader/1.0 (+https://github.com/yt-dlp/yt-dlp)"
 
 
 def find_tool(name: str) -> str | None:

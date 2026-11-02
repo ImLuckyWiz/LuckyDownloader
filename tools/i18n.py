@@ -53,12 +53,12 @@ except ImportError:  # pragma: no cover - message for humans
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCALE_DIR = ROOT / "locale"
-POT_PATH = LOCALE_DIR / "luckytwitch.pot"
+POT_PATH = LOCALE_DIR / "luckydownloader.pot"
 BABEL_CFG = ROOT / "babel.cfg"
 BASELINE_PATH = ROOT / "tools" / "i18n_baseline.json"
 GLOSSARY_PATH = ROOT / "docs" / "i18n-glossary-es.md"
-DOMAIN = "luckytwitch"
-PROJECT = "LuckyTwitch Downloader"
+DOMAIN = "luckydownloader"
+PROJECT = "LuckyDownloader"
 LANGUAGES = ("es",)
 PLURAL_FORMS = {"es": (2, "(n != 1)")}  # forms a language needs; Spanish: 1 = singular, everything else = plural
 KEYWORDS: dict[str, Any] = {"t": None, "tn": (1, 2), "tc": ((1, "c"), 2), "N_": None}

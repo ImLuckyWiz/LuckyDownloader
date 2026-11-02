@@ -209,3 +209,51 @@ def test_queue_summary():
         "1 running  ·  2 queued  ·  1 done  ·  1 failed  ·  1 cancelled"
     assert status.FINISHED == ("done", "failed", "cancelled")
     assert set(status.STATUS_COLOURS) == set(status.STATUS_ICONS)
+
+
+# ------------------------------------------------------------------ legacy migration
+def test_resolve_legacy_data_dir():
+    assert paths.resolve_legacy_data_dir(frozen=False) is None
+    stable = paths.resolve_legacy_data_dir(frozen=True, version="1.0")
+    assert stable is not None
+    assert stable.name == "LuckyTwitch"
+    beta = paths.resolve_legacy_data_dir(frozen=True, version="v0.8.0-beta.1")
+    assert beta is not None
+    assert beta.name == "LuckyTwitch-beta"
+
+
+def test_migrate_from_legacy_copies_files_without_deleting_or_overwriting(tmp_path):
+    src = tmp_path / "legacy_twitch"
+    dest = tmp_path / "new_downloader"
+    src.mkdir()
+    (src / "config.json").write_text('{"token": "xyz"}', encoding="utf-8")
+    (src / "luckytwitch_settings.json").write_text('{"quality": "best"}', encoding="utf-8")
+    (src / "luckytwitch_history.json").write_text('["vid1"]', encoding="utf-8")
+    src_tools = src / "tools"
+    src_tools.mkdir()
+    (src_tools / "yt-dlp.exe").write_text("dummy-binary", encoding="utf-8")
+
+    dest.mkdir()
+    (dest / "config.json").write_text('{"token": "existing"}', encoding="utf-8")
+
+    copied = paths.migrate_from_legacy(src=src, dest=dest)
+
+    assert "config.json" not in copied
+    assert "luckytwitch_settings.json" in copied
+    assert "luckytwitch_history.json" in copied
+    assert "tools/yt-dlp.exe" in copied
+
+    assert (dest / "config.json").read_text(encoding="utf-8") == '{"token": "existing"}'
+    assert (dest / "luckytwitch_settings.json").read_text(encoding="utf-8") == '{"quality": "best"}'
+    assert (dest / "tools" / "yt-dlp.exe").read_text(encoding="utf-8") == "dummy-binary"
+
+    assert (src / "config.json").is_file()
+    assert (src / "luckytwitch_settings.json").is_file()
+    assert (src_tools / "yt-dlp.exe").is_file()
+
+    # Second migration does nothing because files already exist
+    assert paths.migrate_from_legacy(src=src, dest=dest) == []
+    # If src does not exist or equals dest, returns []
+    assert paths.migrate_from_legacy(src=tmp_path / "nonexistent", dest=dest) == []
+    assert paths.migrate_from_legacy(src=dest, dest=dest) == []
+    assert paths.migrate_from_legacy(src=None, dest=dest) == []

@@ -1,10 +1,12 @@
 """
-Links that open the app: ``luckytwitch://open?url=<VOD link>&cuts=<cut points>&label=<name>``.
+Links that open the app: ``luckydownloader://open?url=<VOD link>&cuts=<cut points>&label=<name>``.
 
-Any web page, document or other program can offer such a link. Clicking it opens LuckyTwitch Downloader (or
+Any web page, document or other program can offer such a link. Clicking it opens LuckyDownloader (or
 brings the open window to the front) with the VOD and the cut points already filled in on the Plan tab.
 A link only fills in the form. It never adds anything to the queue and never starts a download: the person
 still checks the cut points and presses the button.
+
+Legacy ``luckytwitch://`` links are preserved and remain fully supported as aliases.
 
 This file has no GUI code, so it can be tested without a display. The format is described in
 docs/link-format.md.
@@ -12,7 +14,7 @@ docs/link-format.md.
 Parts:
     parse_link / build_link       the link format
     hand_off / take_links / beat  passing a link from a second launch to the window that is already open
-    registration / register       making the operating system send ``luckytwitch:`` links to this app (Windows)
+    registration / register       making the operating system send links to this app (Windows)
 """
 
 from __future__ import annotations
@@ -26,7 +28,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import parse_qsl, quote, urlsplit
 
-SCHEME = "luckytwitch"
+SCHEME = "luckydownloader"
+LEGACY_SCHEMES = ("luckytwitch",)
+SUPPORTED_SCHEMES = ("luckydownloader", "luckytwitch")
 VERSION = 1  # layout of the link. Unknown extra parameters are ignored; a higher ``v`` is refused
 
 MAX_URL = 2000
@@ -74,19 +78,19 @@ def _blocked_host(host: str) -> bool:
 
 
 def parse_link(text: str) -> OpenRequest:
-    """``luckytwitch://open?url=...`` -> OpenRequest. Raises LinkError with a readable message."""
+    """``luckydownloader://open?url=...`` (or legacy ``luckytwitch://...``) -> OpenRequest. Raises LinkError with a readable message."""
     text = (text or "").strip().strip('"')
     if len(text) > MAX_LINK:
-        raise LinkError("That link is too long to be a LuckyTwitch link.")
+        raise LinkError("That link is too long to be a LuckyDownloader link.")
     parts = urlsplit(text)
-    if parts.scheme.lower() != SCHEME:
-        raise LinkError("That is not a luckytwitch:// link.")
+    if parts.scheme.lower() not in SUPPORTED_SCHEMES:
+        raise LinkError("That is not a luckydownloader:// link.")
 
     action = (parts.netloc or parts.path).strip("/").lower()
     if action != "open":
         raise LinkError(
             f"This link asks for «{action or 'nothing'}», which this version of the app does not know. "
-            "Update LuckyTwitch Downloader and try again."
+            "Update LuckyDownloader and try again."
         )
 
     params: dict[str, str] = {}
@@ -98,7 +102,7 @@ def parse_link(text: str) -> OpenRequest:
         if not version.isdigit():
             raise LinkError("The link has a version this app cannot read.")
         if int(version) > VERSION:
-            raise LinkError("This link was made for a newer version of the app. Update LuckyTwitch Downloader and try again.")
+            raise LinkError("This link was made for a newer version of the app. Update LuckyDownloader and try again.")
 
     url = _clean(params.get("url", ""), MAX_URL, "url")
     if not url:
@@ -118,21 +122,23 @@ def parse_link(text: str) -> OpenRequest:
     return OpenRequest(url=url, cuts=cuts, label=label)
 
 
-def build_link(url: str, cuts: str = "", label: str = "") -> str:
+def build_link(url: str, cuts: str = "", label: str = "", scheme: str = SCHEME) -> str:
     """The link for a VOD. Used by the tests and handy for anyone writing a page that offers one."""
     query = [("v", str(VERSION)), ("url", url)]
     if cuts:
         query.append(("cuts", cuts))
     if label:
         query.append(("label", label))
-    return f"{SCHEME}://open?" + "&".join(f"{k}={quote(v, safe='')}" for k, v in query)
+    return f"{scheme}://open?" + "&".join(f"{k}={quote(v, safe='')}" for k, v in query)
 
 
 def find_link(argv: list[str]) -> str | None:
-    """The first command-line argument that is a luckytwitch: link (the operating system passes it that way)."""
+    """The first command-line argument that is a luckydownloader: or luckytwitch: link."""
     for arg in argv:
-        if arg.strip().strip('"').lower().startswith(SCHEME + ":"):
-            return arg.strip().strip('"')
+        cleaned = arg.strip().strip('"')
+        for s in SUPPORTED_SCHEMES:
+            if cleaned.lower().startswith(s + ":"):
+                return cleaned
     return None
 
 
@@ -224,7 +230,8 @@ def take_links(inbox: Path, now: float | None = None) -> list[str]:
 # Windows keeps this per user (HKEY_CURRENT_USER\Software\Classes), so it needs no administrator rights. The
 # installer writes the same entries. On macOS the app bundle declares the scheme (see build_mac.sh), so there is
 # nothing to do at run time.
-_KEY = r"Software\Classes\luckytwitch"
+_KEY = r"Software\Classes\luckydownloader"
+_LEGACY_KEY = r"Software\Classes\luckytwitch"
 
 
 @dataclass(frozen=True)
@@ -266,12 +273,16 @@ def registration(expected: str | None = None, reg=None) -> Registration:
         with reg.OpenKey(reg.HKEY_CURRENT_USER, _KEY + r"\shell\open\command") as key:
             command = str(reg.QueryValueEx(key, "")[0])
     except OSError:
-        return Registration(True, "missing")
+        try:
+            with reg.OpenKey(reg.HKEY_CURRENT_USER, _LEGACY_KEY + r"\shell\open\command") as key:
+                command = str(reg.QueryValueEx(key, "")[0])
+        except OSError:
+            return Registration(True, "missing")
     return Registration(True, "ok" if _same_command(command, expected) else "other", command)
 
 
 def register(expected: str | None = None, reg=None) -> None:
-    """Point ``luckytwitch:`` links at this app. Raises OSError if the system refuses."""
+    """Point luckydownloader: and luckytwitch: links at this app. Raises OSError if the system refuses."""
     reg = reg or _winreg()
     if reg is None:
         raise OSError("Links are set up by the app bundle on this system.")
@@ -281,6 +292,7 @@ def register(expected: str | None = None, reg=None) -> None:
         with reg.CreateKeyEx(reg.HKEY_CURRENT_USER, subkey, 0, reg.KEY_SET_VALUE) as key:
             reg.SetValueEx(key, name, 0, reg.REG_SZ, value)
 
-    put(_KEY, "", "URL:LuckyTwitch Link")
-    put(_KEY, "URL Protocol", "")
-    put(_KEY + r"\shell\open\command", "", expected)
+    for k in (_KEY, _LEGACY_KEY):
+        put(k, "", "URL:LuckyDownloader Link")
+        put(k, "URL Protocol", "")
+        put(k + r"\shell\open\command", "", expected)

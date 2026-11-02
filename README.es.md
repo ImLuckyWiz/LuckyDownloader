@@ -1,4 +1,4 @@
-# LuckyTwitch Downloader
+# LuckyDownloader
 
 Descarga VODs de Twitch (o cualquier enlace compatible con yt-dlp) y córtalos en partes por marcas de tiempo, con capítulos opcionales creados a partir de los clips de Twitch del VOD. Funciona en Windows, macOS y Linux.
 
@@ -12,21 +12,22 @@ Obtén la versión más reciente en la página de [Versiones](../../releases):
 
 | Sistema | Archivo |
 | --- | --- |
-| Windows | `LuckyTwitch-Setup.exe` |
-| macOS (Apple Silicon: M1, M2, M3, M4) | `LuckyTwitch-macos-arm64.dmg` |
-| Linux (x86_64) | `LuckyTwitch-x86_64.AppImage`, `LuckyTwitch-linux-x86_64.tar.gz` |
+| Windows | `LuckyDownloader-Setup.exe` |
+| macOS (Apple Silicon: M1, M2, M3, M4) | `LuckyDownloader-macos-arm64.dmg` |
+| Linux (x86_64) | `LuckyDownloader-x86_64.AppImage`, `LuckyDownloader-linux-x86_64.tar.gz` |
 
 ### Instalación
 
-- **Windows:** ejecuta el instalador. Se instala solo para tu usuario (no requiere permisos de administrador) y añade una entrada al menú Inicio. Ejecutar un instalador más reciente actualiza la instalación existente.
-- **macOS:** abre el `.dmg` y arrastra **LuckyTwitch** al acceso directo de **Aplicaciones**. Para actualizar, arrastra la nueva versión sobre la anterior y selecciona **Reemplazar** (cierra la aplicación primero).
-- **Linux:** haz ejecutable el archivo AppImage (`chmod +x LuckyTwitch-x86_64.AppImage`) y ejecútalo (`./LuckyTwitch-x86_64.AppImage`). En Ubuntu 24.04+, si FUSE no está instalado, instala `libfuse2t64` (`sudo apt install libfuse2t64`) o extráelo (`./LuckyTwitch-x86_64.AppImage --appimage-extract`). También está disponible un archivo portátil comprimido (`LuckyTwitch-linux-x86_64.tar.gz`).
+- **Windows:** ejecuta el instalador. Se instala solo para tu usuario (no requiere permisos de administrador) y añade una entrada al menú Inicio. Ejecutar un instalador más reciente actualiza la instalación existente. Tus ajustes, historial y herramientas previas de LuckyTwitch se migran y conservan automáticamente.
+- **macOS:** abre el `.dmg` y arrastra **LuckyDownloader** al acceso directo de **Aplicaciones**. Para actualizar, arrastra la nueva versión sobre la anterior y selecciona **Reemplazar** (cierra la aplicación primero).
+- **Linux:** haz ejecutable el archivo AppImage (`chmod +x LuckyDownloader-x86_64.AppImage`) y ejecútalo (`./LuckyDownloader-x86_64.AppImage`). En Ubuntu 24.04+, si FUSE no está instalado, instala `libfuse2t64` (`sudo apt install libfuse2t64`) o extráelo (`./LuckyDownloader-x86_64.AppImage --appimage-extract`). También está disponible un archivo portátil comprimido (`LuckyDownloader-linux-x86_64.tar.gz`).
 
 ### Primer inicio
 
-- **macOS:** la aplicación no está notarizada por Apple. Haz clic derecho → **Abrir** → **Abrir** (solo una vez). Si macOS indica que la aplicación está dañada, ejecuta `xattr -cr /Applications/LuckyTwitch.app` en la Terminal.
+- **macOS:** la aplicación no está notarizada por Apple. Haz clic derecho → **Abrir** → **Abrir** (solo una vez). Si macOS indica que la aplicación está dañada, ejecuta `xattr -cr /Applications/LuckyDownloader.app` en la Terminal.
 - **Windows:** SmartScreen puede mostrar una advertencia de editor desconocido. Haz clic en **Más información** → **Ejecutar de todas formas**.
 - La aplicación necesita conexión a internet en su primer inicio: descarga **yt-dlp** y **ffmpeg** automáticamente. yt-dlp se mantiene actualizado de manera continua.
+- **Migración desde LuckyTwitch:** tus ajustes, historial de descargas, lista de seguimiento y herramientas se copian automáticamente al nuevo directorio sin borrar los datos anteriores.
 
 ---
 
@@ -57,7 +58,7 @@ La pestaña **Cola y registro** administra y ejecuta las tareas en cola:
 
 ### Interfaz y Barra de ventana personalizada
 
-- **Idioma (Español):** LuckyTwitch está completamente traducido al inglés y al español. En el primer inicio detecta automáticamente el idioma de tu sistema operativo. Puedes cambiar de idioma en cualquier momento en **Opciones → Interfaz → Idioma**.
+- **Idioma (Español):** LuckyDownloader está completamente traducido al inglés y al español. En el primer inicio detecta automáticamente el idioma de tu sistema operativo. Puedes cambiar de idioma en cualquier momento en **Opciones → Interfaz → Idioma**.
 - **Barra de ventana oscura personalizada:** la ventana utiliza una barra de título oscura personalizada que coincide con la estética de la aplicación, con botones de minimizar, maximizar/restaurar y cerrar, arrastre fluido de ventana y recuperación de geometría. Para utilizar el marco de ventana nativo del sistema operativo, inicia la aplicación con el parámetro `--native-frame` o actívalo en los ajustes de Interfaz.
 
 ### Calidad y Solo audio (VODs de Twitch)
@@ -85,4 +86,4 @@ Al cargar un VOD de Twitch, aparece un selector de **Calidad** en la pestaña Pl
 
 ## Licencia
 
-LuckyTwitch Downloader se distribuye bajo los términos de la licencia MIT.
+LuckyDownloader se distribuye bajo los términos de la licencia MIT.

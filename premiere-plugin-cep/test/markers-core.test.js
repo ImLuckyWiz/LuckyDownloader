@@ -34,6 +34,13 @@ test("rejects things that are not a markers file, with a clear message", () => {
   assert.throws(() => core.parseMarkersFile(`{"format":"${core.FORMAT}","markers":[]}`), /valid version/);
 });
 
+test("accepts both luckytwitch-markers and luckydownloader-markers formats", () => {
+  const lt = core.parseMarkersFile(JSON.stringify({ format: "luckytwitch-markers", version: 1, markers: [] }));
+  assert.equal(lt.markers.length, 0);
+  const ld = core.parseMarkersFile(JSON.stringify({ format: "luckydownloader-markers", version: 1, markers: [] }));
+  assert.equal(ld.markers.length, 0);
+});
+
 test("a file from a newer app is refused instead of half-read", () => {
   const newer = JSON.stringify({ format: core.FORMAT, version: core.SUPPORTED_VERSION + 1, markers: [] });
   assert.throws(() => core.parseMarkersFile(newer), /newer than this plugin/);

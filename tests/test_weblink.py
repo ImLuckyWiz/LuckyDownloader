@@ -14,7 +14,10 @@ VOD = "https://www.twitch.tv/videos/123456789"
 
 # --------------------------------------------------------------------------- reading a link
 def test_a_simple_link():
-    req = parse_link(f"luckytwitch://open?url={VOD}")
+    req = parse_link(f"luckydownloader://open?url={VOD}")
+    assert req == OpenRequest(url=VOD, cuts="", label="")
+    req_legacy = parse_link(f"luckytwitch://open?url={VOD}")
+    assert req_legacy == req
     assert req == OpenRequest(url=VOD, cuts="", label="")
 
 
@@ -29,7 +32,10 @@ def test_url_encoded_values_are_decoded():
 def test_build_link_and_parse_link_agree():
     cuts = "0:00:00 - 30:00 ; 2:00:00 - end"
     link = build_link(VOD + "?t=1h2m", cuts, "Ünïcode & symbols = ok")
-    assert link.startswith("luckytwitch://open?v=1&url=")
+    assert link.startswith("luckydownloader://open?v=1&url=")
+    legacy = build_link(VOD + "?t=1h2m", cuts, "Ünïcode & symbols = ok", scheme="luckytwitch")
+    assert legacy.startswith("luckytwitch://open?v=1&url=")
+    assert parse_link(legacy) == parse_link(link)
     assert " " not in link
     assert parse_link(link) == OpenRequest(url=VOD + "?t=1h2m", cuts=cuts, label="Ünïcode & symbols = ok")
 
@@ -61,7 +67,7 @@ def test_the_first_value_of_a_repeated_parameter_wins_and_unknown_ones_are_ignor
 
 
 @pytest.mark.parametrize("link, fragment", [
-    ("https://www.twitch.tv/videos/1", "not a luckytwitch"),
+    ("https://www.twitch.tv/videos/1", "not a luckydownloader"),
     ("luckytwitch://open", "which VOD"),
     ("luckytwitch://open?url=", "which VOD"),
     ("luckytwitch://download?url=" + VOD, "does not know"),
@@ -231,6 +237,8 @@ def test_registration_roundtrip():
     assert wl.registration(COMMAND, reg=reg) == wl.Registration(True, "missing")
     wl.register(COMMAND, reg=reg)
     assert wl.registration(COMMAND, reg=reg).state == "ok"
+    assert reg.data[(r"Software\Classes\luckydownloader", "URL Protocol")] == ""
+    assert reg.data[(r"Software\Classes\luckydownloader\shell\open\command", "")] == COMMAND
     assert reg.data[(r"Software\Classes\luckytwitch", "URL Protocol")] == ""
     assert reg.data[(r"Software\Classes\luckytwitch\shell\open\command", "")] == COMMAND
 

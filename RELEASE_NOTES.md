@@ -1,3 +1,15 @@
+## v2.12.0
+
+LuckyDownloader **v2.12.0** marks the official project rebranding from LuckyTwitch to **LuckyDownloader**, laying the foundation for broad multi-platform video downloading while maintaining seamless backward compatibility for existing users.
+
+### What's new in 2.12.0:
+- **Project Rebrand to LuckyDownloader:** Updated application identity, repository, window title, desktop launchers, and release packages to LuckyDownloader.
+- **Zero-Loss Data Migration:** On first launch, existing settings, download history, streamer watch list, recent streamers, UI state, and managed tools are copied seamlessly from `%LOCALAPPDATA%\LuckyTwitch` (or platform equivalent) to `LuckyDownloader` without deleting or overwriting any data.
+- **Seamless Upgrade Path:** Inno Setup installer preserves existing AppIds (`{6E2B6B0C-...}`), upgrading previous LuckyTwitch installations in place without leaving duplicate Add/Remove entries.
+- **Dual Scheme Support (`luckydownloader://` & `luckytwitch://`):** Registered `luckydownloader://` as the primary URL scheme while retaining full support for legacy `luckytwitch://` links across Windows, macOS, and Linux.
+- **Premiere Pro Plugin Compatibility:** The Premiere CEP panel and marker exporter now support both `luckydownloader-markers` and `luckytwitch-markers` formats. Releases provide both `LuckyDownloader-Premiere-Plugin-CEP.*` and legacy aliases.
+- **Rebranded Distribution Packages:** Standalone builds, installers, AppImages, and DMG packages are now packaged under the `LuckyDownloader` name.
+
 ## v2.11.1
 
 LuckyTwitch Downloader **v2.11.1** is a patch release fixing right-edge layout clipping in the Plan tab on macOS and narrow window sizes.

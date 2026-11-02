@@ -6,6 +6,7 @@
  */
 
 const FORMAT = "luckytwitch-markers";
+const SUPPORTED_FORMATS = ["luckytwitch-markers", "luckydownloader-markers"];
 const SUPPORTED_VERSION = 1; // the file version this plugin understands (MARKERS_JSON_VERSION in the app)
 
 // Premiere's marker color presets, in the order of its "Marker color" menu.
@@ -111,7 +112,7 @@ function parseMarkersFile(text) {
   } catch (e) {
     throw new MarkersFileError("That file is not valid JSON. Pick the .markers.json that LuckyTwitch wrote next to the video.");
   }
-  if (!data || typeof data !== "object" || data.format !== FORMAT) {
+  if (!data || typeof data !== "object" || !SUPPORTED_FORMATS.includes(data.format)) {
     throw new MarkersFileError("That is not a LuckyTwitch markers file. Pick the .markers.json written next to the video (not the .markers.xml or .clips.json).");
   }
   if (!isNum(data.version) || data.version < 1) {
@@ -1047,6 +1048,7 @@ function checkRippleHoles(before, removed, after, frame, opts) {
 
 const LT_CORE_API = {
   FORMAT,
+  SUPPORTED_FORMATS,
   SUPPORTED_VERSION,
   COLORS,
   DEFAULT_SETTINGS,

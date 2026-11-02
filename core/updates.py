@@ -23,12 +23,12 @@ from core import paths
 from luckytwitch_engine import USER_AGENT
 
 VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?$")
-GITHUB_RELEASE_API = "https://api.github.com/repos/ImLuckyWiz/LuckyTwitchDownloader/releases/latest"
-GITHUB_RELEASE_WEB = "https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/latest"
-GITHUB_DOWNLOAD_PREFIX = "https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/"
+GITHUB_RELEASE_API = "https://api.github.com/repos/ImLuckyWiz/LuckyDownloader/releases/latest"
+GITHUB_RELEASE_WEB = "https://github.com/ImLuckyWiz/LuckyDownloader/releases/latest"
+GITHUB_DOWNLOAD_PREFIX = "https://github.com/ImLuckyWiz/LuckyDownloader/releases/download/"
 GITHUB_DOWNLOAD_PREFIXES = (
-    "https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/",
     "https://github.com/ImLuckyWiz/LuckyDownloader/releases/download/",
+    "https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/",
 )
 THROTTLE_HOURS = 24
 

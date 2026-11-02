@@ -48,7 +48,7 @@ def win(qtbot, themed, boxes):
 
 
 def test_window_title_size_and_minimum(win):
-    assert win.windowTitle() == "LuckyTwitch Downloader"
+    assert win.windowTitle() == "LuckyDownloader"
     assert mw.START_SIZE == (1040, 860)
     assert win.width() >= 950 and win.height() >= 560  # offscreen it is exactly 1040x860; a real screen may clamp it
     assert (win.minimumSize().width(), win.minimumSize().height()) == (950, 560)

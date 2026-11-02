@@ -39,17 +39,17 @@ from qt_ui.theme import dark_titlebar
 from qt_ui.titlebar import CustomTitleBar
 from qt_ui.twitch_dialog import TwitchDialog
 
-WINDOW_TITLE = "LuckyTwitch Downloader"
+WINDOW_TITLE = "LuckyDownloader"
 START_SIZE = (1040, 860)
 MIN_SIZE = (950, 560)
 TAB_NAMES = ("Search", "Plan", "Options", "Queue & log")
 READY_TEXT = "Ready. Paste a VOD URL or ID and press «Get info»."
 
-_VOD_URL_RE = re.compile(r"(?:(?:https?://)?(?:www\.|m\.)?twitch\.tv/(?:videos/\d+|\w+/v/\d+)|luckytwitch://\S+)", re.I)
+_VOD_URL_RE = re.compile(r"(?:(?:https?://)?(?:www\.|m\.)?twitch\.tv/(?:videos/\d+|\w+/v/\d+)|luckydownloader://\S+|luckytwitch://\S+)", re.I)
 
 
 def extract_vod_input(text: str) -> str | None:
-    """Return a Twitch VOD URL / luckytwitch:// link / numeric VOD ID from ``text``, or None."""
+    """Return a Twitch VOD URL / luckydownloader:// / luckytwitch:// link / numeric VOD ID from ``text``, or None."""
     s = (text or "").strip()
     if not s or "\n" in s or "\r" in s:
         return None
@@ -96,7 +96,7 @@ def is_valid_url(text: str) -> bool:
         return True
     if extract_vod_input(s):
         return True
-    if s.lower().startswith(("http://", "https://", "luckytwitch://")):
+    if s.lower().startswith(("http://", "https://", "luckydownloader://", "luckytwitch://")):
         try:
             parsed = urlsplit(s)
             return bool(parsed.scheme and parsed.netloc and " " not in s)
@@ -186,6 +186,7 @@ class MainWindow(QMainWindow):
 
         use_custom_frame = (
             "--native-frame" not in sys.argv
+            and os.environ.get("LUCKYDOWNLOADER_NATIVE_FRAME") != "1"
             and os.environ.get("LUCKYTWITCH_NATIVE_FRAME") != "1"
             and self.settings.get("custom_titlebar", True)
         )
@@ -289,7 +290,7 @@ class MainWindow(QMainWindow):
         self.update_pill.setProperty("variant", "pill")
         self.update_pill.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.update_pill.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.update_pill.setToolTip(t("A new version of LuckyTwitch is available."))
+        self.update_pill.setToolTip(t("A new version of LuckyDownloader is available."))
         self.update_pill.setVisible(False)
         self.update_pill.clicked.connect(self.open_update_dialog)
         status_row.addWidget(self.update_pill)
@@ -575,7 +576,7 @@ class MainWindow(QMainWindow):
         if not raw:
             return
         event.acceptProposedAction()
-        if raw.lower().startswith("luckytwitch://"):
+        if raw.lower().startswith(("luckydownloader://", "luckytwitch://")):
             self.open_link(raw)
             return
 
@@ -958,7 +959,7 @@ class MainWindow(QMainWindow):
                     cur = paths.BUNDLED_VERSION or "current version"
                     notify.info(
                         self, t("Update available"),
-                        t("LuckyTwitch {version} is out (you have {current}).", version=info.tag, current=cur),
+                        t("LuckyDownloader {version} is out (you have {current}).", version=info.tag, current=cur),
                         action=(t("View update"), lambda: self.open_update_dialog(info)),
                         duration_ms=12000,
                     )
@@ -970,7 +971,7 @@ class MainWindow(QMainWindow):
             self._set_update_pill_visible(False)
             if manual:
                 cur = paths.BUNDLED_VERSION or "current version"
-                notify.info(self, t("Up to date"), t("LuckyTwitch is up to date ({version}).", version=cur))
+                notify.info(self, t("Up to date"), t("LuckyDownloader is up to date ({version}).", version=cur))
 
     def open_update_dialog(self, info=None) -> None:
         target = info or self._update_info

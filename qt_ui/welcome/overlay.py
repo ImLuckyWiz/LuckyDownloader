@@ -69,7 +69,7 @@ class WelcomeOverlay(QWidget):
         center_lay.addWidget(self.icon_lbl, 0, Qt.AlignmentFlag.AlignCenter)
 
         # Title
-        self.title_lbl = QLabel(t("LuckyTwitch Downloader"), scroll_widget)
+        self.title_lbl = QLabel(t("LuckyDownloader"), scroll_widget)
         self.title_lbl.setStyleSheet(f"color: {WHITE}; font-size: 26pt; font-weight: 800; letter-spacing: -0.5px;")
         self.title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         center_lay.addWidget(self.title_lbl, 0, Qt.AlignmentFlag.AlignCenter)
@@ -95,7 +95,7 @@ class WelcomeOverlay(QWidget):
         center_lay.addSpacing(8)
 
         # Primary Call-To-Action (CTA) Button
-        self.start_btn = QPushButton(t("Start Using LuckyTwitch →"), scroll_widget)
+        self.start_btn = QPushButton(t("Start Using LuckyDownloader →"), scroll_widget)
         self.start_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.start_btn.setMinimumHeight(48)
         self.start_btn.setMinimumWidth(320)

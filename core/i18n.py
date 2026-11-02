@@ -77,7 +77,8 @@ SUPPORTED_LANGUAGES = {
 
 DEFAULT_LANGUAGE = LANG_EN
 
-DOMAIN = "luckytwitch"
+DOMAIN = "luckydownloader"
+LEGACY_DOMAIN = "luckytwitch"
 LOCALE_DIR: Path = resource_path("locale")
 
 _current_language = DEFAULT_LANGUAGE
@@ -104,8 +105,14 @@ def _load(lang: str) -> gettext.NullTranslations:
         return cached
     try:
         tr: gettext.NullTranslations = gettext.translation(DOMAIN, localedir=str(LOCALE_DIR), languages=[lang])
-    except OSError:  # no .mo for this language, or a corrupt one: show English rather than crash
-        tr = gettext.NullTranslations()
+    except OSError:
+        try:
+            tr = gettext.translation(LEGACY_DOMAIN, localedir=str(LOCALE_DIR), languages=[lang])
+        except OSError:
+            tr = gettext.NullTranslations()
+    
+
+
     _cache[lang] = tr
     return tr
 

@@ -130,7 +130,7 @@ def test_missing_catalog_falls_back_to_english(tmp_path):
 def test_corrupt_catalog_falls_back_to_english(tmp_path):
     bad = tmp_path / "es" / "LC_MESSAGES"
     bad.mkdir(parents=True)
-    (bad / "luckytwitch.mo").write_bytes(b"not a catalog")
+    (bad / f"{i18n.DOMAIN}.mo").write_bytes(b"not a catalog")
     i18n.set_locale_dir(tmp_path)
     set_language(LANG_ES)
     assert t("Search") == "Search"
@@ -141,13 +141,13 @@ def test_catalog_with_plural_forms_is_used(tmp_path):
     from babel.messages.catalog import Catalog
     from babel.messages.mofile import write_mo
 
-    cat = Catalog(locale="es", domain="luckytwitch")
+    cat = Catalog(locale="es", domain=i18n.DOMAIN)
     cat.add(("{n} clip", "{n} clips"), string=("{n} clip (uno)", "{n} clips (varios)"))
     cat.add("Plan", string="Plan", context="verb")
     cat.add("Plan", string="Plano", context="tab")
     target = tmp_path / "es" / "LC_MESSAGES"
     target.mkdir(parents=True)
-    with open(target / "luckytwitch.mo", "wb") as fh:
+    with open(target / f"{i18n.DOMAIN}.mo", "wb") as fh:
         write_mo(fh, cat)
     i18n.set_locale_dir(tmp_path)
     set_language(LANG_ES)
@@ -227,7 +227,7 @@ def test_plural_forms_header_is_two_forms_for_spanish():
 
 
 def test_mo_has_the_gettext_magic_number():
-    data = (ROOT / "locale" / "es" / "LC_MESSAGES" / "luckytwitch.mo").read_bytes()
+    data = (ROOT / "locale" / "es" / "LC_MESSAGES" / f"{i18n.DOMAIN}.mo").read_bytes()
     assert struct.unpack("<I", data[:4])[0] == 0x950412DE
 
 

@@ -230,11 +230,15 @@ def main() -> int:
     args = parser.parse_args()
 
     args.dist.mkdir(parents=True, exist_ok=True)
-    zip_path = args.dist / "LuckyTwitch-Premiere-Plugin-CEP.zip"
-    zxp_path = args.dist / "LuckyTwitch-Premiere-Plugin-CEP.zxp"
+    zip_path = args.dist / "LuckyDownloader-Premiere-Plugin-CEP.zip"
+    zxp_path = args.dist / "LuckyDownloader-Premiere-Plugin-CEP.zxp"
+    legacy_zip = args.dist / "LuckyTwitch-Premiere-Plugin-CEP.zip"
+    legacy_zxp = args.dist / "LuckyTwitch-Premiere-Plugin-CEP.zxp"
 
     print("--- Packaging Premiere CEP extension ---")
     build_zip_package(zip_path)
+    shutil.copy2(zip_path, legacy_zip)
+    print(f"Created legacy ZIP alias: {legacy_zip}")
 
     if args.skip_zxp:
         print("Skipping ZXP packaging as requested.")
@@ -257,6 +261,8 @@ def main() -> int:
             password=args.password,
             tsa_url=args.tsa,
         )
+        shutil.copy2(zxp_path, legacy_zxp)
+        print(f"Created legacy ZXP alias: {legacy_zxp}")
 
     print("--- Packaging complete ---")
     return 0

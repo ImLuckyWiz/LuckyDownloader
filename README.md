@@ -1,4 +1,4 @@
-# LuckyTwitch Downloader
+# LuckyDownloader
 
 Download Twitch VODs (or any link yt-dlp supports) and cut them into parts by timestamps, with optional chapters built from the VOD's Twitch clips. Runs on Windows, macOS, and Linux.
 
@@ -10,21 +10,22 @@ Get the latest version from the [Releases](../../releases) page:
 
 | System | File |
 | --- | --- |
-| Windows | `LuckyTwitch-Setup.exe` |
-| macOS (Apple Silicon: M1, M2, M3, M4) | `LuckyTwitch-macos-arm64.dmg` |
-| Linux (x86_64) | `LuckyTwitch-x86_64.AppImage`, `LuckyTwitch-linux-x86_64.tar.gz` |
+| Windows | `LuckyDownloader-Setup.exe` |
+| macOS (Apple Silicon: M1, M2, M3, M4) | `LuckyDownloader-macos-arm64.dmg` |
+| Linux (x86_64) | `LuckyDownloader-x86_64.AppImage`, `LuckyDownloader-linux-x86_64.tar.gz` |
 
 ### Install
 
-- **Windows:** run the installer. It installs for your user only (no admin rights needed) and adds a Start menu entry. Running a newer installer updates the existing install.
-- **macOS:** open the `.dmg` and drag **LuckyTwitch** onto the **Applications** shortcut. To update, drag the new version over the old one and choose **Replace** (close the app first).
-- **Linux:** make the AppImage executable (`chmod +x LuckyTwitch-x86_64.AppImage`) and run it (`./LuckyTwitch-x86_64.AppImage`). On Ubuntu 24.04+, if FUSE is not installed, install `libfuse2t64` (`sudo apt install libfuse2t64`) or extract it (`./LuckyTwitch-x86_64.AppImage --appimage-extract`). A portable directory archive (`LuckyTwitch-linux-x86_64.tar.gz`) is also available.
+- **Windows:** run the installer. It installs for your user only (no admin rights needed) and adds a Start menu entry. Running a newer installer updates an existing install in place. Existing LuckyTwitch installations and settings are preserved and migrated automatically on upgrade.
+- **macOS:** open the `.dmg` and drag **LuckyDownloader** onto the **Applications** shortcut. To update, drag the new version over the old one and choose **Replace** (close the app first).
+- **Linux:** make the AppImage executable (`chmod +x LuckyDownloader-x86_64.AppImage`) and run it (`./LuckyDownloader-x86_64.AppImage`). On Ubuntu 24.04+, if FUSE is not installed, install `libfuse2t64` (`sudo apt install libfuse2t64`) or extract it (`./LuckyDownloader-x86_64.AppImage --appimage-extract`). A portable directory archive (`LuckyDownloader-linux-x86_64.tar.gz`) is also available.
 
 ### First launch
 
-- **macOS:** the app is not notarized by Apple. Right-click it → **Open** → **Open** (only once). If macOS says the app is damaged, run `xattr -cr /Applications/LuckyTwitch.app` in Terminal.
+- **macOS:** the app is not notarized by Apple. Right-click it → **Open** → **Open** (only once). If macOS says the app is damaged, run `xattr -cr /Applications/LuckyDownloader.app` in Terminal.
 - **Windows:** SmartScreen may warn about an unknown publisher. Click **More info** → **Run anyway**.
 - The app needs internet on first run: it downloads **yt-dlp** and **ffmpeg** by itself. yt-dlp is kept up to date automatically.
+- **Upgrading from LuckyTwitch:** your existing settings, download history, watch list, recent streamers, UI layout, and tools are copied over automatically without deleting your previous files.
 
 ## Using it
 
@@ -53,7 +54,7 @@ The **Queue & log** tab manages and runs queued jobs:
 
 ### Interface & Custom Window Bar
 
-- **Language (Español):** LuckyTwitch is fully localized in English and Spanish. On first run, it automatically detects your system language. You can also manually switch languages anytime in **Options → Interface → Language**.
+- **Language (Español):** LuckyDownloader is fully localized in English and Spanish. On first run, it automatically detects your system language. You can also manually switch languages anytime in **Options → Interface → Language**.
 - **Custom dark window bar:** The window uses a custom dark purple title bar matching the app's aesthetic, with responsive minimize, maximize/restore, and soft-red close buttons, smooth window dragging, and geometry recovery. To use your operating system's native window frame instead, launch with `--native-frame` or toggle it in UI settings.
 
 ### Quality and Audio only (Twitch VODs)
@@ -81,17 +82,18 @@ In **Options → Chapter details**, tick *Also mark the game / category changes*
 
 ### Premiere Pro panel: colored markers and automated timeline edits (optional)
 
-The `.markers.xml` above is limited by what Premiere's XML import understands: no marker colors, and it brings in a separate sequence. For more, tick **Options → Chapter details → Also export a .markers.json for the LuckyTwitch Premiere plugin**. Each part (or the full VOD) then gets a `.markers.json` next to it, and the Premiere Pro CEP panel imports it as colored markers: game changes in one color, clips colored by their views, with the creator and link in the comment. It is independent of the XML option, so you can use either or both. The game markers option applies to both files.
+The `.markers.xml` above is limited by what Premiere's XML import understands: no marker colors, and it brings in a separate sequence. For more, tick **Options → Chapter details → Also export a .markers.json for the Premiere plugin**. Each part (or the full VOD) then gets a `.markers.json` next to it, and the Premiere Pro CEP panel imports it as colored markers: game changes in one color, clips colored by their views, with the creator and link in the comment. It is independent of the XML option, so you can use either or both. The game markers option applies to both files.
 
 The panel lives in [`premiere-plugin-cep/`](premiere-plugin-cep) and is available on the release page in two packages:
-- **`LuckyTwitch-Premiere-Plugin-CEP.zxp`**: 1-click install using ZXPInstaller, Anastasiy's Extension Manager, or aescripts manager.
-- **`LuckyTwitch-Premiere-Plugin-CEP.zip`**: Manual install with `install.bat` (Windows) or `install-mac.command` (macOS), which configures Adobe's unsigned panels flag automatically.
+- **`LuckyDownloader-Premiere-Plugin-CEP.zxp`**: 1-click install using ZXPInstaller, Anastasiy's Extension Manager, or aescripts manager.
+- **`LuckyDownloader-Premiere-Plugin-CEP.zip`**: Manual install with `install.bat` (Windows) or `install-mac.command` (macOS), which configures Adobe's unsigned panels flag automatically.
+*(Legacy `LuckyTwitch-Premiere-Plugin-CEP.*` file names continue to be provided for backward compatibility).*
 
 The CEP panel offers the whole edit in one button with the real razor: it adds the markers, cuts around every clip (with padding), deletes the gaps, links video and audio again, and checks the whole result against the plan. See [`premiere-plugin-cep/README.md`](premiere-plugin-cep/README.md) and [`docs/markers-format.md`](docs/markers-format.md).
 
 - **Limit to chapter:** Pick any individual game or chapter to restrict markers, cuts, and gap deletes strictly inside that segment without touching the rest of the timeline.
 - **Named recipes:** Choose from built-in presets (*Default*, *Safety (5s)*, *Tight Cut & Delete*) or apply custom recipes for padding and ripple limits.
-- **Preferences inheritance:** Default padding and safety limits configured in LuckyTwitch Downloader are automatically adopted by the panel.
+- **Preferences inheritance:** Default padding and safety limits configured in LuckyDownloader are automatically adopted by the panel.
 - **Muted audio markers:** Silenced audio stretches are mapped directly as colored markers on the timeline.
 
 ### Muted audio (Twitch VODs)
@@ -135,11 +137,11 @@ Also in Advanced: the look (outlined text, or a dark semi-transparent panel), si
 
 ### Open a VOD from a link (web pages and other programs)
 
-A web page, a document or another program can offer a `luckytwitch://` link. Clicking it opens the app (or brings the open window to the front) with the VOD and the cut points already filled in on the **Plan** tab, and reads the VOD for you. A link only fills in the form: it never adds to the queue and never starts a download, so you still check the cut points and press the button yourself.
+A web page, a document or another program can offer a `luckydownloader://` (or legacy `luckytwitch://`) link. Clicking it opens the app (or brings the open window to the front) with the VOD and the cut points already filled in on the **Plan** tab, and reads the VOD for you. A link only fills in the form: it never adds to the queue and never starts a download, so you still check the cut points and press the button yourself.
 
-- **Windows:** the installer has an option for it, ticked by default. If you use the portable folder, or run from source, press **Options → Tools → Links from web pages → Set up links**.
-- **macOS:** it works once the app is in Applications. If a link does nothing, open LuckyTwitch from Applications once and try again.
-- Your browser may ask whether to open LuckyTwitch the first time.
+- **Windows:** the installer registers both `luckydownloader://` and `luckytwitch://` schemes. If you use the portable folder, or run from source, press **Options → Tools → Links from web pages → Set up links**.
+- **macOS:** it works once the app is in Applications. If a link does nothing, open LuckyDownloader from Applications once and try again.
+- Your browser may ask whether to open LuckyDownloader the first time.
 
 Making a page that offers such a link? The format is in [`docs/link-format.md`](docs/link-format.md).
 
@@ -147,9 +149,9 @@ Making a page that offers such a link? The format is in [`docs/link-format.md`](
 
 | What | Windows | macOS | Linux |
 | --- | --- | --- | --- |
-| Settings, Twitch login, history, watch list | `%LOCALAPPDATA%\LuckyTwitch` | `~/Library/Application Support/LuckyTwitch` | `~/.local/share/LuckyTwitch` |
-| yt-dlp and ffmpeg | `...\LuckyTwitch\tools` | `.../LuckyTwitch/tools` | `~/.local/share/LuckyTwitch/tools` |
-| Downloads (default) | `Downloads\LuckyTwitch` | `~/Downloads/LuckyTwitch` | `~/Downloads/LuckyTwitch` |
+| Settings, Twitch login, history, watch list | `%LOCALAPPDATA%\LuckyDownloader` | `~/Library/Application Support/LuckyDownloader` | `~/.local/share/LuckyDownloader` |
+| yt-dlp and ffmpeg | `...\LuckyDownloader\tools` | `.../LuckyDownloader/tools` | `~/.local/share/LuckyDownloader/tools` |
+| Downloads (default) | `Downloads\LuckyDownloader` | `~/Downloads/LuckyDownloader` | `~/Downloads/LuckyDownloader` |
 
 The data folder also holds a small `links` folder and a `running.beat` file: they are how a second launch (a clicked link) hands its link to the window that is already open.
 
@@ -168,9 +170,9 @@ Python 3.10+ is required. When run from source, settings and downloads stay next
 
 Nuitka compiles native standalone binaries, so build each system on that system.
 
-- **Windows:** run `build_windows.bat [version]` → `dist\LuckyTwitch\LuckyTwitch.exe`, plus `dist\LuckyTwitch-Setup.exe` if [Inno Setup 6](https://jrsoftware.org/isdl.php) is installed.
-- **macOS:** run `./build_mac.sh` → `dist/LuckyTwitch.app` and `dist/LuckyTwitch-macos-<arch>.dmg`. It also installs the app into Applications on that Mac. The result matches the Mac's chip (Apple Silicon or Intel).
-- **Linux:** run `./build_linux.sh [version]` → `dist/LuckyTwitch-x86_64.AppImage` and `dist/LuckyTwitch-linux-x86_64.tar.gz`.
+- **Windows:** run `build_windows.bat [version]` → `dist\LuckyDownloader\LuckyDownloader.exe`, plus `dist\LuckyDownloader-Setup.exe` if [Inno Setup 6](https://jrsoftware.org/isdl.php) is installed.
+- **macOS:** run `./build_mac.sh` → `dist/LuckyDownloader.app` and `dist/LuckyDownloader-macos-<arch>.dmg`. It also installs the app into Applications on that Mac. The result matches the Mac's chip (Apple Silicon or Intel).
+- **Linux:** run `./build_linux.sh [version]` → `dist/LuckyDownloader-x86_64.AppImage` and `dist/LuckyDownloader-linux-x86_64.tar.gz`.
 
 ## Development
 
@@ -179,7 +181,7 @@ core/                       modular core engines (download, finalize, runtime, p
 luckytwitch_engine.py       lightweight backward-compatible facade re-exporting core modules
 luckytwitch_qt.py           the Qt 6 app entry point
 qt_ui/                      Qt 6 UI components (main_window, shell, tabs, timeline, widgets, icons)
-weblink.py                  luckytwitch:// links: reading them, handing them to the open window, registering the scheme
+weblink.py                  luckydownloader:// links: reading them, handing them to the open window, registering the scheme
 tests/                      pytest suite
 premiere-plugin-cep/        the Premiere Pro panel (CEP): reads .markers.json and edits the whole timeline (JavaScript, own tests)
 docs/                       file format notes (markers-format.md, link-format.md)
@@ -200,10 +202,10 @@ The Premiere panel has its own tests (`cd premiere-plugin-cep && npm test`, Node
 - [FFmpeg](https://ffmpeg.org) cuts them (builds from [yt-dlp/FFmpeg-Builds](https://github.com/yt-dlp/FFmpeg-Builds) on Windows, static builds on macOS).
 - [TwitchDownloader](https://github.com/lay295/TwitchDownloader) by lay295 and contributors downloads the chat (MIT). It is downloaded on demand, not bundled.
 
-LuckyTwitch Downloader is not affiliated with Twitch Interactive, Inc., TwitchDownloader or yt-dlp.
+LuckyDownloader is not affiliated with Twitch Interactive, Inc., TwitchDownloader or yt-dlp.
 
 ## Notes
 
 - The ffmpeg builds the app downloads are GPL. That is fine for personal use; follow the GPL terms if you redistribute them.
 - yt-dlp breaks now and then when Twitch changes things. The app updates it on launch, so restarting it is usually enough.
-- **Update check:** LuckyTwitch checks GitHub releases once per day to notify you of new versions. The request is anonymous (a single HTTPS GET with no settings, paths, or identifiers sent). You can toggle this off at any time under **Options > Tools > LuckyTwitch updates**. On Windows installs, updates can be downloaded and installed in place seamlessly with verified SHA-256 integrity.
+- **Update check:** LuckyDownloader checks GitHub releases once per day to notify you of new versions. The request is anonymous (a single HTTPS GET with no settings, paths, or identifiers sent). You can toggle this off at any time under **Options > Tools > Updates**. On Windows installs, updates can be downloaded and installed in place seamlessly with verified SHA-256 integrity.

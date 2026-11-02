@@ -79,8 +79,8 @@ def test_macos_build_script_registers_the_luckytwitch_scheme_before_codesign():
     scheme_idx = mac.index("string luckytwitch")
     sign_idx = mac.index("codesign --force --deep --sign")
     assert plist_idx < scheme_idx < sign_idx
-    assert 'BUNDLE_ID="com.luckytwitch.app.beta"' in mac
-    assert 'BUNDLE_ID="com.luckytwitch.app"' in mac
+    assert 'BUNDLE_ID="com.luckydownloader.app.beta"' in mac
+    assert 'BUNDLE_ID="com.luckydownloader.app"' in mac
 
 
 def test_installer_isolates_prereleases_and_keeps_stable_identity():
@@ -88,11 +88,11 @@ def test_installer_isolates_prereleases_and_keeps_stable_identity():
     assert '#if Pos("-", AppVersion) > 0' in iss
     # Stable AppId and folder preserved so 2.0 upgrades 1.x in place
     assert "{{6E2B6B0C-3F0D-4C57-9B6A-1A7C2E0D4F11}" in iss
-    assert '#define EffectiveDirName "LuckyTwitch"' in iss
+    assert '#define EffectiveDirName "LuckyDownloader"' in iss
     # Pre-release gets its own AppId and install folder
     assert "{{9C4A8D2E-7B1F-4E63-8A5D-3F2E1C9B7D44}" in iss
-    assert '#define EffectiveDirName "LuckyTwitch-Beta"' in iss
-    assert '#define EffectiveAppName "LuckyTwitch (Beta)"' in iss
+    assert '#define EffectiveDirName "LuckyDownloader-Beta"' in iss
+    assert '#define EffectiveAppName "LuckyDownloader (Beta)"' in iss
 
 
 @pytest.mark.parametrize(
@@ -117,10 +117,10 @@ def test_paths_resolve_data_dir_and_app_id_for_stable_and_prerelease(version, ex
     if expected_pre:
         assert resolved == base.with_name(base.name + "-beta")
         assert resolved != base
-        assert paths.resolve_app_user_model_id(version) == "LuckyTwitch.Downloader.Beta"
+        assert paths.resolve_app_user_model_id(version) == "LuckyDownloader.Downloader.Beta"
     else:
         assert resolved == base
-        assert paths.resolve_app_user_model_id(version) == "LuckyTwitch.Downloader"
+        assert paths.resolve_app_user_model_id(version) == "LuckyDownloader.Downloader"
 
 
 def test_read_bundled_version_reads_version_file_when_present(tmp_path, monkeypatch):
@@ -129,7 +129,7 @@ def test_read_bundled_version_reads_version_file_when_present(tmp_path, monkeypa
     assert paths.read_bundled_version() == ""
     ver_file.write_text("v0.8.0-beta.1\n", encoding="utf-8")
     assert paths.read_bundled_version() == "v0.8.0-beta.1"
-    assert theme.APP_ID == "LuckyTwitch.Downloader"  # running from source
+    assert theme.APP_ID == "LuckyDownloader.Downloader"  # running from source
 
 
 def test_ci_workflow_runs_pytest_offscreen_and_passes_version_to_both_builders():
@@ -140,8 +140,8 @@ def test_ci_workflow_runs_pytest_offscreen_and_passes_version_to_both_builders()
     assert "build_windows.bat" in yml
     assert "bash build_mac.sh" in yml
     assert "bash build_linux.sh" in yml
-    assert "LuckyTwitch-*.AppImage" in yml
-    assert "LuckyTwitch-*.tar.gz" in yml
+    assert "LuckyDownloader-*.AppImage" in yml
+    assert "LuckyDownloader-*.tar.gz" in yml
 
 
 def test_linux_desktop_entry_and_assets():
@@ -157,6 +157,14 @@ def test_linux_desktop_entry_and_assets():
 
     icon_file = ROOT / "assets" / "luckytwitch.png"
     assert icon_file.is_file()
+
+    rebranded_desktop = ROOT / "assets" / "luckydownloader.desktop"
+    assert rebranded_desktop.is_file()
+    r_content = rebranded_desktop.read_text(encoding="utf-8")
+    assert "Name=LuckyDownloader" in r_content
+    assert "Exec=LuckyDownloader %u" in r_content
+    assert "MimeType=x-scheme-handler/luckydownloader;x-scheme-handler/luckytwitch;" in r_content
+    assert (ROOT / "assets" / "luckydownloader.png").is_file()
 
     build_script = ROOT / "build_linux.sh"
     assert build_script.is_file()

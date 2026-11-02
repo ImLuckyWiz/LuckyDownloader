@@ -4,7 +4,7 @@
 
 - **Date:** 2026-11-02
 - **Command:** `pytest`
-- **Result:** 1,591 passed, 31 skipped, 1 warning (129.89s)
+- **Result:** 1,682 passed, 31 skipped, 1 warning (126.96s)
 - **Environment:** Windows (win32), Python 3.14.7, PySide6 6.12.0
 - **Rule:** Subsequent phases must maintain all tests passing. The skipped count (31) must not grow without an explicit written reason.
 
@@ -25,7 +25,7 @@
 | **Phase 2** | Generic source info and format selection (`generic.py`, yt-dlp spikes & fixtures) | done | Offline parsing for YouTube/TikTok/IG/Reddit fixtures, format selection, args builder, naming templates & playlist rejection (1,665 passed, 31 skipped). |
 | **Phase 3** | Generic download flow in the UI (adaptive Plan tab card, Queue, History) | done | Simple card mode for non-timeline sources, async thumbnail loader, 7-column History with site & URL support, Queue delegate fallback thumb, full video enqueueing (1,672 passed, 31 skipped). |
 | **Phase 4** | Reliability for YouTube, TikTok, and Instagram (error mapping, cookies, runtimes) | done | Cookies from browser option in Settings/Tools & job options, mapped errors with suggested actions (login, age, geoblock, rate limit, extractor), extractor update & retry prompt, yt-dlp generic format selector fix verified live with YouTube (1,680 passed, 31 skipped). |
-| **Phase 5** | Rebrand and Release 1 (repo/folder rename handoff, branding assets, link scheme) | not started | User intervention point for folder & repo rename |
+| **Phase 5** | Rebrand and Release 1 (repo/folder rename handoff, branding assets, link scheme) | done | Git remote updated to LuckyDownloader; updater release API updated; per-user first-run non-destructive migration from LuckyTwitch; dual URL schemes (luckydownloader:// default + luckytwitch:// alias); Premiere CEP plugin dual format support; gettext domain renamed to luckydownloader (i18n check clean); installer & build scripts updated with AppId retention; UI branding & docs rebranded (1,682 passed, 31 skipped; 134 CEP tests passed). |
 | **Phase 6** | Playlists and channels (Release 2) | not started | |
 | **Phase 7** | Browse tab with provider selector (Release 3) | not started | |
 | **Phase 8** | Subscriptions & watchlist multi-provider | not started | |

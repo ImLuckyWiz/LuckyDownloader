@@ -122,7 +122,7 @@ class CustomTitleBar(QWidget):
     minimize_clicked = Signal()
     maximize_clicked = Signal()
 
-    def __init__(self, window: QWidget, title: str = "LuckyTwitch Downloader"):
+    def __init__(self, window: QWidget, title: str = "LuckyDownloader"):
         super().__init__(window)
         self.window = window
         self._drag_pos: QPoint | None = None

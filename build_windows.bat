@@ -1,7 +1,7 @@
 @echo off
-REM Build LuckyTwitch (PySide6) for Windows with Nuitka:
-REM   dist\LuckyTwitch\LuckyTwitch.exe   (portable folder)
-REM   dist\LuckyTwitch-Setup.exe         (installer, if Inno Setup is installed)
+REM Build LuckyDownloader (PySide6) for Windows with Nuitka:
+REM   dist\LuckyDownloader\LuckyDownloader.exe   (portable folder)
+REM   dist\LuckyDownloader-Setup.exe             (installer, if Inno Setup is installed)
 REM Usage: build_windows.bat [version]
 REM Needs Python 3.10+ from python.org. Installer needs Inno Setup 6 (jrsoftware.org/isdl.php).
 setlocal
@@ -21,20 +21,20 @@ python -c "import re, sys; v = sys.argv[1]; nums = [str(min(int(n), 65535)) for 
 set /p PRODUCT_VER=<build\pe_version.txt
 if "%PRODUCT_VER%"=="" set PRODUCT_VER=1.0.0.0
 
-if exist dist\LuckyTwitch rmdir /s /q dist\LuckyTwitch
-if exist dist\LuckyTwitch.dist rmdir /s /q dist\LuckyTwitch.dist
+if exist dist\LuckyDownloader rmdir /s /q dist\LuckyDownloader
+if exist dist\LuckyDownloader.dist rmdir /s /q dist\LuckyDownloader.dist
 
 python -m nuitka --mode=standalone ^
   --enable-plugin=pyside6 ^
   --windows-console-mode=disable ^
   --windows-icon-from-ico=assets\icon.ico ^
-  --company-name=LuckyTwitch ^
-  --product-name=LuckyTwitch ^
+  --company-name=LuckyDownloader ^
+  --product-name=LuckyDownloader ^
   --product-version=%PRODUCT_VER% ^
   --file-version=%PRODUCT_VER% ^
   --output-dir=dist ^
-  --output-folder-name=LuckyTwitch ^
-  --output-filename=LuckyTwitch.exe ^
+  --output-folder-name=LuckyDownloader ^
+  --output-filename=LuckyDownloader.exe ^
   --include-data-dir=assets=assets ^
   --include-data-dir=locale=locale ^
   --include-data-files=build\version.txt=version.txt ^
@@ -50,8 +50,8 @@ python -m nuitka --mode=standalone ^
   --update-check=never ^
   luckytwitch_qt.py || goto :err
 
-if exist dist\LuckyTwitch.dist (
-  ren dist\LuckyTwitch.dist LuckyTwitch || goto :err
+if exist dist\LuckyDownloader.dist (
+  ren dist\LuckyDownloader.dist LuckyDownloader || goto :err
 )
 
 set ISCC=
@@ -66,12 +66,12 @@ if not defined ISCC if exist "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" set
 if defined ISCC (
   %ISCC% /DAppVersion=%VER% installer.iss || goto :err
   echo.
-  echo Installer: dist\LuckyTwitch-Setup.exe
+  echo Installer: dist\LuckyDownloader-Setup.exe
 ) else (
   echo.
   echo Inno Setup not found - skipping the installer. Get it from https://jrsoftware.org/isdl.php
 )
-echo Portable app: dist\LuckyTwitch\LuckyTwitch.exe
+echo Portable app: dist\LuckyDownloader\LuckyDownloader.exe
 exit /b 0
 
 :err

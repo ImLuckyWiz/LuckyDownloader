@@ -1,4 +1,4 @@
-name: Build LuckyTwitch
+name: Build LuckyDownloader
 
 on:
   push:
@@ -134,7 +134,7 @@ jobs:
           key: ${{ runner.os }}-nuitka-${{ hashFiles('requirements.txt', 'luckytwitch_qt.py') }}
           restore-keys: |
             ${{ runner.os }}-nuitka-
-      - name: Build (Windows)
+          - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: cmd
         run: build_windows.bat ${{ github.ref_type == 'tag' && github.ref_name || '1.0' }}
@@ -148,37 +148,37 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "dist\LuckyTwitch\LuckyTwitch.exe" -ArgumentList "--i18n-selftest" -Wait -PassThru
+          $p = Start-Process -FilePath "dist\LuckyDownloader\LuckyDownloader.exe" -ArgumentList "--i18n-selftest" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "The Windows build cannot find its translations (--i18n-selftest exit code $($p.ExitCode))" }
       - name: Smoke test packaged catalogs (macOS)
         if: runner.os == 'macOS'
-        run: dist/LuckyTwitch.app/Contents/MacOS/LuckyTwitch --i18n-selftest
+        run: dist/LuckyDownloader.app/Contents/MacOS/LuckyDownloader --i18n-selftest
       - name: Smoke test packaged catalogs (Linux)
         if: runner.os == 'Linux'
-        run: dist/LuckyTwitch/LuckyTwitch --i18n-selftest
+        run: dist/LuckyDownloader/LuckyDownloader --i18n-selftest
       - name: Smoke test standalone binary (Linux)
         if: runner.os == 'Linux'
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          dist/LuckyTwitch/LuckyTwitch --help || true
+          dist/LuckyDownloader/LuckyDownloader --help || true
       - uses: actions/upload-artifact@v4
         with:
-          name: LuckyTwitch-${{ matrix.label }}
+          name: LuckyDownloader-${{ matrix.label }}
           path: |
-            dist/LuckyTwitch-Setup.exe
-            dist/LuckyTwitch-*.dmg
-            dist/LuckyTwitch-*.AppImage
-            dist/LuckyTwitch-*.tar.gz
+            dist/LuckyDownloader-Setup.exe
+            dist/LuckyDownloader-*.dmg
+            dist/LuckyDownloader-*.AppImage
+            dist/LuckyDownloader-*.tar.gz
       - name: Upload binaries to Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/LuckyTwitch-Setup.exe
-            dist/LuckyTwitch-*.dmg
-            dist/LuckyTwitch-*.AppImage
-            dist/LuckyTwitch-*.tar.gz
+            dist/LuckyDownloader-Setup.exe
+            dist/LuckyDownloader-*.dmg
+            dist/LuckyDownloader-*.AppImage
+            dist/LuckyDownloader-*.tar.gz
           fail_on_unmatched_files: false
 
   plugin:
@@ -202,13 +202,15 @@ jobs:
       - name: Verify packaged files
         shell: pwsh
         run: |
-          if (-not (Test-Path "dist/LuckyTwitch-Premiere-Plugin-CEP.zip")) { throw "Missing ZIP" }
-          if (-not (Test-Path "dist/LuckyTwitch-Premiere-Plugin-CEP.zxp")) { throw "Missing ZXP" }
+          if (-not (Test-Path "dist/LuckyDownloader-Premiere-Plugin-CEP.zip")) { throw "Missing ZIP" }
+          if (-not (Test-Path "dist/LuckyDownloader-Premiere-Plugin-CEP.zxp")) { throw "Missing ZXP" }
           Write-Host "Packaged artifacts verified successfully."
       - uses: actions/upload-artifact@v4
         with:
-          name: LuckyTwitch-plugin
+          name: LuckyDownloader-plugin
           path: |
+            dist/LuckyDownloader-Premiere-Plugin-CEP.zip
+            dist/LuckyDownloader-Premiere-Plugin-CEP.zxp
             dist/LuckyTwitch-Premiere-Plugin-CEP.zip
             dist/LuckyTwitch-Premiere-Plugin-CEP.zxp
       - name: Upload Premiere plugin to Release
@@ -216,6 +218,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            dist/LuckyDownloader-Premiere-Plugin-CEP.zip
+            dist/LuckyDownloader-Premiere-Plugin-CEP.zxp
             dist/LuckyTwitch-Premiere-Plugin-CEP.zip
             dist/LuckyTwitch-Premiere-Plugin-CEP.zxp
           fail_on_unmatched_files: false
@@ -229,7 +233,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          pattern: LuckyTwitch-*
+          pattern: LuckyDownloader-*
           merge-multiple: true
           path: release
       - name: Generate SHA-256 checksums

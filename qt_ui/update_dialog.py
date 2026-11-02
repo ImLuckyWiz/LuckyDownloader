@@ -58,7 +58,7 @@ class UpdateDialog(QDialog):
         title_lbl = QLabel(t("Update available"))
         title_lbl.setStyleSheet("font-size: 16px; font-weight: bold;")
         current_ver = paths.BUNDLED_VERSION or t("dev build")
-        sub_lbl = QLabel(t("LuckyTwitch {tag}   (you have {cur})").format(tag=info.tag, cur=current_ver))
+        sub_lbl = QLabel(t("LuckyDownloader {tag}   (you have {cur})").format(tag=info.tag, cur=current_ver))
         sub_lbl.setProperty("role", "muted")
         head_box.addWidget(title_lbl)
         head_box.addWidget(sub_lbl)
@@ -158,10 +158,10 @@ class UpdateDialog(QDialog):
         from qt_ui.background_jobs import UpdateDownloadRunner
         from qt_ui.bridge import Bridge
 
-        dest = updates.get_update_temp_dir() / f"LuckyTwitch-Setup-{self.info.tag}.exe"
+        dest = updates.get_update_temp_dir() / f"LuckyDownloader-Setup-{self.info.tag}.exe"
         self.progress_container.setVisible(True)
         self.progress_bar.setValue(0)
-        self.progress_label.setText(t("Downloading LuckyTwitch {tag}...").format(tag=self.info.tag))
+        self.progress_label.setText(t("Downloading LuckyDownloader {tag}...").format(tag=self.info.tag))
         self.btn_update.setEnabled(False)
         self.btn_skip.setEnabled(False)
         self.btn_later.setText(t("Cancel"))
@@ -196,7 +196,7 @@ class UpdateDialog(QDialog):
         proceed = dialogs.ask_yes_no(
             self,
             t("Install and restart"),
-            t("LuckyTwitch will close, update and reopen.\nSettings, Twitch login and tools are kept.\n\nDo you want to proceed?"),
+            t("LuckyDownloader will close, update and reopen.\nSettings, Twitch login and tools are kept.\n\nDo you want to proceed?"),
         )
         if not proceed:
             self.progress_label.setText(t("Update ready to install."))

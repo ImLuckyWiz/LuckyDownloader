@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=LuckyDownloader
+GenericName=Video Downloader
+GenericName[es]=Descargador de vídeos
+Comment=Fast, modern video downloader & cutter
+Comment[es]=Descargador y cortador de vídeo rápido y moderno
+Exec=LuckyDownloader %u
+Icon=luckydownloader
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;Network;
+MimeType=x-scheme-handler/luckydownloader;x-scheme-handler/luckytwitch;
+StartupWMClass=LuckyDownloader

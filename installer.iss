@@ -1,37 +1,37 @@
-; Inno Setup script for LuckyTwitch (Windows installer)
+; Inno Setup script for LuckyDownloader (Windows installer)
 ; Build with:  iscc /DAppVersion=1.0 installer.iss   (run after Nuitka)
 ; Pre-release versions (containing '-', e.g. v0.8.0-beta.1) get their own AppId and install folder
-; so they can be installed side-by-side without overwriting a stable LuckyTwitch installation.
+; so they can be installed side-by-side without overwriting a stable LuckyDownloader installation.
 #ifndef AppVersion
   #define AppVersion "1.0"
 #endif
 
 #if Pos("-", AppVersion) > 0
-  #define EffectiveAppId "{{9C4A8D2E-7B1F-4E63-8A5D-3F2E1C9B7D44}"
-  #define EffectiveAppName "LuckyTwitch (Beta)"
-  #define EffectiveDirName "LuckyTwitch-Beta"
+  #define EffectiveAppId "{{9C4A8D2E-7B1F-4E63-8A5D-3F2E1C9B7D44}}"
+  #define EffectiveAppName "LuckyDownloader (Beta)"
+  #define EffectiveDirName "LuckyDownloader-Beta"
 #else
-  #define EffectiveAppId "{{6E2B6B0C-3F0D-4C57-9B6A-1A7C2E0D4F11}"
-  #define EffectiveAppName "LuckyTwitch"
-  #define EffectiveDirName "LuckyTwitch"
+  #define EffectiveAppId "{{6E2B6B0C-3F0D-4C57-9B6A-1A7C2E0D4F11}}"
+  #define EffectiveAppName "LuckyDownloader"
+  #define EffectiveDirName "LuckyDownloader"
 #endif
 
 [Setup]
 AppId={#EffectiveAppId}
 AppName={#EffectiveAppName}
 AppVersion={#AppVersion}
-AppPublisher=LuckyTwitch
-; Per-user install: no admin rights needed, goes to %LOCALAPPDATA%\Programs\LuckyTwitch (or LuckyTwitch-Beta)
+AppPublisher=LuckyDownloader
+; Per-user install: no admin rights needed, goes to %LOCALAPPDATA%\Programs\LuckyDownloader (or LuckyDownloader-Beta)
 PrivilegesRequired=lowest
 DefaultDirName={autopf}\{#EffectiveDirName}
 DefaultGroupName={#EffectiveAppName}
 DisableProgramGroupPage=yes
 OutputDir=dist
-OutputBaseFilename=LuckyTwitch-Setup
+OutputBaseFilename=LuckyDownloader-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\LuckyTwitch.exe
+UninstallDisplayIcon={app}\LuckyDownloader.exe
 SetupIconFile=assets\icon.ico
 ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=yes
@@ -45,8 +45,8 @@ en.CreateDesktopIcon=Create a desktop shortcut
 es.CreateDesktopIcon=Crear un acceso directo en el escritorio
 en.ShortcutsGroup=Shortcuts:
 es.ShortcutsGroup=Accesos directos:
-en.WebLinksDesc=Open luckytwitch:// links from web pages with LuckyTwitch
-es.WebLinksDesc=Abrir enlaces luckytwitch:// desde páginas web con LuckyTwitch
+en.WebLinksDesc=Open luckydownloader:// links from web pages with LuckyDownloader
+es.WebLinksDesc=Abrir enlaces luckydownloader:// desde páginas web con LuckyDownloader
 en.LinksGroup=Links:
 es.LinksGroup=Enlaces:
 en.LaunchApp=Launch {#EffectiveAppName}
@@ -57,23 +57,28 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "weblinks"; Description: "{cm:WebLinksDesc}"; GroupDescription: "{cm:LinksGroup}"
 
 [Files]
-Source: "dist\LuckyTwitch\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "dist\LuckyDownloader\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
-; Web pages can offer luckytwitch:// links. Per user (HKCU), so no admin rights; the app writes the same
+; Web pages can offer luckydownloader:// or luckytwitch:// links. Per user (HKCU), so no admin rights; the app writes the same
 ; entries from Options > Tools > Links from web pages (see weblink.py: the command must stay identical).
 [Registry]
-Root: HKCU; Subkey: "Software\Classes\luckytwitch"; ValueType: string; ValueName: ""; ValueData: "URL:LuckyTwitch Link"; Flags: uninsdeletekey; Tasks: weblinks
+Root: HKCU; Subkey: "Software\Classes\luckydownloader"; ValueType: string; ValueName: ""; ValueData: "URL:LuckyDownloader Link"; Flags: uninsdeletekey; Tasks: weblinks
+Root: HKCU; Subkey: "Software\Classes\luckydownloader"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Tasks: weblinks
+Root: HKCU; Subkey: "Software\Classes\luckydownloader\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\LuckyDownloader.exe,0"; Tasks: weblinks
+Root: HKCU; Subkey: "Software\Classes\luckydownloader\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\LuckyDownloader.exe"" ""%1"""; Tasks: weblinks
+
+Root: HKCU; Subkey: "Software\Classes\luckytwitch"; ValueType: string; ValueName: ""; ValueData: "URL:LuckyDownloader Link"; Flags: uninsdeletekey; Tasks: weblinks
 Root: HKCU; Subkey: "Software\Classes\luckytwitch"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Tasks: weblinks
-Root: HKCU; Subkey: "Software\Classes\luckytwitch\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\LuckyTwitch.exe,0"; Tasks: weblinks
-Root: HKCU; Subkey: "Software\Classes\luckytwitch\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\LuckyTwitch.exe"" ""%1"""; Tasks: weblinks
+Root: HKCU; Subkey: "Software\Classes\luckytwitch\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\LuckyDownloader.exe,0"; Tasks: weblinks
+Root: HKCU; Subkey: "Software\Classes\luckytwitch\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\LuckyDownloader.exe"" ""%1"""; Tasks: weblinks
 
 [Icons]
-Name: "{autoprograms}\{#EffectiveAppName}"; Filename: "{app}\LuckyTwitch.exe"
-Name: "{autodesktop}\{#EffectiveAppName}"; Filename: "{app}\LuckyTwitch.exe"; Tasks: desktopicon
+Name: "{autoprograms}\{#EffectiveAppName}"; Filename: "{app}\LuckyDownloader.exe"
+Name: "{autodesktop}\{#EffectiveAppName}"; Filename: "{app}\LuckyDownloader.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\LuckyTwitch.exe"; Description: "Launch {#EffectiveAppName}"; Flags: nowait postinstall skipifsilent
-Filename: "{app}\LuckyTwitch.exe"; Flags: nowait; Check: IsRelaunch
+Filename: "{app}\LuckyDownloader.exe"; Description: "Launch {#EffectiveAppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\LuckyDownloader.exe"; Flags: nowait; Check: IsRelaunch
 
 [Code]
 function IsRelaunch(): Boolean;
