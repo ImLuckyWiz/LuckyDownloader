@@ -36,7 +36,7 @@ OPTIONS_KEYS = {
     "chat_embed", "auto_update", "check_app_updates",
     "chat_render", "chat_render_mode", "chat_render_look", "chat_render_width", "chat_render_height",
     "chat_render_font_size", "chat_render_fps", "chat_render_smooth",
-    "default_quality", "audio_format", "cookies_from_browser",
+    "default_quality", "audio_format", "cookies_from_browser", "cookies_scope",
 }
 PLAN_KEYS = {"chapters", "min_views", "min_duration", "top_n", "pad_before"}
 SWITCHES = {"exact", "keep_full", "clean_title", "subfolders", "premiere_plugin", "game_markers", "muted_markers", "premiere_xml",
@@ -162,7 +162,7 @@ def test_numbers_are_spin_boxes_and_lists_are_combo_boxes(tab):
     spins = {"threads", "threshold", "pad_after", "clip_pad_before", "clip_pad_after", "chat_render_width",
              "chat_render_height", "chat_render_font_size"}
     combos = {"container", "strategy", "chat_format", "chat_render_mode", "chat_render_look", "chat_render_fps",
-              "default_quality", "audio_format", "cookies_from_browser"}
+              "default_quality", "audio_format", "cookies_from_browser", "cookies_scope"}
     assert {k for k, c in tab.binder.controls.items() if isinstance(c, SpinBox)} == spins
     assert {k for k, c in tab.binder.controls.items() if isinstance(c, ComboBox)} == combos
 

@@ -51,6 +51,7 @@ class JobOptions:
     audio_format: str = "m4a"  # audio container when quality is audio-only: "m4a" | "mp3"
     rate_limit: str = ""  # optional bandwidth limit passed to yt-dlp ("--limit-rate"), e.g. "5M", "500K"
     cookies_browser: str = ""  # browser to pass cookies from ("--cookies-from-browser"), e.g. "chrome", "firefox"
+    cookies_scope: str = "known_only"  # "known_only" (YouTube, TikTok, Instagram, X) or "all"
     download_archive: str = ""  # optional path to yt-dlp download archive file ("--download-archive")
 
 

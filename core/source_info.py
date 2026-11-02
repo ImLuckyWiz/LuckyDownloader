@@ -192,9 +192,13 @@ def get_source_info(text: str, cookies_browser: str | None = None) -> SourceInfo
         "--extractor-args", "youtube:player_client=web_safari,web",
     ]
     from core.settings import load_settings
-    cb = cookies_browser if cookies_browser is not None else load_settings().get("cookies_from_browser")
-    if cb and str(cb).strip().lower() not in ("none", "disabled", ""):
-        cmd += ["--cookies-from-browser", str(cb).strip().lower()]
+    from core.cookie_scope import resolve_cookies_for_request
+    st = load_settings()
+    cb = cookies_browser if cookies_browser is not None else st.get("cookies_from_browser")
+    scope = st.get("cookies_scope", "known_only")
+    resolved_cb = resolve_cookies_for_request(url, cb, scope_mode=scope)
+    if resolved_cb:
+        cmd += ["--cookies-from-browser", resolved_cb]
     if not twitch_vod_id(url):
         cmd.append("--flat-playlist")
     cmd.append(url)

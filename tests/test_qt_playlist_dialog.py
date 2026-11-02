@@ -198,3 +198,35 @@ def test_dialog_thumbnail_column_and_loader(qtbot, sample_playlist, tmp_path):
     lbl = dlg._thumb_labels[0]
     assert lbl.pixmap() is not None
     assert not lbl.pixmap().isNull()
+
+
+def test_dialog_cookies_toggle(qtbot, sample_playlist):
+    # Case 1: no browser configured
+    dlg_none = PlaylistPickerDialog(sample_playlist, settings={"cookies_from_browser": "None"})
+    qtbot.addWidget(dlg_none)
+    assert dlg_none.is_cookies_enabled() is False
+    assert dlg_none.cookies_check.isHidden()
+
+    # Case 2: firefox configured with YouTube URL -> enabled by default
+    sample_playlist.url = "https://www.youtube.com/playlist?list=PL123"
+    dlg_yt = PlaylistPickerDialog(sample_playlist, settings={"cookies_from_browser": "firefox"})
+    qtbot.addWidget(dlg_yt)
+    assert not dlg_yt.cookies_check.isHidden()
+    assert dlg_yt.is_cookies_enabled() is True
+    jobs = dlg_yt.build_jobs()
+    assert jobs[0].opts.cookies_browser == "firefox"
+
+    # User manually unchecks the cookies checkbox
+    dlg_yt.cookies_check.setChecked(False)
+    assert dlg_yt.is_cookies_enabled() is False
+    jobs_unchecked = dlg_yt.build_jobs()
+    assert jobs_unchecked[0].opts.cookies_browser == ""
+
+    # Case 3: firefox configured with external / untrusted URL -> unchecked by default
+    sample_playlist.url = "https://www.pornhub.com/playlist/123"
+    dlg_ph = PlaylistPickerDialog(sample_playlist, settings={"cookies_from_browser": "firefox"})
+    qtbot.addWidget(dlg_ph)
+    assert not dlg_ph.cookies_check.isHidden()
+    assert dlg_ph.is_cookies_enabled() is False
+    jobs_ph = dlg_ph.build_jobs()
+    assert jobs_ph[0].opts.cookies_browser == ""

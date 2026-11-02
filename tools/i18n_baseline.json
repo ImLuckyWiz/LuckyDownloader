@@ -30,6 +30,8 @@
   "Chat",
   "Clip",
   "Clips",
+  "Cookies",
+  "Cookies ({browser})",
   "ERROR: {error}",
   "Error",
   "Error.",

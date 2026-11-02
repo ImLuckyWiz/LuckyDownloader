@@ -56,6 +56,7 @@ DEFAULTS = {
     "clip_pad_before": "3",
     "clip_pad_after": "3",
     "cookies_from_browser": "None",
+    "cookies_scope": "Only known platforms (YouTube, TikTok, Instagram, X)",
     "auto_update": True,
     "check_app_updates": True,
 }

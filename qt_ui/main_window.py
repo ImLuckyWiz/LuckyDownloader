@@ -1241,12 +1241,14 @@ class MainWindow(QMainWindow):
             audio_only = self.tab_plan.is_audio_only()
             quality = "audio" if audio_only else self.tab_plan.current_quality()
             out_dir = self.tab_plan.current_output_dir() or opts.out_dir
+            cookies_browser = opts.cookies_browser if self.tab_plan.is_cookies_enabled() else ""
             opts = replace(
                 opts,
                 cut_text="",
                 quality=quality,
                 container=container,
                 out_dir=out_dir,
+                cookies_browser=cookies_browser,
                 strategy="full",
                 keep_full=False,
                 sidecar=False,

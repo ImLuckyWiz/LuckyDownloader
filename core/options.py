@@ -38,6 +38,11 @@ CHAT_RENDER_LOOK_TYPES = {
 }
 CHAT_RENDER_FPS_NAMES = ["Like the video", "30", "60"]
 COOKIES_BROWSER_NAMES = ["None", "Chrome", "Firefox", "Edge", "Brave", "Opera", "Vivaldi", "Safari"]
+COOKIES_SCOPE_CHOICES = {
+    "Only known platforms (YouTube, TikTok, Instagram, X)": "known_only",
+    "All supported sites": "all",
+}
+COOKIES_SCOPE_NAMES = list(COOKIES_SCOPE_CHOICES)
 
 STRATEGY_NAMES = list(STRATEGIES)
 QUALITY_NAMES = list(QUALITY_CHOICES)
@@ -127,4 +132,5 @@ def build_options(settings: dict, cut_text: str = "", quality: str | None = None
         quality=quality or QUALITY_CHOICES.get(text(s, "default_quality"), "best"),
         audio_format=AUDIO_FORMAT_CHOICES.get(text(s, "audio_format"), "m4a"),
         cookies_browser="" if text(s, "cookies_from_browser").strip().lower() in ("none", "disabled", "") else text(s, "cookies_from_browser").strip().lower(),
+        cookies_scope=COOKIES_SCOPE_CHOICES.get(text(s, "cookies_scope"), text(s, "cookies_scope").strip().lower() if text(s, "cookies_scope").strip().lower() in ("known_only", "all") else "known_only"),
     )

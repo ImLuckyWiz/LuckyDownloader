@@ -86,9 +86,13 @@ class GenericProvider(Provider):
             "--extractor-args", "youtube:player_client=web_safari,web",
         ]
         from core.settings import load_settings
+        from core.cookie_scope import resolve_cookies_for_request
+        st = load_settings()
         cb = load_settings().get("cookies_from_browser")
-        if cb and str(cb).strip().lower() not in ("none", "disabled", ""):
-            cmd += ["--cookies-from-browser", str(cb).strip().lower()]
+        scope = st.get("cookies_scope", "known_only")
+        resolved_cb = resolve_cookies_for_request(url, cb, scope_mode=scope)
+        if resolved_cb:
+            cmd += ["--cookies-from-browser", resolved_cb]
         cmd.append(url)
         try:
             proc = subprocess.run(

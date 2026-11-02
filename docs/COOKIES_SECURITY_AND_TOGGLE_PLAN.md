@@ -77,39 +77,39 @@ Crear funciones auxiliares para validar si una URL o proveedor es elegible para 
 
 ## 4. Plan de Implementación Paso a Paso
 
-- [ ] **Paso 1: Módulo Core de Ámbito (`core/cookie_scope.py`)**
+- [x] **Paso 1: Módulo Core de Ámbito (`core/cookie_scope.py`)**
   - Implementar lista de dominios conocidos seguros.
   - Implementar `is_cookie_eligible(url, scope_mode)`.
   - Crear tests unitarios en `tests/test_cookie_scope.py`.
 
-- [ ] **Paso 2: Ajustes en Ajustes y Opciones (`core/settings.py` & `core/options.py`)**
+- [x] **Paso 2: Ajustes en Ajustes y Opciones (`core/settings.py` & `core/options.py`)**
   - Añadir `cookies_scope` a `DEFAULTS` con valor `"known_only"`.
   - Exponer `cookies_scope` en `JobOptions` / `load_options()`.
 
-- [ ] **Paso 3: Actualización de la Pestaña Plan (`qt_ui/tabs/plan.py`)**
+- [x] **Paso 3: Actualización de la Pestaña Plan (`qt_ui/tabs/plan.py`)**
   - Añadir control `generic_cookies_toggle` a la tarjeta de detalles.
   - Conectar el estado por defecto al detectar el proveedor/dominio del video.
   - Exponer método `is_cookies_enabled() -> bool`.
 
-- [ ] **Paso 4: Actualización del Diálogo de Listas (`qt_ui/dialogs/playlist.py`)**
+- [x] **Paso 4: Actualización del Diálogo de Listas (`qt_ui/playlist_dialog.py`)**
   - Añadir checkbox de cookies a las opciones inferiores de la lista.
   - Exponer método `is_cookies_enabled() -> bool`.
 
-- [ ] **Paso 5: Enrutamiento en `main_window.py`**
+- [x] **Paso 5: Enrutamiento en `main_window.py`**
   - Pasar el estado de cookies al construir el `JobOptions` tanto para videos individuales como para lotes de playlists.
 
-- [ ] **Paso 6: Ajustes en la Pestaña de Opciones (`qt_ui/tabs/options.py`)**
+- [x] **Paso 6: Ajustes en la Pestaña de Opciones (`qt_ui/tabs/options.py`)**
   - Añadir fila de control para `cookies_scope` debajo de `cookies_from_browser`.
 
-- [ ] **Paso 7: Internacionalización (i18n)**
-  - Añadir claves en inglés (`resources/i18n/en.json`) y español (`resources/i18n/es.json`).
+- [x] **Paso 7: Internacionalización (i18n)**
+  - Añadir claves en inglés y español.
   - Ejecutar `python tools/i18n.py check`.
 
-- [ ] **Paso 8: Pruebas y Validación**
+- [x] **Paso 8: Pruebas y Validación**
   - Test de URLs de YouTube (reciben cookies si el toggle está activo).
   - Test de URLs de Pornhub y sitios externos (NO reciben cookies por defecto).
   - Test de conmutación manual del toggle por video.
-  - Ejecución de la suite completa de pruebas (`pytest`).
+  - Ejecución de la suite de pruebas (`pytest`).
 
 ---
 

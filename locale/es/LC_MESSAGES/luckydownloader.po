@@ -3355,3 +3355,30 @@ msgstr "Vaciar cola"
 msgid "Queue cleared."
 msgstr "Cola vaciada."
 
+#: qt_ui/playlist_dialog.py
+#, python-brace-format
+msgid "Use browser cookies ({browser})"
+msgstr "Usar cookies del navegador ({browser})"
+
+#: qt_ui/tabs/options.py
+msgid "Cookies scope"
+msgstr "Ámbito de cookies"
+
+#: qt_ui/tabs/options.py
+msgid "Restrict browser cookies to known platforms (YouTube, TikTok, Instagram, X) or allow on all sites."
+msgstr "Restringir cookies a plataformas conocidas (YouTube, TikTok, Instagram, X) o permitir en todos los sitios."
+
+#: qt_ui/tabs/plan.py
+msgid "Cookies"
+msgstr "Cookies"
+
+#: qt_ui/tabs/plan.py
+#, python-brace-format
+msgid "Cookies ({browser})"
+msgstr "Cookies ({browser})"
+
+#: qt_ui/tabs/plan.py
+#, python-brace-format
+msgid "Send cookies from {browser} for this download"
+msgstr "Enviar cookies de {browser} para esta descarga"
+

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 09:04-0300\n"
+"POT-Creation-Date: 2026-11-02 10:25-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -1000,6 +1000,11 @@ msgstr ""
 
 #: qt_ui/playlist_dialog.py
 #, python-brace-format
+msgid "Use browser cookies ({browser})"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+#, python-brace-format
 msgid ""
 "You have selected {count} videos to download.\n"
 "Are you sure you want to add all of them to the queue?"
@@ -1363,6 +1368,10 @@ msgid "Cookies from browser"
 msgstr ""
 
 #: qt_ui/tabs/options.py
+msgid "Cookies scope"
+msgstr ""
+
+#: qt_ui/tabs/options.py
 msgid "Cuts"
 msgstr ""
 
@@ -1670,6 +1679,10 @@ msgstr ""
 
 #: qt_ui/tabs/options.py
 msgid "Redraws on every frame instead of 5 times a second. Slower."
+msgstr ""
+
+#: qt_ui/tabs/options.py
+msgid "Restrict browser cookies to known platforms (YouTube, TikTok, Instagram, X) or allow on all sites."
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -2006,6 +2019,15 @@ msgid "Clips → chapters"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
+msgid "Cookies"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+#, python-brace-format
+msgid "Cookies ({browser})"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
 msgid "Creator"
 msgstr ""
 
@@ -2103,6 +2125,11 @@ msgstr ""
 
 #: qt_ui/tabs/plan.py
 msgid "Selection:"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+#, python-brace-format
+msgid "Send cookies from {browser} for this download"
 msgstr ""
 
 #: qt_ui/tabs/plan.py

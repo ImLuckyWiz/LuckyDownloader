@@ -268,10 +268,31 @@ class PlaylistPickerDialog(QDialog):
         self.btn_browse.clicked.connect(self._browse_folder)
         opt_lay.addWidget(self.btn_browse, 1, 4)
 
-        # Skip existing / download archive checkbox
+        # Checkboxes row: skip existing & cookies
+        checks_box = QWidget(opt_card)
+        chk_lay = QHBoxLayout(checks_box)
+        chk_lay.setContentsMargins(0, 0, 0, 0)
+        chk_lay.setSpacing(16)
+
         self.skip_existing_check = QCheckBox(t("Skip already downloaded videos"), opt_card)
         self.skip_existing_check.setChecked(True)
-        opt_lay.addWidget(self.skip_existing_check, 2, 1, 1, 4)
+        chk_lay.addWidget(self.skip_existing_check)
+
+        browser = str(self.settings.get("cookies_from_browser", "None")).strip()
+        has_browser = browser.lower() not in ("none", "disabled", "")
+        self.cookies_check = QCheckBox(t("Use browser cookies ({browser})", browser=browser), opt_card)
+        if has_browser:
+            from core.cookie_scope import is_cookie_eligible
+            scope = str(self.settings.get("cookies_scope", "known_only"))
+            eligible = is_cookie_eligible(getattr(self.playlist, "url", ""), scope_mode=scope)
+            self.cookies_check.setChecked(eligible)
+        else:
+            self.cookies_check.setChecked(False)
+            self.cookies_check.setVisible(False)
+        chk_lay.addWidget(self.cookies_check)
+        chk_lay.addStretch(1)
+
+        opt_lay.addWidget(checks_box, 2, 1, 1, 4)
 
         opt_card.add_widget(opt_container)
         root_lay.addWidget(opt_card)
@@ -453,12 +474,18 @@ class PlaylistPickerDialog(QDialog):
     def skip_existing(self) -> bool:
         return self.skip_existing_check.isChecked()
 
+    def is_cookies_enabled(self) -> bool:
+        return bool(hasattr(self, "cookies_check") and not self.cookies_check.isHidden() and self.cookies_check.isChecked())
+
     def build_jobs(self) -> list[Job]:
         selected = self.selected_items()
         if not selected:
             return []
 
         opts = build_options(self.settings, cut_text="", quality=self.current_quality())
+        cookies_browser = str(self.settings.get("cookies_from_browser", "")).strip().lower()
+        if not self.is_cookies_enabled() or cookies_browser in ("none", "disabled"):
+            cookies_browser = ""
         from dataclasses import replace
         opts = replace(
             opts,
@@ -466,6 +493,7 @@ class PlaylistPickerDialog(QDialog):
             container=self.current_container(),
             out_dir=self.current_output_dir() or opts.out_dir,
             audio_format="mp3" if self.current_container() == "mp3" else "m4a",
+            cookies_browser=cookies_browser,
         )
 
         return expand_playlist_jobs(

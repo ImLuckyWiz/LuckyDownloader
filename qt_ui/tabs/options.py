@@ -35,7 +35,7 @@ import weblink
 from core import examples
 from core.files import open_in_file_manager
 from core.options import (
-    COOKIES_BROWSER_NAMES, AUDIO_FORMAT_NAMES, CHAT_RENDER_FPS_NAMES, CHAT_RENDER_LOOK_NAMES, CHAT_RENDER_TYPE_NAMES, QUALITY_NAMES,
+    COOKIES_BROWSER_NAMES, COOKIES_SCOPE_NAMES, AUDIO_FORMAT_NAMES, CHAT_RENDER_FPS_NAMES, CHAT_RENDER_LOOK_NAMES, CHAT_RENDER_TYPE_NAMES, QUALITY_NAMES,
     STRATEGY_NAMES, flag,
 )
 from core.settings import DEFAULTS
@@ -719,6 +719,16 @@ class OptionsTab(QWidget):
             card,
         )
         row.add_control(self._combo("cookies_from_browser", COOKIES_BROWSER_NAMES, 10))
+
+        row_scope = self._add_setting_row(
+            card,
+            "cookies_scope",
+            N_("Cookies scope"),
+            N_("Restrict browser cookies to known platforms (YouTube, TikTok, Instagram, X) or allow on all sites."),
+            "tools",
+            card,
+        )
+        row_scope.add_control(self._combo("cookies_scope", COOKIES_SCOPE_NAMES, 26))
 
         self.update_row = card.add_row(t("Update yt-dlp"), t("Download the latest version now."))
         self.update_btn = QPushButton(t("Update yt-dlp now"))

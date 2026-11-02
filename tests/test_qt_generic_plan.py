@@ -125,6 +125,37 @@ def test_generic_card_controls_and_options(qtbot, tmp_path):
     assert "1 video" in tab.plan_summary_lbl.text()
 
 
+def test_generic_card_cookies_toggle(qtbot):
+    tab = PlanTab()
+    qtbot.addWidget(tab)
+
+    # 1. No browser configured
+    tab.settings = {"cookies_from_browser": "None", "cookies_scope": "known_only"}
+    src_yt = _make_sample_source("youtube", 185.0)
+    src_yt.url = "https://www.youtube.com/watch?v=123"
+    tab.update_generic_card(src_yt)
+    assert tab.is_cookies_enabled() is False
+    assert tab.generic_cookies_box.isHidden()
+
+    # 2. Firefox configured + YouTube URL -> auto enabled
+    tab.settings = {"cookies_from_browser": "Firefox", "cookies_scope": "known_only"}
+    tab.update_generic_card(src_yt)
+    assert not tab.generic_cookies_box.isHidden()
+    assert tab.is_cookies_enabled() is True
+    assert "Firefox" in tab.generic_cookies_label.text()
+
+    # User manually unchecks the toggle
+    tab.generic_cookies_toggle.setChecked(False)
+    assert tab.is_cookies_enabled() is False
+
+    # 3. Firefox configured + Untrusted / adult URL -> disabled by default
+    src_ph = _make_sample_source("pornhub", 185.0)
+    src_ph.url = "https://www.pornhub.com/view_video.php?viewkey=123"
+    tab.update_generic_card(src_ph)
+    assert not tab.generic_cookies_box.isHidden()
+    assert tab.is_cookies_enabled() is False
+
+
 def test_main_window_generic_flow(qtbot, monkeypatch, tmp_path):
     import core.paths as paths
     monkeypatch.setattr(paths, "HISTORY_PATH", tmp_path / "history.json")

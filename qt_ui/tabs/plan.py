@@ -502,18 +502,28 @@ class PlanTab(ScrollPage):
         ab_lay.addWidget(self.generic_audio_toggle)
         opts_grid.addWidget(audio_box, 0, 4)
 
+        self.generic_cookies_toggle = Toggle()
+        self.generic_cookies_box = QWidget()
+        cb_lay = QHBoxLayout(self.generic_cookies_box)
+        cb_lay.setContentsMargins(0, 0, 0, 0)
+        cb_lay.setSpacing(6)
+        self.generic_cookies_label = QLabel(t("Cookies"))
+        cb_lay.addWidget(self.generic_cookies_label)
+        cb_lay.addWidget(self.generic_cookies_toggle)
+        opts_grid.addWidget(self.generic_cookies_box, 0, 5)
+
         f_lbl = QLabel(t("Folder:"))
         f_lbl.setProperty("role", "muted")
         opts_grid.addWidget(f_lbl, 1, 0)
 
         self.generic_folder_entry = QLineEdit()
         self.generic_folder_entry.setText(str(self.settings.get("out_dir", getattr(paths, "DOWNLOADS_DIR", ""))))
-        opts_grid.addWidget(self.generic_folder_entry, 1, 1, 1, 3)
+        opts_grid.addWidget(self.generic_folder_entry, 1, 1, 1, 4)
 
         self.generic_browse_btn = QPushButton(t("Browse…"))
         self.generic_browse_btn.setProperty("variant", "ghost")
         self.generic_browse_btn.clicked.connect(self._browse_generic_folder)
-        opts_grid.addWidget(self.generic_browse_btn, 1, 4)
+        opts_grid.addWidget(self.generic_browse_btn, 1, 5)
 
         r_lay.addLayout(opts_grid)
         c_lay.addWidget(right_col, 1)
@@ -576,6 +586,21 @@ class PlanTab(ScrollPage):
         if thumb_url:
             self._fetch_generic_thumbnail(thumb_url)
 
+        # Smart cookie toggle default
+        browser = str(self.settings.get("cookies_from_browser", "None")).strip()
+        has_browser = browser.lower() not in ("none", "disabled", "")
+        if has_browser and hasattr(self, "generic_cookies_box"):
+            self.generic_cookies_box.setVisible(True)
+            self.generic_cookies_label.setText(t("Cookies ({browser})", browser=browser))
+            self.generic_cookies_box.setToolTip(t("Send cookies from {browser} for this download", browser=browser))
+            from core.cookie_scope import is_cookie_eligible
+            scope = str(self.settings.get("cookies_scope", "known_only"))
+            eligible = is_cookie_eligible(getattr(source, "url", ""), scope_mode=scope)
+            self.generic_cookies_toggle.setChecked(eligible)
+        elif hasattr(self, "generic_cookies_box"):
+            self.generic_cookies_box.setVisible(False)
+            self.generic_cookies_toggle.setChecked(False)
+
     def _fetch_generic_thumbnail(self, url: str) -> None:
         import threading
         def work():
@@ -609,6 +634,11 @@ class PlanTab(ScrollPage):
     def is_audio_only(self) -> bool:
         if hasattr(self, "generic_audio_toggle"):
             return self.generic_audio_toggle.isChecked()
+        return False
+
+    def is_cookies_enabled(self) -> bool:
+        if hasattr(self, "generic_cookies_toggle") and hasattr(self, "generic_cookies_box"):
+            return not self.generic_cookies_box.isHidden() and self.generic_cookies_toggle.isChecked()
         return False
 
     def current_output_dir(self) -> str:
