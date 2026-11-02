@@ -1,3 +1,27 @@
+## v2.14.0
+
+LuckyDownloader **v2.14.0** is the official **Release 3**, introducing the multi-platform **Browse Tab** with YouTube video and channel search, **Multi-Provider Subscriptions & Watchlist** (pinning and tracking YouTube channels alongside Twitch streamers), and a **Cut Editor for Generic Sources** (enabling trimming, splitting, and section downloads via yt-dlp across YouTube, TikTok, and other platforms).
+
+### What's new in 2.14.0:
+- **Browse Tab with Provider Selector (Phase 7):**
+  - **Search becomes Browse:** Renamed the navigation rail, window tabs, and keyboard shortcuts from *Search* to *Browse* (`Explorar` in Spanish), with backward-compatible aliases for scripting and settings.
+  - **Provider Selector:** Added a clean dropdown selector to switch between Twitch streamer browsing and YouTube search/channel listing.
+  - **YouTube Provider (`core/providers/youtube.py`):** Search YouTube videos directly via keyword (`ytsearch`) or explore channel videos using flat extraction.
+  - **Adaptive Browse UI:** Contextual search placeholders, streamer vs. video result cards, and dynamic action buttons (*Use this video* / *Use this VOD*).
+  - **Isolated Recent Searches:** Independent recent search histories for Twitch streamer lookups and YouTube queries.
+- **Multi-Provider Subscriptions & Watchlist (Phase 8):**
+  - **Universal Channel Watchlist (`WatchedChannel`):** Generalized the watch list model to support any platform (`Twitch`, `YouTube`, etc.), retaining 100% backward compatibility with legacy `WatchedStreamer` formats and saved files.
+  - **YouTube Channel Following:** Periodic checking of watched YouTube channels via fast flat extraction, establishing a clean baseline without false alarms and alerting on new uploads.
+  - **Browse Tab Pinning:** Dedicated pin/unpin button in the Browse tab header to follow YouTube channels directly into your Watch List.
+- **Cut Editor for Generic Sources (Phase 9):**
+  - **Adaptive Cut Points in Plan Tab:** Integrated cut editor into the Plan tab for YouTube, TikTok, and other yt-dlp sources.
+  - **Flexible Trimming & Splitting:** Leave cut points blank to download the full video, or specify time ranges (e.g. `0:30 - 1:30 ; 2:00 - 3:00`) to trim unwanted segments or split into multiple parts.
+  - **Real-Time Part Cards & Preview:** Interactive visual part chips with skip buttons, coverage metrics, and strategy controls (*Only the parts* vs. *Full video + split*).
+  - **yt-dlp Section Downloads:** Queue engine executes multi-part jobs via yt-dlp `--download-sections` and forwards browser authentication cookies when enabled.
+  - **Metadata & Storyboard Support:** Automatically parses available video chapters and storyboard sheet formats from yt-dlp metadata.
+- **Modern Module Facades & Internal Cleanups:**
+  - Added `luckydownloader_engine.py` and `luckydownloader_qt.py` modern entrypoints and facades while retaining 100% backward compatibility for all legacy imports and build tooling.
+
 ## v2.13.0
 
 LuckyDownloader **v2.13.0** is the official **Release 2**, bringing full support for importing entire playlists and channels, smart download routing with custom provider folders, and robust browser cookie security scoping.
