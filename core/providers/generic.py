@@ -76,7 +76,15 @@ class GenericProvider(Provider):
         if not ytdlp:
             raise EngineError(YTDLP_MISSING)
 
-        cmd = [ytdlp, "--dump-single-json", "--no-warnings", "--flat-playlist", "--skip-download", "--remote-components", "ejs:github"]
+        cmd = [
+            ytdlp,
+            "--dump-single-json",
+            "--no-warnings",
+            "--flat-playlist",
+            "--skip-download",
+            "--remote-components", "ejs:github",
+            "--extractor-args", "youtube:formats=missing_pot",
+        ]
         from core.settings import load_settings
         cb = load_settings().get("cookies_from_browser")
         if cb and str(cb).strip().lower() not in ("none", "disabled", ""):

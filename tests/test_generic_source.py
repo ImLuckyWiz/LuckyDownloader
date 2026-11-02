@@ -530,3 +530,6 @@ def test_get_source_info_passes_cookies_and_remote_components(monkeypatch):
     assert "--remote-components" in captured_cmd
     idx_rc = captured_cmd.index("--remote-components")
     assert captured_cmd[idx_rc + 1] == "ejs:github"
+    assert "--extractor-args" in captured_cmd
+    idx_ea = captured_cmd.index("--extractor-args")
+    assert captured_cmd[idx_ea + 1] == "youtube:formats=missing_pot"

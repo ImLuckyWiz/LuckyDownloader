@@ -183,7 +183,14 @@ def get_source_info(text: str, cookies_browser: str | None = None) -> SourceInfo
     ytdlp = find_tool("yt-dlp") if find_tool else None
     if not ytdlp:
         raise EngineError(YTDLP_MISSING)
-    cmd = [ytdlp, "--dump-single-json", "--no-warnings", "--skip-download", "--remote-components", "ejs:github"]
+    cmd = [
+        ytdlp,
+        "--dump-single-json",
+        "--no-warnings",
+        "--skip-download",
+        "--remote-components", "ejs:github",
+        "--extractor-args", "youtube:formats=missing_pot",
+    ]
     from core.settings import load_settings
     cb = cookies_browser if cookies_browser is not None else load_settings().get("cookies_from_browser")
     if cb and str(cb).strip().lower() not in ("none", "disabled", ""):
@@ -598,6 +605,7 @@ def build_generic_download_args(
         "--fragment-retries", "10",
         "--continue",
         "--remote-components", "ejs:github",
+        "--extractor-args", "youtube:formats=missing_pot",
     ]
     if threads > 1:
         args += ["--concurrent-fragments", str(max(1, threads))]
