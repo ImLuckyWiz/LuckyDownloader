@@ -16,7 +16,7 @@ From LuckyTwitchDownloader to a multi-site downloader (YouTube, TikTok, Instagra
 ## 2. Releases
 
 - **Release 1 (first LuckyDownloader):** phases 0 to 5. Paste a link from any site yt-dlp supports and download it. Twitch works as before.
-- **Release 2:** playlists and channels (phase 6).
+- **Release 2:** playlists and channels (phase 6), and provider folder routing (phase 6b).
 - **Release 3:** Browse and subscriptions (phases 7 and 8).
 - **Later:** phase 9.
 
@@ -195,6 +195,38 @@ A provider-neutral source record holds id, title, uploader, duration, thumbnail,
 **Tests:** picker model tests, job expansion tests and a playlist fixture.
 
 **Done when:** a playlist link can be picked from, queued as many jobs and finished, with History entries for each.
+
+## Phase 6b: Provider folders and download routing (Release 2)
+
+**Goal:** allow organizing downloads into provider-specific subfolders or custom directories per provider.
+
+**Work**
+
+- **Settings & Defaults:**
+  - `provider_subfolders: bool`: when enabled, automatically groups downloads by provider under the main download directory (e.g. `Downloads/YouTube/`, `Downloads/TikTok/`, `Downloads/Twitch/`).
+  - `provider_out_dirs: dict[str, str]`: optional per-provider custom base output directories (e.g. setting custom paths for YouTube, Twitch, TikTok, or generic fallback).
+  - Expose `{site}` / `{provider}` token support in `folder_template` and naming examples.
+- **Path Resolution:**
+  - Update `core/finalize.py:stream_dir` to resolve the base path using the provider's custom output directory if configured, or inject the provider subfolder when `provider_subfolders` is on.
+- **Plan Tab UI:**
+  - When a URL is resolved in the Plan tab, pre-populate the output folder entry with the detected provider's configured directory (falling back to `out_dir`).
+- **Options Tab UI:**
+  - In the Output settings card, add a toggle for organizing by provider subfolder (`Downloads/<Provider>/...`).
+  - Add an expandable section or selector to set a custom folder for specific providers (Twitch, YouTube, TikTok, etc.).
+- **i18n:**
+  - Add all new UI strings and tooltips to English and Spanish catalogs.
+
+**Tests**
+
+- Unit tests in `test_finalize.py` / `test_options.py` for provider subfolder generation, custom provider out_dir overrides, and fallback behavior.
+- UI tests for Plan tab folder pre-population and Options tab settings binding.
+
+**Done when**
+
+- A YouTube link defaults to the YouTube subfolder or configured custom YouTube folder.
+- Twitch VODs and other providers respect their respective folders or subfolders without breaking existing behavior.
+- Both English and Spanish strings are translated.
+- All tests pass.
 
 ## Phase 7: Browse (Release 3)
 

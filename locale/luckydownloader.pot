@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 07:15-0300\n"
+"POT-Creation-Date: 2026-11-02 08:29-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -590,7 +590,7 @@ msgstr ""
 msgid "Streamer"
 msgstr ""
 
-#: qt_ui/dialogs.py qt_ui/search_models.py qt_ui/tabs/plan.py
+#: qt_ui/dialogs.py qt_ui/playlist_dialog.py qt_ui/search_models.py qt_ui/tabs/plan.py
 msgid "Title"
 msgstr ""
 
@@ -630,6 +630,16 @@ msgstr ""
 #: qt_ui/main_window.py
 #, python-brace-format
 msgid "Added {clips} clip(s) to the queue ({items} item(s)). Open «Queue & log» and press «Start queue»."
+msgstr ""
+
+#: qt_ui/main_window.py
+#, python-brace-format
+msgid "Added {count} playlist items to queue."
+msgstr ""
+
+#: qt_ui/main_window.py
+#, python-brace-format
+msgid "Added {count} videos from «{title}»."
 msgstr ""
 
 #: qt_ui/main_window.py
@@ -772,6 +782,14 @@ msgid "Paste a VOD and press «Get info» first."
 msgstr ""
 
 #: qt_ui/main_window.py
+msgid "Playlist queued"
+msgstr ""
+
+#: qt_ui/main_window.py
+msgid "Playlist selection cancelled."
+msgstr ""
+
+#: qt_ui/main_window.py
 msgid "Please drop a valid video URL, a VOD ID, or a streamer name."
 msgstr ""
 
@@ -887,6 +905,109 @@ msgstr ""
 #: qt_ui/main_window.py
 #, python-brace-format
 msgid "● Update available · {version}"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "#"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "Add to Queue"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+#, python-brace-format
+msgid "Add to Queue ({count})"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "Apply"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+msgid "Audio only"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py qt_ui/tabs/options.py qt_ui/tabs/plan.py qt_ui/welcome/setup_card.py
+msgid "Browse…"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py qt_ui/update_dialog.py
+msgid "Cancel"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "Download options"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+msgid "Duration"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+msgid "Folder:"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+msgid "Format:"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "Large playlist"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+#, python-brace-format
+msgid "Playlist items — {title}"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+msgid "Quality:"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "Range:"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+msgid "Select all"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+msgid "Select download folder"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "Select none"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+#, python-brace-format
+msgid "Selected: {count} of {total}"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "Skip already downloaded videos"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "Uploader"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+#, python-brace-format
+msgid ""
+"You have selected {count} videos to download.\n"
+"Are you sure you want to add all of them to the queue?"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+msgid "e.g. 1-10, 15, 20-25"
+msgstr ""
+
+#: qt_ui/playlist_dialog.py
+#, python-brace-format
+msgid "{count} items"
 msgstr ""
 
 #: qt_ui/queue_model.py
@@ -1167,10 +1288,6 @@ msgstr ""
 
 #: qt_ui/tabs/options.py
 msgid "Bigger file, but it works offline."
-msgstr ""
-
-#: qt_ui/tabs/options.py qt_ui/tabs/plan.py qt_ui/welcome/setup_card.py
-msgid "Browse…"
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -1858,10 +1975,6 @@ msgid "At"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
-msgid "Audio only"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
 msgid "Auto"
 msgstr ""
 
@@ -1904,23 +2017,11 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: qt_ui/tabs/plan.py
-msgid "Duration"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
 msgid "Each clip that passes the filter becomes a chapter."
 msgstr ""
 
 #: qt_ui/tabs/plan.py
 msgid "Fix the cut points to add this VOD"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Folder:"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Format:"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
@@ -1971,10 +2072,6 @@ msgid "Part {n}:  {start} → {end}   ({duration}){silenced}"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
-msgid "Quality:"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
 #, python-brace-format
 msgid "Quality: {quality} · Audio only: saved as .m4a or .mp3 (Options). Video-only extras are skipped."
 msgstr ""
@@ -1994,14 +2091,6 @@ msgstr ""
 
 #: qt_ui/tabs/plan.py
 msgid "Search streamers"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Select all"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Select download folder"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
@@ -2790,10 +2879,6 @@ msgstr ""
 
 #: qt_ui/update_dialog.py
 msgid "(Read the full notes on GitHub)"
-msgstr ""
-
-#: qt_ui/update_dialog.py
-msgid "Cancel"
 msgstr ""
 
 #: qt_ui/update_dialog.py

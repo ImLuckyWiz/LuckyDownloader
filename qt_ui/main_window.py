@@ -1144,6 +1144,10 @@ class MainWindow(QMainWindow):
 
     def on_info_ok(self, info, clips, loaded: bool, warn: str) -> None:
         self.set_info_busy(False)
+        from core.source_info import PlaylistInfo
+        if isinstance(info, PlaylistInfo):
+            self._handle_playlist_loaded(info)
+            return
         raw_title = info.title
         if flag(self.settings, "clean_title"):
             info.title = clean_title(info.title)
@@ -1176,6 +1180,27 @@ class MainWindow(QMainWindow):
             self._info_from_link = None
         if warn:
             self.log(warn)
+
+    def _handle_playlist_loaded(self, pl: PlaylistInfo) -> None:
+        from qt_ui.playlist_dialog import PlaylistPickerDialog
+        dlg = PlaylistPickerDialog(pl, settings=self.settings, parent=self)
+        if dlg.exec():
+            jobs = dlg.build_jobs()
+            if not jobs:
+                return
+            for job in jobs:
+                label = f"{job.source.uploader or job.source.site} · {job.source.title}"[:70]
+                self.tab_queue.enqueue(job, label, 1, "full video")
+            self._sync_queue_badge()
+            self.set_status(t("Added {count} playlist items to queue.", count=len(jobs)))
+            notify.success(
+                self,
+                t("Playlist queued"),
+                t("Added {count} videos from «{title}».", count=len(jobs), title=pl.title),
+                action=(t("Go to Queue"), self.show_queue_tab),
+            )
+        else:
+            self.set_status(t("Playlist selection cancelled."))
 
     def on_info_error(self, msg: str) -> None:
         self._info_from_link = None

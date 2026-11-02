@@ -61,7 +61,7 @@ class GenericProvider(Provider):
 
     @property
     def capabilities(self) -> Capability:
-        return Capability.RESOLVE
+        return Capability.RESOLVE | Capability.PLAYLIST
 
     def get_source_info(self, text: str) -> SourceInfo:
         from core.source_info import YTDLP_MISSING
@@ -76,7 +76,7 @@ class GenericProvider(Provider):
         if not ytdlp:
             raise EngineError(YTDLP_MISSING)
 
-        cmd = [ytdlp, "--dump-single-json", "--no-warnings", "--no-playlist", "--skip-download"]
+        cmd = [ytdlp, "--dump-single-json", "--no-warnings", "--flat-playlist", "--skip-download"]
         from core.settings import load_settings
         cb = load_settings().get("cookies_from_browser")
         if cb and str(cb).strip().lower() not in ("none", "disabled", ""):
@@ -107,12 +107,24 @@ class GenericProvider(Provider):
         except json.JSONDecodeError as e:
             raise EngineError(t("yt-dlp returned unreadable data for that URL.")) from e
 
+        from core.source_info import is_playlist_dict
+        if is_playlist_dict(info):
+            return self.parse_playlist_info(info, url)
         return self.parse_info(info, url)
 
     def parse_info(self, info: dict, url: str) -> SourceInfo:
         """Parse raw yt-dlp dict offline into SourceInfo."""
         from core.source_info import parse_generic_source_info
         src = parse_generic_source_info(info, url)
+        src.provider = self
+        if self._site_name != "generic":
+            src.site = self._site_name
+        return src
+
+    def parse_playlist_info(self, info: dict, url: str) -> PlaylistInfo:
+        """Parse raw yt-dlp dict offline into PlaylistInfo."""
+        from core.source_info import parse_playlist_info
+        src = parse_playlist_info(info, url)
         src.provider = self
         if self._site_name != "generic":
             src.site = self._site_name
@@ -138,6 +150,7 @@ class GenericProvider(Provider):
         rl = getattr(opts, "rate_limit", rate_limit) if opts else rate_limit
         th = getattr(opts, "threads", threads) if opts else threads
         cb = getattr(opts, "cookies_browser", None)
+        da = getattr(opts, "download_archive", None)
         return build_generic_download_args(
             src.url,
             quality=q,
@@ -148,4 +161,5 @@ class GenericProvider(Provider):
             rate_limit=rl,
             threads=th,
             cookies_browser=cb,
+            download_archive=da,
         )

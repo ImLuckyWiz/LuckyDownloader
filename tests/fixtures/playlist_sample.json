@@ -1,0 +1,79 @@
+{
+  "_type": "playlist",
+  "id": "PLBCF2DAC6FFB574DE",
+  "title": "Google Search Stories",
+  "uploader": "Google Search Stories",
+  "webpage_url": "https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE",
+  "entries": [
+    {
+      "id": "GvgqDSnpRQM",
+      "title": "Andrew Willis, Skatepark Engineer",
+      "duration": 90,
+      "url": "https://www.youtube.com/watch?v=GvgqDSnpRQM",
+      "uploader": "Google Search Stories",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/GvgqDSnpRQM/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAG_eTsfQVTsZYSURCrO8aVKT90-Q",
+          "height": 188,
+          "width": 336
+        }
+      ]
+    },
+    {
+      "id": "fIc_VEQ7Vo0",
+      "title": null,
+      "duration": null,
+      "url": "https://www.youtube.com/watch?v=fIc_VEQ7Vo0",
+      "uploader": null,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/fIc_VEQ7Vo0/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCyuRqSjvHV1GFZx8zMeYbpo9Sc9g",
+          "height": 188,
+          "width": 336
+        }
+      ]
+    },
+    {
+      "id": "V4DDt30Aat4",
+      "title": "Mark Lesek: A New/Old Prosthetic",
+      "duration": 159,
+      "url": "https://www.youtube.com/watch?v=V4DDt30Aat4",
+      "uploader": "Google Search Stories",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/V4DDt30Aat4/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAEobtTAyTeqalcVbehJhO_osQvPw",
+          "height": 188,
+          "width": 336
+        }
+      ]
+    },
+    {
+      "id": "07718Vcwcyc",
+      "title": null,
+      "duration": null,
+      "url": "https://www.youtube.com/watch?v=07718Vcwcyc",
+      "uploader": null,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/07718Vcwcyc/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLATMb_bu-OZA6lE6yb575rWGZNT9g",
+          "height": 188,
+          "width": 336
+        }
+      ]
+    },
+    {
+      "id": "XDgC4FMftpg",
+      "title": "Mark Kempton: Neighbors In Need",
+      "duration": 121,
+      "url": "https://www.youtube.com/watch?v=XDgC4FMftpg",
+      "uploader": "Google Search Stories",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/XDgC4FMftpg/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLA0C09CWM9fyPuErmfzVI1oXWD8Ng",
+          "height": 188,
+          "width": 336
+        }
+      ]
+    }
+  ]
+}

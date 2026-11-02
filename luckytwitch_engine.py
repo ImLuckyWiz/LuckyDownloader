@@ -205,6 +205,10 @@ from core.source_info import (
     SourceInfo,
     Storyboard,
     VideoFormat,
+    PlaylistItem,
+    PlaylistInfo,
+    is_playlist_dict,
+    parse_playlist_info,
     YTDLP_MISSING,
     describe_quality,
     estimate_bytes,
@@ -238,6 +242,7 @@ from core.timeline import (
     remove_cut,
     toggle_part,
 )
+from core.playlist import expand_playlist_jobs, parse_item_range
 from core.timeutil import fmt_hms, parse_time, parse_twitch_duration
 from core.tools import (
     FFMPEG_BUILDS,

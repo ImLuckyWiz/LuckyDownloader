@@ -124,6 +124,35 @@ class SourceInfo:
         return TwitchProvider().has_capability(cap)
 
 
+@dataclass
+class PlaylistItem:
+    id: str
+    title: str
+    url: str
+    duration: float = 0.0
+    uploader: str = ""
+    thumbnail: str = ""
+    index: int = 1
+
+
+@dataclass
+class PlaylistInfo:
+    id: str
+    title: str
+    url: str
+    uploader: str = ""
+    entries: list[PlaylistItem] = field(default_factory=list)
+    thumbnail: str = ""
+    site: str = "generic"
+    provider: Any | None = None
+
+    def has_capability(self, cap: Any) -> bool:
+        if self.provider is not None:
+            return self.provider.has_capability(cap)
+        from core.providers.base import Capability
+        return bool(cap & (Capability.RESOLVE | Capability.PLAYLIST))
+
+
 def normalize_url(text: str) -> str:
     text = text.strip()
     if text.isdigit():
@@ -153,9 +182,13 @@ def get_source_info(text: str) -> SourceInfo:
     ytdlp = find_tool("yt-dlp") if find_tool else None
     if not ytdlp:
         raise EngineError(YTDLP_MISSING)
+    cmd = [ytdlp, "--dump-single-json", "--no-warnings", "--skip-download"]
+    if not twitch_vod_id(url):
+        cmd.append("--flat-playlist")
+    cmd.append(url)
     try:
         proc = subprocess.run(
-            [ytdlp, "--dump-single-json", "--no-warnings", "--skip-download", url],
+            cmd,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -179,6 +212,8 @@ def get_source_info(text: str) -> SourceInfo:
     if twitch_vod_id(url):
         src = parse_source_info(info, url)
         src.muted = fetch_muted_ranges(info.get("formats"), src.duration)
+    elif is_playlist_dict(info):
+        src = parse_playlist_info(info, url)
     else:
         src = parse_generic_source_info(info, url)
     return src
@@ -402,6 +437,71 @@ def parse_generic_formats(formats) -> list[VideoFormat]:
     return result
 
 
+def is_playlist_dict(info: dict) -> bool:
+    return bool(info.get("_type") in ("playlist", "channel", "multi_video") or "entries" in info)
+
+
+def parse_playlist_info(info: dict, url: str) -> PlaylistInfo:
+    """Turn yt-dlp's -J / --flat-playlist output for a playlist or channel into PlaylistInfo."""
+    title = str(info.get("title") or info.get("description", "")[:80] or "Playlist").strip()
+    uploader = str(info.get("uploader") or info.get("channel") or info.get("uploader_id") or "").strip()
+    playlist_id = str(info.get("id") or "")
+    thumbnail = str(info.get("thumbnail") or "")
+
+    from core.providers.detect import detect_source
+    prov, _ = detect_source(url)
+    extractor = str(info.get("extractor_key") or info.get("extractor") or "").lower()
+    site = prov.name if prov and prov.name != "generic" else (extractor or "generic")
+
+    raw_entries = info.get("entries") or []
+    items: list[PlaylistItem] = []
+    for idx, e in enumerate(raw_entries, start=1):
+        if not isinstance(e, dict):
+            continue
+        eid = str(e.get("id") or "")
+        etitle = str(e.get("title") or f"Item {idx}").strip()
+        eurl = str(e.get("url") or e.get("webpage_url") or "")
+        if not eurl and eid:
+            if "youtube" in site or "youtu" in url:
+                eurl = f"https://www.youtube.com/watch?v={eid}"
+            else:
+                eurl = eid
+        elif eurl and not eurl.startswith("http"):
+            if "youtube" in site or "youtu" in url:
+                eurl = f"https://www.youtube.com/watch?v={eurl}"
+
+        edur = float(e.get("duration") or 0.0)
+        euploader = str(e.get("uploader") or e.get("channel") or uploader).strip()
+        ethumb = str(e.get("thumbnail") or "")
+        if not ethumb and e.get("thumbnails"):
+            thumbs = e["thumbnails"]
+            if isinstance(thumbs, list) and thumbs:
+                ethumb = str(thumbs[-1].get("url") or "")
+
+        items.append(
+            PlaylistItem(
+                id=eid,
+                title=etitle,
+                url=eurl,
+                duration=edur,
+                uploader=euploader,
+                thumbnail=ethumb,
+                index=idx,
+            )
+        )
+
+    return PlaylistInfo(
+        id=playlist_id,
+        title=title,
+        url=url,
+        uploader=uploader,
+        entries=items,
+        thumbnail=thumbnail,
+        site=site,
+        provider=prov,
+    )
+
+
 def parse_generic_source_info(info: dict, url: str) -> SourceInfo:
     """Turn yt-dlp's --dump-single-json output for a non-Twitch URL into a neutral SourceInfo."""
     if info.get("_type") in ("playlist", "channel", "multi_video") or "entries" in info:
@@ -462,6 +562,7 @@ def build_generic_download_args(
     rate_limit: str | None = None,
     threads: int = 4,
     cookies_browser: str | None = None,
+    download_archive: str | None = None,
 ) -> list[str]:
     format_str = build_generic_format_string(quality=quality, audio_only=audio_only)
     args = [
@@ -477,6 +578,8 @@ def build_generic_download_args(
         args += ["--limit-rate", str(rate_limit).strip()]
     if cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""):
         args += ["--cookies-from-browser", str(cookies_browser).strip().lower()]
+    if download_archive and str(download_archive).strip():
+        args += ["--download-archive", str(download_archive).strip()]
     if audio_only or (quality or "").strip().lower() in ("audio", "audio only", "audio_only"):
         if audio_format and audio_format.lower() in ("mp3", "m4a", "opus", "wav", "flac"):
             afmt = audio_format.lower()
