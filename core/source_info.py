@@ -189,7 +189,7 @@ def get_source_info(text: str, cookies_browser: str | None = None) -> SourceInfo
         "--no-warnings",
         "--skip-download",
         "--remote-components", "ejs:github",
-        "--extractor-args", "youtube:formats=missing_pot",
+        "--extractor-args", "youtube:player_client=web_safari,web",
     ]
     from core.settings import load_settings
     cb = cookies_browser if cookies_browser is not None else load_settings().get("cookies_from_browser")
@@ -605,7 +605,7 @@ def build_generic_download_args(
         "--fragment-retries", "10",
         "--continue",
         "--remote-components", "ejs:github",
-        "--extractor-args", "youtube:formats=missing_pot",
+        "--extractor-args", "youtube:player_client=web_safari,web",
     ]
     if threads > 1:
         args += ["--concurrent-fragments", str(max(1, threads))]

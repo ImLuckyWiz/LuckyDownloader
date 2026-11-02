@@ -83,7 +83,7 @@ class GenericProvider(Provider):
             "--flat-playlist",
             "--skip-download",
             "--remote-components", "ejs:github",
-            "--extractor-args", "youtube:formats=missing_pot",
+            "--extractor-args", "youtube:player_client=web_safari,web",
         ]
         from core.settings import load_settings
         cb = load_settings().get("cookies_from_browser")
