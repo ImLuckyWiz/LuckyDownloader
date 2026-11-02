@@ -134,7 +134,7 @@ jobs:
           key: ${{ runner.os }}-nuitka-${{ hashFiles('requirements.txt', 'luckytwitch_qt.py') }}
           restore-keys: |
             ${{ runner.os }}-nuitka-
-          - name: Build (Windows)
+      - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: cmd
         run: build_windows.bat ${{ github.ref_type == 'tag' && github.ref_name || '1.0' }}
