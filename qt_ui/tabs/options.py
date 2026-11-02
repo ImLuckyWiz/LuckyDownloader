@@ -35,7 +35,7 @@ import weblink
 from core import examples
 from core.files import open_in_file_manager
 from core.options import (
-    AUDIO_FORMAT_NAMES, CHAT_RENDER_FPS_NAMES, CHAT_RENDER_LOOK_NAMES, CHAT_RENDER_TYPE_NAMES, QUALITY_NAMES,
+    COOKIES_BROWSER_NAMES, AUDIO_FORMAT_NAMES, CHAT_RENDER_FPS_NAMES, CHAT_RENDER_LOOK_NAMES, CHAT_RENDER_TYPE_NAMES, QUALITY_NAMES,
     STRATEGY_NAMES, flag,
 )
 from core.settings import DEFAULTS
@@ -709,6 +709,16 @@ class OptionsTab(QWidget):
 
         row = self._add_setting_row(card, "auto_update", N_("Check for yt-dlp updates on startup"), N_("Recommended: Twitch changes often."), "tools", card)
         self._switch(row, "auto_update")
+
+        row = self._add_setting_row(
+            card,
+            "cookies_from_browser",
+            N_("Cookies from browser"),
+            N_("Pass browser cookies to yt-dlp for age-restricted or login-required content (YouTube, TikTok, Instagram)."),
+            "tools",
+            card,
+        )
+        row.add_control(self._combo("cookies_from_browser", COOKIES_BROWSER_NAMES, 10))
 
         self.update_row = card.add_row(t("Update yt-dlp"), t("Download the latest version now."))
         self.update_btn = QPushButton(t("Update yt-dlp now"))

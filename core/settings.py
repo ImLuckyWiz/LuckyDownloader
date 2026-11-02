@@ -52,8 +52,10 @@ DEFAULTS = {
     "audio_format": "m4a · keep Twitch's audio",
     "folder_template": "{date} - {title} - {id}",
     "clip_name_template": "{clip_title}",
+    "generic_name_template": "{uploader} - {date} - {title} [{id}]",
     "clip_pad_before": "3",
     "clip_pad_after": "3",
+    "cookies_from_browser": "None",
     "auto_update": True,
     "check_app_updates": True,
 }

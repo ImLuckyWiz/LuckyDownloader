@@ -26,6 +26,10 @@ VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?$")
 GITHUB_RELEASE_API = "https://api.github.com/repos/ImLuckyWiz/LuckyTwitchDownloader/releases/latest"
 GITHUB_RELEASE_WEB = "https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/latest"
 GITHUB_DOWNLOAD_PREFIX = "https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/"
+GITHUB_DOWNLOAD_PREFIXES = (
+    "https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/",
+    "https://github.com/ImLuckyWiz/LuckyDownloader/releases/download/",
+)
 THROTTLE_HOURS = 24
 
 
@@ -125,29 +129,29 @@ def pick_asset(release: dict, sys_platform: str | None = None, machine: str | No
     if sys_plat.startswith("win"):
         for a in assets:
             name = a.get("name", "")
-            if name.startswith("LuckyTwitch-Setup") and name.endswith(".exe"):
+            if name.startswith(("LuckyTwitch-Setup", "LuckyDownloader-Setup")) and name.endswith(".exe"):
                 return a
     elif sys_plat == "darwin":
         is_arm = mach in ("arm64", "aarch64")
         target_token = "arm64" if is_arm else "x86_64"
         for a in assets:
             name = a.get("name", "")
-            if name.endswith(".dmg") and target_token in name:
+            if name.startswith(("LuckyTwitch-", "LuckyDownloader-")) and name.endswith(".dmg") and target_token in name:
                 return a
         for a in assets:
-            if a.get("name", "").endswith(".dmg"):
+            if name.startswith(("LuckyTwitch-", "LuckyDownloader-")) and name.endswith(".dmg"):
                 return a
     elif sys_plat.startswith("linux"):
         for a in assets:
             name = a.get("name", "")
-            if name.endswith(".AppImage") and "x86_64" in name:
+            if name.startswith(("LuckyTwitch-", "LuckyDownloader-")) and name.endswith(".AppImage") and "x86_64" in name:
                 return a
         for a in assets:
-            if a.get("name", "").endswith(".AppImage"):
+            if name.startswith(("LuckyTwitch-", "LuckyDownloader-")) and name.endswith(".AppImage"):
                 return a
         for a in assets:
             name = a.get("name", "")
-            if name.endswith(".tar.gz") and "linux" in name:
+            if name.startswith(("LuckyTwitch-", "LuckyDownloader-")) and name.endswith(".tar.gz") and "linux" in name:
                 return a
 
     return None
@@ -155,7 +159,7 @@ def pick_asset(release: dict, sys_platform: str | None = None, machine: str | No
 
 def is_safe_asset_url(url: str) -> bool:
     """Ensure asset download URL starts with the official release download prefix."""
-    return bool(url and url.startswith(GITHUB_DOWNLOAD_PREFIX))
+    return bool(url and any(url.startswith(p) for p in GITHUB_DOWNLOAD_PREFIXES))
 
 
 def verify_download(file_path: Path, expected_size: int, expected_sha256: str) -> bool:

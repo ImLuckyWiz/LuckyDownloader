@@ -162,3 +162,43 @@ def test_queue_runner_cancel_single_job(qtbot):
         runner.worker.join(5.0)
     finally:
         qr_mod.run_job = orig_run
+
+
+def test_download_full_forwards_cookies_browser(monkeypatch, tmp_path: Path):
+    import luckytwitch_engine as eng
+    from core.download import download_full
+    recorded_kw = {}
+
+    def fake_ytdlp(ctx, args, threads, **kw):
+        recorded_kw.update(kw)
+        out_f = tmp_path / "full.mp4"
+        out_f.write_bytes(b"x" * 1024)
+
+    monkeypatch.setattr(eng, "run_ytdlp", fake_ytdlp)
+    ctx = eng.Ctx()
+    download_full(ctx, "https://youtube.com/watch?v=123", tmp_path, threads=4, cookies_browser="firefox")
+    assert recorded_kw.get("cookies_browser") == "firefox"
+
+
+def test_run_ytdlp_appends_cookies_flag(monkeypatch, tmp_path: Path):
+    from core.download import run_ytdlp
+    from core.runtime import Ctx
+    captured_cmd = []
+
+    class FakeProc:
+        returncode = 0
+        stdout = []
+        def wait(self): pass
+
+    def fake_popen(cmd, *args, **kwargs):
+        captured_cmd.extend(cmd)
+        return FakeProc()
+
+    monkeypatch.setattr("core.download.find_tool", lambda name: "fake_ytdlp")
+    monkeypatch.setattr("subprocess.Popen", fake_popen)
+
+    ctx = Ctx()
+    run_ytdlp(ctx, ["https://youtube.com/watch?v=123"], threads=2, cookies_browser="chrome")
+    assert "--cookies-from-browser" in captured_cmd
+    idx = captured_cmd.index("--cookies-from-browser")
+    assert captured_cmd[idx + 1] == "chrome"

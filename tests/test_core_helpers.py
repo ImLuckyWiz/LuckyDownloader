@@ -56,9 +56,9 @@ def test_resource_path_points_into_the_project():
 # ------------------------------------------------------------------ settings
 def test_defaults_are_the_42_documented_keys_with_the_documented_types():
     d = settings.DEFAULTS
-    assert len(d) == 42
+    assert len(d) == 44
     assert sum(isinstance(v, bool) for v in d.values()) == 16
-    assert sum(isinstance(v, str) for v in d.values()) == 26
+    assert sum(isinstance(v, str) for v in d.values()) == 28
     expected_bools = {
         "exact", "keep_full", "chapters", "sidecar", "premiere_xml",
         "premiere_plugin", "game_markers", "muted_markers", "chat",

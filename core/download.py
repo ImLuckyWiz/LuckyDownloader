@@ -26,7 +26,7 @@ from core.source_info import YTDLP_MISSING
 from core.timeutil import fmt_hms
 
 if sys.version_info >= (3, 11):
-    from typing import TYPE_CHECKING
+    from typing import Any, TYPE_CHECKING
     if TYPE_CHECKING:
         from core.job import JobOptions
 
@@ -300,6 +300,7 @@ def run_ytdlp(
     watch_dir: Path | None = None,
     format_id: str | None = None,
     rate_limit: str | None = None,
+    cookies_browser: str | None = None,
 ) -> None:
     """
     Run the yt-dlp binary, forwarding progress to ctx. Cancel kills the whole process tree.
@@ -328,6 +329,8 @@ def run_ytdlp(
         cmd += ["--downloader-args", "ffmpeg:-stats"]
     if rate_limit and str(rate_limit).strip():
         cmd += ["--limit-rate", str(rate_limit).strip()]
+    if cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""):
+        cmd += ["--cookies-from-browser", str(cookies_browser).strip().lower()]
     ffmpeg = _find("ffmpeg")
     if ffmpeg:
         cmd += ["--ffmpeg-location", str(Path(ffmpeg).parent)]
@@ -401,7 +404,14 @@ def _find_media(folder: Path) -> Path | None:
 
 
 def download_full(
-    ctx: Ctx, url: str, workdir: Path, threads: int, format_id: str | None = None, rate_limit: str | None = None
+    ctx: Ctx,
+    url: str,
+    workdir: Path,
+    threads: int,
+    format_id: str | None = None,
+    rate_limit: str | None = None,
+    cookies_browser: str | None = None,
+    **kwargs: Any,
 ) -> Path:
     workdir.mkdir(parents=True, exist_ok=True)
     done = workdir / "full.done"
@@ -414,6 +424,8 @@ def download_full(
         kw["format_id"] = format_id
     if rate_limit and str(rate_limit).strip():
         kw["rate_limit"] = str(rate_limit).strip()
+    if cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""):
+        kw["cookies_browser"] = str(cookies_browser).strip().lower()
     eng = sys.modules.get("luckytwitch_engine")
     _ytdlp = getattr(eng, "run_ytdlp", run_ytdlp) if eng else run_ytdlp
     _ytdlp(ctx, ["-o", _out_template(workdir, "full"), url], threads, **kw)
@@ -433,6 +445,8 @@ def download_section(
     exact: bool,
     format_id: str | None = None,
     rate_limit: str | None = None,
+    cookies_browser: str | None = None,
+    **kwargs: Any,
 ) -> Path:
     pdir = workdir / f"part{part.index}"
     if pdir.exists():
@@ -446,6 +460,8 @@ def download_section(
         kw["format_id"] = format_id
     if rate_limit and str(rate_limit).strip():
         kw["rate_limit"] = str(rate_limit).strip()
+    if cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""):
+        kw["cookies_browser"] = str(cookies_browser).strip().lower()
     eng = sys.modules.get("luckytwitch_engine")
     _ytdlp = getattr(eng, "run_ytdlp", run_ytdlp) if eng else run_ytdlp
     _ytdlp(ctx, args + [url], threads, total_secs=part.duration, watch_dir=pdir, **kw)

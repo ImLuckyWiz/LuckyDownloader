@@ -1,0 +1,87 @@
+{
+  "id": "zv89llsvexdz",
+  "title": "That small heart attack.",
+  "uploader": "Antw87",
+  "channel": "r/videos",
+  "channel_id": "videos",
+  "duration": 12.0,
+  "upload_date": "20170805",
+  "webpage_url": "https://www.reddit.com/r/videos/comments/6rrwyj/that_small_heart_attack/",
+  "thumbnail": "https://b.thumbs.redditmedia.com/zv89llsvexdz.jpg",
+  "extractor": "reddit",
+  "extractor_key": "Reddit",
+  "formats": [
+    {
+      "format_id": "dash-audio",
+      "ext": "m4a",
+      "width": null,
+      "height": null,
+      "fps": null,
+      "vcodec": "none",
+      "acodec": "mp4a.40.2",
+      "tbr": 128.0,
+      "filesize": 192000,
+      "format_note": "audio"
+    },
+    {
+      "format_id": "dash-360",
+      "ext": "mp4",
+      "width": 640,
+      "height": 360,
+      "fps": 30.0,
+      "vcodec": "avc1.4d401e",
+      "acodec": "none",
+      "tbr": 800.0,
+      "filesize": 1200000,
+      "format_note": "DASH video"
+    },
+    {
+      "format_id": "dash-480",
+      "ext": "mp4",
+      "width": 854,
+      "height": 480,
+      "fps": 30.0,
+      "vcodec": "avc1.4d401f",
+      "acodec": "none",
+      "tbr": 1200.0,
+      "filesize": 1800000,
+      "format_note": "DASH video"
+    },
+    {
+      "format_id": "dash-720",
+      "ext": "mp4",
+      "width": 1280,
+      "height": 720,
+      "fps": 30.0,
+      "vcodec": "avc1.4d401f",
+      "acodec": "none",
+      "tbr": 2500.0,
+      "filesize": 3750000,
+      "format_note": "DASH video"
+    },
+    {
+      "format_id": "dash-1080",
+      "ext": "mp4",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30.0,
+      "vcodec": "avc1.4d4028",
+      "acodec": "none",
+      "tbr": 4500.0,
+      "filesize": 6750000,
+      "format_note": "DASH video"
+    },
+    {
+      "format_id": "fallback",
+      "ext": "mp4",
+      "width": 1280,
+      "height": 720,
+      "fps": 30.0,
+      "vcodec": "h264",
+      "acodec": "aac",
+      "tbr": 2628.0,
+      "filesize": 3942000,
+      "format_note": "fallback format"
+    }
+  ]
+}

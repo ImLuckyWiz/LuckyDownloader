@@ -100,7 +100,9 @@ from core.finalize import (
     _load_chapters,
     _load_muted,
     _write_sidecar,
+    GENERIC_NAME_TEMPLATE,
     clean_title,
+    format_generic_stem,
     cut_exact,
     date_components,
     dominant_game,
@@ -176,6 +178,14 @@ from core.premiere_export import (
     write_markers_json,
     write_premiere_xml,
 )
+from core.providers import (
+    Capability,
+    GenericProvider,
+    Provider,
+    TwitchProvider,
+    detect_source,
+    map_generic_error,
+)
 from core.runtime import (
     APP_DIR,
     Ctx,
@@ -204,6 +214,10 @@ from core.source_info import (
     normalize_url,
     parse_formats,
     parse_game_segments,
+    build_generic_download_args,
+    build_generic_format_string,
+    parse_generic_formats,
+    parse_generic_source_info,
     parse_source_info,
     parse_storyboard,
     resolve_format,

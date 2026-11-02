@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING
 
 from core.chapters import ClipFilter
 from core.source_info import QUALITY_BEST, SourceInfo
-from core.twitch_api import TwitchClient
+if TYPE_CHECKING:
+    from core.twitch_api import TwitchClient
 
 
 @dataclass
@@ -29,6 +30,7 @@ class JobOptions:
     subfolders: bool = True  # out_dir/<streamer>/<stream>/parts
     folder_template: str = "{date} - {title} - {id}"  # name of the per-stream folder
     clip_name_template: str = "{clip_title}"  # file name when a single clip is downloaded
+    generic_name_template: str = "{uploader} - {date} - {title} [{id}]"  # file name for generic (non-Twitch) downloads
     clean_title: bool = True  # strip bot commands (!links, !gsupps) and promo tags from stream titles
     premiere_xml: bool = False  # also write a Premiere Pro XML (clips as markers) next to each part
     game_markers: bool = False  # also put the game / category changes into that XML as markers ("GAME: ...")
@@ -48,6 +50,7 @@ class JobOptions:
     quality: str = QUALITY_BEST  # quality to download (Twitch VODs): "best", "720p60", "audio", etc.
     audio_format: str = "m4a"  # audio container when quality is audio-only: "m4a" | "mp3"
     rate_limit: str = ""  # optional bandwidth limit passed to yt-dlp ("--limit-rate"), e.g. "5M", "500K"
+    cookies_browser: str = ""  # browser to pass cookies from ("--cookies-from-browser"), e.g. "chrome", "firefox"
 
 
 @dataclass

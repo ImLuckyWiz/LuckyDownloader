@@ -469,6 +469,7 @@ class VodStrip(QFrame):
 
     clicked = Signal()
     clear_requested = Signal()
+    _thumb_loaded = Signal(str)
 
     HEIGHT = 48
 
@@ -529,6 +530,7 @@ class VodStrip(QFrame):
         self.clear_btn.clicked.connect(self.clear_requested.emit)
         lay.addWidget(self.clear_btn)
 
+        self._thumb_loaded.connect(self._on_thumb_file)
         self.setVisible(False)
 
     def set_vod(self, src, clips: list | None = None, warn: str = "") -> None:
@@ -553,7 +555,7 @@ class VodStrip(QFrame):
             bits.append(f"({warn})")
         self.meta_label.setText("  \u00b7  ".join(b for b in bits if b))
 
-        vod_id = str(getattr(src, "twitch_vod_id", "") or getattr(src, "vod_id", "") or "")
+        vod_id = str(getattr(src, "twitch_vod_id", "") or getattr(src, "id", "") or getattr(src, "vod_id", "") or "")
         from core import history
         hist = history.is_downloaded(vod_id)
         if hist and hasattr(self, "downloaded_badge"):
@@ -561,8 +563,21 @@ class VodStrip(QFrame):
             self.downloaded_badge.setVisible(True)
         elif hasattr(self, "downloaded_badge"):
             self.downloaded_badge.setVisible(False)
+
+        site = str(getattr(src, "site", "twitch") or "twitch")
+        if site == "twitch":
+            self.open_btn.setText(t("Open on Twitch"))
+            self.open_btn.setAccessibleName(t("Open VOD on Twitch in browser"))
+        else:
+            site_title = site.capitalize()
+            self.open_btn.setText(t("Open on {site}", site=site_title))
+            self.open_btn.setAccessibleName(t("Open video on {site} in browser", site=site_title))
+
         self.thumb_label.setPixmap(QPixmap())
-        self.thumb_label.setText(t("VOD"))
+        self.thumb_label.setText(site.upper()[:4] if site != "twitch" else t("VOD"))
+        thumb_url = getattr(src, "thumbnail", "")
+        if thumb_url:
+            self._fetch_thumbnail(thumb_url)
         from qt_ui.motion import DURATION_NORMAL, Motion, animate_height
         if Motion.enabled() and self.parentWidget() and self.parentWidget().isVisible():
             self.setMaximumHeight(0)
@@ -571,6 +586,28 @@ class VodStrip(QFrame):
         else:
             self.setFixedHeight(self.HEIGHT)
             self.setVisible(True)
+
+    def set_thumbnail_from_pixmap(self, pm: QPixmap) -> None:
+        if pm is not None and not pm.isNull():
+            self.thumb_label.setPixmap(pm)
+            self.thumb_label.setText("")
+
+    def _fetch_thumbnail(self, url: str) -> None:
+        import threading
+        def work():
+            try:
+                from luckytwitch_engine import fetch_thumbnail
+                p = fetch_thumbnail(url)
+                if p and Path(p).is_file():
+                    self._thumb_loaded.emit(str(p))
+            except Exception:
+                pass
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_thumb_file(self, path_str: str) -> None:
+        pm = QPixmap(path_str)
+        if not pm.isNull():
+            self.set_thumbnail_from_pixmap(pm)
 
     def set_thumbnail_from_pil(self, pil_img) -> None:
         """Convert a PIL image (e.g. first storyboard frame) into a 16:9 QPixmap on the strip."""

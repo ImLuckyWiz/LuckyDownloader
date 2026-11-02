@@ -129,8 +129,9 @@ def test_history_dialog_populates_rows(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(dlg)
 
     assert dlg.table.rowCount() == 1
-    assert dlg.table.item(0, 1).text() == "alice"
-    assert dlg.table.item(0, 2).text() == "Cool Stream"
+    assert dlg.table.item(0, 0).text() == "Twitch"
+    assert dlg.table.item(0, 2).text() == "alice"
+    assert dlg.table.item(0, 3).text() == "Cool Stream"
     assert "1 completed" in dlg.count_label.text()
 
     # Test clear
@@ -172,3 +173,48 @@ def test_vod_strip_shows_downloaded_badge(qtbot, tmp_path, monkeypatch):
 
     strip.set_vod(NotDownloadedSrc())
     assert not strip.downloaded_badge.isVisible()
+
+
+def test_is_downloaded_by_url(tmp_path: Path):
+    target = tmp_path / "history.json"
+    history.record_download(
+        {
+            "site": "youtube",
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "title": "Never Gonna Give You Up",
+            "streamer": "Rick Astley",
+        },
+        path=target,
+    )
+
+    found = history.is_downloaded(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", path=target)
+    assert found is not None
+    assert found.title == "Never Gonna Give You Up"
+    assert found.site == "youtube"
+
+    assert history.is_downloaded(url="https://www.youtube.com/watch?v=other", path=target) is None
+
+
+def test_history_dialog_populates_generic_entry(qtbot, tmp_path, monkeypatch):
+    import core.paths as paths
+    target = tmp_path / "luckytwitch_history.json"
+    monkeypatch.setattr(paths, "HISTORY_PATH", target)
+    history.record_download(
+        {
+            "site": "tiktok",
+            "url": "https://www.tiktok.com/@user/video/12345",
+            "title": "Fun Clip",
+            "streamer": "user",
+        },
+        path=target,
+    )
+
+    from qt_ui.dialogs import HistoryDialog
+    dlg = HistoryDialog()
+    qtbot.addWidget(dlg)
+
+    assert dlg.table.rowCount() == 1
+    assert dlg.table.item(0, 0).text() == "Tiktok"
+    assert dlg.table.item(0, 2).text() == "user"
+    assert dlg.table.item(0, 3).text() == "Fun Clip"
+

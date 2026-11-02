@@ -276,9 +276,9 @@ class HistoryDialog(QDialog):
         # Table
         from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView
         self.table = QTableWidget(self)
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels([t("Downloaded"), t("Streamer"), t("Title"), t("Parts"), t("Quality"), t("Actions")])
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels([t("Site"), t("Downloaded"), t("Streamer"), t("Title"), t("Parts"), t("Quality"), t("Actions")])
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         outer.addWidget(self.table, 1)
@@ -313,11 +313,13 @@ class HistoryDialog(QDialog):
             self.empty_state.hide_message()
 
         for row, e in enumerate(entries):
-            self.table.setItem(row, 0, QTableWidgetItem(e.downloaded_at))
-            self.table.setItem(row, 1, QTableWidgetItem(e.streamer))
-            self.table.setItem(row, 2, QTableWidgetItem(e.title))
-            self.table.setItem(row, 3, QTableWidgetItem(str(e.parts)))
-            self.table.setItem(row, 4, QTableWidgetItem(e.quality))
+            site_val = (getattr(e, "site", "twitch") or "twitch").capitalize()
+            self.table.setItem(row, 0, QTableWidgetItem(site_val))
+            self.table.setItem(row, 1, QTableWidgetItem(e.downloaded_at))
+            self.table.setItem(row, 2, QTableWidgetItem(e.streamer))
+            self.table.setItem(row, 3, QTableWidgetItem(e.title))
+            self.table.setItem(row, 4, QTableWidgetItem(str(e.parts)))
+            self.table.setItem(row, 5, QTableWidgetItem(e.quality))
 
             actions_widget = QWidget(self.table)
             act_lay = QHBoxLayout(actions_widget)
@@ -330,13 +332,24 @@ class HistoryDialog(QDialog):
                 f_btn.clicked.connect(lambda _, p=e.folder: open_in_file_manager(p))
                 act_lay.addWidget(f_btn)
 
-            if e.vod_id:
+            if e.vod_id or getattr(e, "url", ""):
                 load_btn = QPushButton(t("Load"), actions_widget)
                 load_btn.setProperty("variant", "ghost")
-                load_btn.clicked.connect(lambda _, vid=e.vod_id: self._load_vod(vid))
+                load_btn.clicked.connect(lambda _, item=e: self._load_entry(item))
                 act_lay.addWidget(load_btn)
 
-            self.table.setCellWidget(row, 5, actions_widget)
+            self.table.setCellWidget(row, 6, actions_widget)
+
+    def _load_entry(self, entry) -> None:
+        url = getattr(entry, "url", "")
+        if not url:
+            vid = getattr(entry, "vod_id", "")
+            if getattr(entry, "site", "twitch") == "twitch" or vid.isdigit():
+                url = f"https://www.twitch.tv/videos/{vid}"
+            else:
+                url = vid
+        self.vod_requested.emit(url)
+        self.accept()
 
     def _load_vod(self, vod_id: str) -> None:
         url = f"https://www.twitch.tv/videos/{vod_id}"

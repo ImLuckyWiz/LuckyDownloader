@@ -79,6 +79,10 @@ class VideoFormat:
     tbr: float = 0.0         # kbit/s as Twitch declares it (0 = unknown)
     audio_only: bool = False
     source: bool = False     # Twitch's own "Source" quality (format_note == "Source")
+    container: str = ""      # container/ext: "mp4", "mkv", "webm", "m4a", etc.
+    filesize: int = 0        # declared or estimated bytes (0 = unknown)
+    vcodec: str = ""
+    acodec: str = ""
 
     @property
     def label(self) -> str:  # what the person reads
@@ -99,12 +103,25 @@ class SourceInfo:
     uploader: str
     duration: float
     date: str  # YYYY-MM-DD or ""
-    twitch_vod_id: str | None
+    twitch_vod_id: str | None = None
     segments: list[GameSegment] = field(default_factory=list)  # game changes; [] when yt-dlp gives none
     storyboard: Storyboard | None = None  # None when the site has no preview thumbnails
     # Stretches Twitch silenced, in VOD seconds. [] = checked, none; None = not checked or could not be told.
     muted: list[Range] | None = None
     formats: list[VideoFormat] = field(default_factory=list)
+    thumbnail: str = ""
+    site: str = "twitch"
+    provider: Any | None = None
+
+    def has_capability(self, cap: Any) -> bool:
+        if self.provider is not None:
+            return self.provider.has_capability(cap)
+        from core.providers.detect import detect_source
+        prov, _ = detect_source(self.url)
+        if prov is not None:
+            return prov.has_capability(cap)
+        from core.providers.twitch import TwitchProvider
+        return TwitchProvider().has_capability(cap)
 
 
 def normalize_url(text: str) -> str:
@@ -153,14 +170,17 @@ def get_source_info(text: str) -> SourceInfo:
     except OSError as e:
         raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
     if proc.returncode != 0:
-        raise EngineError(t("yt-dlp could not read that URL:\n{error}").format(error=proc.stderr.strip()[-800:]))
+        from core.providers.generic import map_generic_error
+        raise EngineError(map_generic_error(proc.stderr))
     try:
         info = json.loads(proc.stdout)
     except json.JSONDecodeError as e:
         raise EngineError(t("yt-dlp returned unreadable data for that URL.")) from e
-    src = parse_source_info(info, url)
-    if src.twitch_vod_id:  # one more small request; a failure only means "no muted ranges to show"
+    if twitch_vod_id(url):
+        src = parse_source_info(info, url)
         src.muted = fetch_muted_ranges(info.get("formats"), src.duration)
+    else:
+        src = parse_generic_source_info(info, url)
     return src
 
 
@@ -293,6 +313,189 @@ def parse_formats(formats) -> list[VideoFormat]:
     return result
 
 
+def parse_generic_formats(formats) -> list[VideoFormat]:
+    """Turn yt-dlp's "formats" from generic sites (YouTube, TikTok, Reddit, Instagram)
+    into a deduplicated, sorted list of VideoFormat choices by resolution + audio only.
+    """
+    if not isinstance(formats, list):
+        return []
+
+    by_height: dict[int, dict] = {}
+    best_audio: dict | None = None
+    has_video = False
+
+    for f in formats:
+        if not isinstance(f, dict):
+            continue
+        if f.get("format_note") == "storyboard":
+            continue
+        vcodec = f.get("vcodec") or ""
+        acodec = f.get("acodec") or ""
+        h = f.get("height")
+        try:
+            h_int = int(h) if h is not None else 0
+        except (ValueError, TypeError):
+            h_int = 0
+
+        # Audio-only stream
+        if vcodec == "none" and acodec and acodec != "none":
+            tbr = float(f.get("tbr") or f.get("abr") or 0.0)
+            best_tbr = float(best_audio.get("tbr") or best_audio.get("abr") or 0.0) if best_audio else -1.0
+            if best_audio is None or tbr > best_tbr:
+                best_audio = f
+            continue
+
+        # Video stream
+        if vcodec and vcodec != "none" and h_int > 0:
+            has_video = True
+            tbr = float(f.get("tbr") or f.get("vbr") or 0.0)
+            fps = float(f.get("fps") or 0.0)
+            existing = by_height.get(h_int)
+            ex_fps = float(existing.get("fps") or 0.0) if existing else 0.0
+            ex_tbr = float(existing.get("tbr") or existing.get("vbr") or 0.0) if existing else 0.0
+            if existing is None or (fps, tbr) > (ex_fps, ex_tbr):
+                by_height[h_int] = f
+
+    result: list[VideoFormat] = []
+    sorted_heights = sorted(by_height.keys(), reverse=True)
+    for i, h in enumerate(sorted_heights):
+        f = by_height[h]
+        fps = float(f.get("fps") or 0.0)
+        tbr = float(f.get("tbr") or f.get("vbr") or 0.0)
+        ext = str(f.get("ext") or "mp4")
+        fs = int(f.get("filesize") or f.get("filesize_approx") or 0)
+        fid = f"{h}p"
+        result.append(
+            VideoFormat(
+                format_id=fid,
+                height=h,
+                fps=fps,
+                tbr=tbr,
+                audio_only=False,
+                source=(i == 0),
+                container=ext,
+                filesize=fs,
+                vcodec=str(f.get("vcodec") or ""),
+                acodec=str(f.get("acodec") or ""),
+            )
+        )
+
+    if best_audio is not None or has_video:
+        tbr = float(best_audio.get("tbr") or best_audio.get("abr") or 0.0) if best_audio else 0.0
+        ext = str(best_audio.get("ext") or "m4a") if best_audio else "m4a"
+        fs = int(best_audio.get("filesize") or best_audio.get("filesize_approx") or 0) if best_audio else 0
+        result.append(
+            VideoFormat(
+                format_id="Audio_Only",
+                height=0,
+                fps=0.0,
+                tbr=tbr,
+                audio_only=True,
+                source=False,
+                container=ext,
+                filesize=fs,
+                vcodec="none",
+                acodec=str(best_audio.get("acodec") or "") if best_audio else "",
+            )
+        )
+
+    return result
+
+
+def parse_generic_source_info(info: dict, url: str) -> SourceInfo:
+    """Turn yt-dlp's --dump-single-json output for a non-Twitch URL into a neutral SourceInfo."""
+    if info.get("_type") in ("playlist", "channel", "multi_video") or "entries" in info:
+        raise EngineError(t("Playlists and channels are not supported yet (coming in Phase 6). Paste a single video link."))
+
+    duration = float(info.get("duration") or 0.0)
+    d = str(info.get("upload_date") or "")
+    date = f"{d[:4]}-{d[4:6]}-{d[6:8]}" if len(d) == 8 else ""
+    title = str(info.get("title") or info.get("description", "")[:80] or "video").strip()
+    uploader = str(info.get("uploader") or info.get("channel") or info.get("uploader_id") or "").strip()
+    thumbnail = str(info.get("thumbnail") or "")
+
+    from core.providers.detect import detect_source
+    prov, _ = detect_source(url)
+    extractor = str(info.get("extractor_key") or info.get("extractor") or "").lower()
+    site = prov.name if prov and prov.name != "generic" else (extractor or "generic")
+
+    return SourceInfo(
+        url=url,
+        id=str(info.get("id", "")),
+        title=title,
+        uploader=uploader,
+        duration=duration,
+        date=date,
+        twitch_vod_id=None,
+        segments=[],
+        storyboard=None,
+        muted=None,
+        formats=parse_generic_formats(info.get("formats")),
+        thumbnail=thumbnail,
+        site=site,
+        provider=prov,
+    )
+
+
+def build_generic_format_string(quality: str = QUALITY_BEST, audio_only: bool = False) -> str:
+    """Turn quality choice into yt-dlp format selector string."""
+    q = (quality or "").strip().lower()
+    if audio_only or q in ("audio", "audio only", "audio_only"):
+        return "ba/b"
+    if q in ("", QUALITY_BEST, "best available"):
+        return "bv*+ba/b"
+    m = re.search(r"(\d{3,4})p?", q)
+    if m:
+        h = int(m.group(1))
+        return f"bv*[height<={h}]+ba/b[height<={h}]/bv*+ba/b"
+    return q
+
+
+def build_generic_download_args(
+    url: str,
+    *,
+    quality: str = QUALITY_BEST,
+    container: str = "mp4",
+    audio_only: bool = False,
+    audio_format: str | None = None,
+    out_template: str | None = None,
+    rate_limit: str | None = None,
+    threads: int = 4,
+    cookies_browser: str | None = None,
+) -> list[str]:
+    format_str = build_generic_format_string(quality=quality, audio_only=audio_only)
+    args = [
+        "-f", format_str,
+        "--no-playlist",
+        "--retries", "10",
+        "--fragment-retries", "10",
+        "--continue",
+    ]
+    if threads > 1:
+        args += ["--concurrent-fragments", str(max(1, threads))]
+    if rate_limit and str(rate_limit).strip():
+        args += ["--limit-rate", str(rate_limit).strip()]
+    if cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""):
+        args += ["--cookies-from-browser", str(cookies_browser).strip().lower()]
+    if audio_only or (quality or "").strip().lower() in ("audio", "audio only", "audio_only"):
+        if audio_format and audio_format.lower() in ("mp3", "m4a", "opus", "wav", "flac"):
+            afmt = audio_format.lower()
+        elif container and container.lower().lstrip(".") in ("mp3", "m4a", "opus", "wav", "flac"):
+            afmt = container.lower().lstrip(".")
+        else:
+            afmt = "m4a"
+        args += ["-x", "--audio-format", afmt]
+    else:
+        cnt = container.lower().lstrip(".")
+        if cnt in ("mp4", "mkv", "webm", "mov"):
+            args += ["--merge-output-format", cnt]
+    if out_template:
+        args += ["-o", out_template]
+    args.append(url)
+    return args
+
+
+
 def resolve_format(formats: list[VideoFormat], wanted: str = QUALITY_BEST) -> VideoFormat | None:
     """Pick the format from ``formats`` that best matches the ``wanted`` string."""
     if not formats:
@@ -300,7 +503,7 @@ def resolve_format(formats: list[VideoFormat], wanted: str = QUALITY_BEST) -> Vi
     w = (wanted or "").strip().lower()
 
     # 1. "audio" -> audio-only; fallback to best video
-    if w == QUALITY_AUDIO:
+    if w in (QUALITY_AUDIO, "audio only", "audio_only"):
         for vf in formats:
             if vf.audio_only:
                 return vf

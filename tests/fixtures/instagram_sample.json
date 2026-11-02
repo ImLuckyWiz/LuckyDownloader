@@ -1,0 +1,123 @@
+{
+  "id": "Chunk8-jurw",
+  "title": "Video by instagram",
+  "uploader": "Instagram",
+  "channel": "instagram",
+  "channel_id": null,
+  "duration": 15.0,
+  "upload_date": "20220826",
+  "webpage_url": "https://www.instagram.com/reel/Chunk8-jurw/",
+  "thumbnail": "https://instagram.fmvd2-1.fna.fbcdn.net/v/t51.71878-15/503029218_989312563369593_1066977119782083769_n.jpg?stp=dst-jpg_e15_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ig_cache_key=MjkxMzQ0MDA3MjE0NDQ0ODI0MA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkNMSVBTLnhwaWRzLjEwODAuc2RyLnZpZGVvX2RlZmF1bHRfY292ZXJfZnJhbWUuQzMifQ%3D%3D&_nc_ohc=fdG8pxGJDcUQ7kNvwGcgcl0&_nc_oc=Adq4HL3kFH3Wx-Tx_FFLn1whDJYcTdhmPpp28CL3jWtUcmL8BOoRL-2R7tgf3UC-O_CtI2yQqrHlS8x8mW6Fwfnn&_nc_zt=23&_nc_ht=instagram.fmvd2-1.fna&_nc_gid=4rvEbMkC_ahIxn_O_rFGYg&_nc_ss=70689&oh=00_AQRdl9_SbSXUc0Pm2RUDC2ON1bl47nZSGPC3wlbpaNiRaQ&oe=6AEE18C0",
+  "extractor": "Instagram",
+  "extractor_key": "Instagram",
+  "formats": [
+    {
+      "format_id": "0",
+      "ext": "mp4",
+      "width": null,
+      "height": null,
+      "fps": null,
+      "vcodec": null,
+      "acodec": "none",
+      "tbr": null,
+      "filesize": null,
+      "format_note": null
+    },
+    {
+      "format_id": "1",
+      "ext": "mp4",
+      "width": null,
+      "height": null,
+      "fps": null,
+      "vcodec": null,
+      "acodec": "none",
+      "tbr": null,
+      "filesize": null,
+      "format_note": null
+    },
+    {
+      "format_id": "2",
+      "ext": "mp4",
+      "width": null,
+      "height": null,
+      "fps": null,
+      "vcodec": null,
+      "acodec": "none",
+      "tbr": null,
+      "filesize": null,
+      "format_note": null
+    },
+    {
+      "format_id": "dash-747962539633307v",
+      "ext": "mp4",
+      "width": 472,
+      "height": 840,
+      "fps": 30,
+      "vcodec": "avc1.64001F",
+      "acodec": "none",
+      "tbr": 102.873,
+      "filesize": null,
+      "format_note": "DASH video"
+    },
+    {
+      "format_id": "dash-2162089093995799v",
+      "ext": "mp4",
+      "width": 720,
+      "height": 1280,
+      "fps": 30,
+      "vcodec": "avc1.64001F",
+      "acodec": "none",
+      "tbr": 239.705,
+      "filesize": null,
+      "format_note": "DASH video"
+    },
+    {
+      "format_id": "dash-389862563296509v",
+      "ext": "mp4",
+      "width": 720,
+      "height": 1280,
+      "fps": 30,
+      "vcodec": "avc1.64001F",
+      "acodec": "none",
+      "tbr": 510.666,
+      "filesize": null,
+      "format_note": "DASH video"
+    },
+    {
+      "format_id": "dash-381042170865427v",
+      "ext": "mp4",
+      "width": 720,
+      "height": 1280,
+      "fps": 30,
+      "vcodec": "avc1.64001F",
+      "acodec": "none",
+      "tbr": 1036.605,
+      "filesize": null,
+      "format_note": "DASH video"
+    },
+    {
+      "format_id": "dash-5586132858113159v",
+      "ext": "mp4",
+      "width": 720,
+      "height": 1280,
+      "fps": 30,
+      "vcodec": "avc1.64001F",
+      "acodec": "none",
+      "tbr": 1966.337,
+      "filesize": null,
+      "format_note": "DASH video"
+    },
+    {
+      "format_id": "dash-841320813455671v",
+      "ext": "mp4",
+      "width": 720,
+      "height": 1280,
+      "fps": 30,
+      "vcodec": "avc1.64001F",
+      "acodec": "none",
+      "tbr": 3140.618,
+      "filesize": null,
+      "format_note": "DASH video"
+    }
+  ]
+}

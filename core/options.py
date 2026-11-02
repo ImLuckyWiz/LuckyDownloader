@@ -37,6 +37,7 @@ CHAT_RENDER_LOOK_TYPES = {
     "Dark see-through panel": "panel",
 }
 CHAT_RENDER_FPS_NAMES = ["Like the video", "30", "60"]
+COOKIES_BROWSER_NAMES = ["None", "Chrome", "Firefox", "Edge", "Brave", "Opera", "Vivaldi", "Safari"]
 
 STRATEGY_NAMES = list(STRATEGIES)
 QUALITY_NAMES = list(QUALITY_CHOICES)
@@ -121,7 +122,9 @@ def build_options(settings: dict, cut_text: str = "", quality: str | None = None
         subfolders=flag(s, "subfolders"),
         folder_template=text(s, "folder_template").strip() or DEFAULTS["folder_template"],
         clip_name_template=text(s, "clip_name_template").strip() or DEFAULTS["clip_name_template"],
+        generic_name_template=text(s, "generic_name_template").strip() or DEFAULTS.get("generic_name_template", "{uploader} - {date} - {title} [{id}]"),
         clean_title=flag(s, "clean_title") if "clean_title" in s else True,
         quality=quality or QUALITY_CHOICES.get(text(s, "default_quality"), "best"),
         audio_format=AUDIO_FORMAT_CHOICES.get(text(s, "audio_format"), "m4a"),
+        cookies_browser="" if text(s, "cookies_from_browser").strip().lower() in ("none", "disabled", "") else text(s, "cookies_from_browser").strip().lower(),
     )

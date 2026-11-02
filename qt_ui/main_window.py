@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 import weblink
 from core import paths, updates
+from core.providers import Capability, detect_source
 from core.config import make_client
 from core.i18n import LANG_AUTO, t
 from core.options import build_filter, build_options, flag, num
@@ -830,6 +831,7 @@ class MainWindow(QMainWindow):
         self.tab_plan.set_title("", raw_title="")
         self.tab_plan.set_formats([], "")
         self.command_bar.show_no_vod()
+        self.tab_plan.set_mode(True)
         self.vod_strip.clear()
         self.update_preview()
         self.refresh_clips()
@@ -906,6 +908,11 @@ class MainWindow(QMainWindow):
             dialogs.warning(self, t("Tools"), error)
         else:
             self.set_status(t("Ready. Paste a VOD URL or ID and press «Get info»."))
+            if getattr(self, "_pending_retry_url", None):
+                retry_url = self._pending_retry_url
+                self._pending_retry_url = None
+                self.vod_entry.setText(retry_url)
+                self.on_get_info()
 
     # ---------------------------- LuckyTwitch updates ---------------------------- #
     def start_update_check(self, force: bool = False, manual: bool | None = None) -> None:
@@ -1079,7 +1086,8 @@ class MainWindow(QMainWindow):
             self.tab_search.search_edit.selectAll()
             self.tab_search.on_search()
             return
-        if not is_valid_url(text):
+        prov, cleaned = detect_source(text)
+        if prov is None and not is_valid_url(text):
             self.set_status(t("Please enter a valid video URL, a VOD ID, or a streamer name."))
             dialogs.warning(
                 self,
@@ -1093,7 +1101,7 @@ class MainWindow(QMainWindow):
         self.set_info_busy(True)
         self.set_status(t("Reading VOD info…"))
         self._info_from_link, self._link_pending = self._link_pending, None
-        self.info_runner.start(text, self.client)
+        self.info_runner.start(cleaned or text, self.client)
 
     def set_info_busy(self, busy: bool) -> None:
         """Feedback while «Get info» works: the button and the line under it show «Loading…» with moving dots, and the
@@ -1133,19 +1141,27 @@ class MainWindow(QMainWindow):
             info.title = clean_title(info.title)
         info.raw_title = raw_title
         self.source, self.clips, self.clips_loaded = info, list(clips), bool(loaded)
+        has_timeline = getattr(info, "has_capability", lambda c: True)(Capability.TIMELINE)
+        self.tab_plan.set_mode(has_timeline)
         self.tab_plan.set_formats(
             getattr(info, "formats", []), str(self.settings.get("default_quality", DEFAULTS["default_quality"]))
         )
         self.tab_plan.set_title(info.title, raw_title=raw_title)
+        if not has_timeline:
+            self.tab_plan.update_generic_card(info)
         extra = f" \u00b7 {len(self.clips)} clips" if loaded else ""
         self.info_label.setText(f"{info.uploader} \u00b7 {info.title} \u00b7 {fmt_hms(info.duration)} \u00b7 {info.date}{extra}")
         self.vod_strip.set_vod(info, self.clips if loaded else [], warn)
-        if not self.cut_text():
+        if not self.cut_text() and has_timeline:
             self.tab_plan.set_cut_text("0:00:00 - end")
         self.update_preview()
-        self.refresh_clips()
+        if has_timeline:
+            self.refresh_clips()
         self.tab_options.refresh_name_examples()
-        self.set_status(t("VOD loaded. Set your cut points and add it to the queue."))
+        if has_timeline:
+            self.set_status(t("VOD loaded. Set your cut points and add it to the queue."))
+        else:
+            self.set_status(t("Video loaded. Choose your options and add it to the queue."))
         if self._info_from_link is not None:
             what = f" ({self._info_from_link})" if self._info_from_link else ""
             self.set_status(t("VOD opened from a link{details}. Check the cut points, then add it to the queue.", details=what))
@@ -1158,6 +1174,15 @@ class MainWindow(QMainWindow):
         self.set_info_busy(False)
         self.info_btn.setEnabled(True)
         self.set_status(t("Error."))
+        if "extractor" in msg.lower() or "updating yt-dlp" in msg.lower():
+            if dialogs.ask_yes_no(
+                self,
+                t("Extractor error"),
+                msg + "\n\n" + t("Would you like to update yt-dlp now and try again?"),
+            ):
+                self._pending_retry_url = self.vod_entry.text().strip()
+                self.update_tools_now()
+                return
         dialogs.error(self, t("Error"), msg)
 
     # ---------------------------- adding to the queue ---------------------------- #
@@ -1172,6 +1197,48 @@ class MainWindow(QMainWindow):
         if not self.source:
             dialogs.info(self, t("No VOD"), t("Paste a VOD and press «Get info» first."))
             return
+        has_timeline = getattr(self.source, "has_capability", lambda c: True)(Capability.TIMELINE)
+        if not has_timeline:
+            card_title = self.tab_plan.card_title()
+            if card_title:
+                self.source.title = card_title
+            opts = self.build_options()
+            container = self.tab_plan.current_container()
+            audio_only = self.tab_plan.is_audio_only()
+            quality = "audio" if audio_only else self.tab_plan.current_quality()
+            out_dir = self.tab_plan.current_output_dir() or opts.out_dir
+            opts = replace(
+                opts,
+                cut_text="",
+                quality=quality,
+                container=container,
+                out_dir=out_dir,
+                strategy="full",
+                keep_full=False,
+                sidecar=False,
+                chapters=False,
+                game_markers=False,
+                muted_markers=False,
+                chat=False,
+                chat_render=False,
+                premiere_xml=False,
+                premiere_plugin=False,
+            )
+            job = Job(self.source, opts, clips=None, client=self.client)
+            label = f"{self.source.uploader or self.source.site} \u00b7 {self.source.title}"[:70]
+            strat = "full video"
+            self.tab_queue.enqueue(job, label, 1, strat, thumb=self._current_vod_thumb())
+            self._sync_queue_badge()
+            if self.settings:
+                save_settings(self.settings)
+            if start:
+                self.tab_queue.start_queue()
+            else:
+                msg = t("Added to queue ({count} item(s)).", count=len(self.tab_queue.items))
+                self.set_status(msg)
+                notify.success(self, t("Added to queue"), label, action=(t("Go to Queue"), self.show_queue_tab))
+            return
+
         opts = self.build_options()
         try:
             plan = make_plan(opts.cut_text, self.source.duration, opts.strategy, opts.full_threshold)

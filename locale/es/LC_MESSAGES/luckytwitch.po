@@ -1664,7 +1664,7 @@ msgstr "Estado"
 msgid "Strategy"
 msgstr "Estrategia"
 
-#: qt_ui/queue_model.py
+#: qt_ui/queue_model.py qt_ui/tabs/plan.py
 msgid "Video"
 msgstr "Video"
 
@@ -1822,7 +1822,7 @@ msgstr ""
 msgid "Bigger file, but it works offline."
 msgstr "Archivo más grande, pero funciona sin conexión."
 
-#: qt_ui/tabs/options.py qt_ui/welcome/setup_card.py
+#: qt_ui/tabs/options.py qt_ui/tabs/plan.py qt_ui/welcome/setup_card.py
 msgid "Browse…"
 msgstr "Examinar…"
 
@@ -2698,7 +2698,7 @@ msgstr "✔ {name}  ({width}x{height}, {fps} fps, {label}; comienza junto con la
 msgid "Could not get the playlist address: {error}"
 msgstr "No se pudo obtener la dirección de la lista de reproducción: {error}"
 
-#: core/download.py core/source_info.py
+#: core/download.py core/providers/generic.py core/source_info.py
 #, python-brace-format
 msgid ""
 "Could not run yt-dlp:\n"
@@ -2865,7 +2865,7 @@ msgstr "Pega una URL o ID de VOD."
 msgid "Paste a single VOD URL or ID (not multi-line text)."
 msgstr "Pega una sola URL o ID de VOD (no texto multilínea)."
 
-#: core/source_info.py
+#: core/providers/generic.py
 #, python-brace-format
 msgid ""
 "yt-dlp could not read that URL:\n"
@@ -2878,11 +2878,11 @@ msgstr ""
 msgid "yt-dlp did not report the video length for that URL."
 msgstr "yt-dlp no informó la duración del video para esa URL."
 
-#: core/source_info.py
+#: core/providers/generic.py core/source_info.py
 msgid "yt-dlp returned unreadable data for that URL."
 msgstr "yt-dlp devolvió datos ilegibles para esa URL."
 
-#: core/source_info.py
+#: core/providers/generic.py core/source_info.py
 msgid "yt-dlp took too long to read that URL."
 msgstr "yt-dlp tardó demasiado en leer esa URL."
 
@@ -3120,4 +3120,120 @@ msgstr "Descartar notificación"
 #, python-brace-format
 msgid "done ({} files)"
 msgstr "listo ({} archivos)"
+
+#: core/providers/generic.py
+msgid "Paste a single URL (not multi-line text)."
+msgstr "Pega una sola URL (no texto multilínea)."
+
+#: core/providers/generic.py
+msgid "Paste a video URL."
+msgstr "Pega una URL de video."
+
+#: core/source_info.py
+msgid "Playlists and channels are not supported yet (coming in Phase 6). Paste a single video link."
+msgstr ""
+"Las listas de reproducción y canales aún no son compatibles (próximamente en la Fase 6). Pega un "
+"enlace a un solo video."
+
+#: core/providers/generic.py
+msgid "Network error: could not connect to the video host. Check your internet connection."
+msgstr "Error de red: no se pudo conectar al host de video. Comprueba tu conexión a internet."
+
+#: core/providers/generic.py
+msgid "Unsupported URL: yt-dlp cannot extract video from this link."
+msgstr "URL no compatible: yt-dlp no puede extraer video de este enlace."
+
+#: core/providers/generic.py
+msgid "Video unavailable: the requested video was not found or was removed."
+msgstr "Video no disponible: el video solicitado no se encontró o fue eliminado."
+
+#: core/providers/generic.py
+msgid "yt-dlp could not read that URL."
+msgstr "yt-dlp no pudo leer esa URL."
+
+#: qt_ui/dialogs.py
+msgid "Site"
+msgstr "Sitio"
+
+#: qt_ui/shell.py
+#, python-brace-format
+msgid "Open on {site}"
+msgstr "Abrir en {site}"
+
+#: qt_ui/shell.py
+#, python-brace-format
+msgid "Open video on {site} in browser"
+msgstr "Abrir video en {site} en el navegador"
+
+#: qt_ui/main_window.py
+msgid "Video loaded. Choose your options and add it to the queue."
+msgstr "Video cargado. Elige tus opciones y agrégalo a la cola."
+
+#: qt_ui/tabs/plan.py
+msgid "Audio only"
+msgstr "Solo audio"
+
+#: qt_ui/tabs/plan.py
+msgid "Folder:"
+msgstr "Carpeta:"
+
+#: qt_ui/tabs/plan.py
+msgid "Format:"
+msgstr "Formato:"
+
+#: qt_ui/tabs/plan.py
+msgid "Select download folder"
+msgstr "Seleccionar carpeta de descarga"
+
+#: qt_ui/tabs/plan.py
+msgid "Video details"
+msgstr "Detalles del video"
+
+#: qt_ui/tabs/plan.py
+msgid "Video title…"
+msgstr "Título del video…"
+
+#: core/providers/generic.py
+msgid "Age-restricted video: sign-in required. Enable browser cookies in Options > Tools."
+msgstr "Video con restricción de edad: requiere iniciar sesión. Activa las cookies del navegador en Opciones > Herramientas."
+
+#: core/providers/generic.py
+msgid "Extractor error: the video site layout may have changed. Try updating yt-dlp in Options > Tools."
+msgstr "Error de extractor: el diseño del sitio de videos puede haber cambiado. Prueba actualizando yt-dlp en Opciones > Herramientas."
+
+#: core/providers/generic.py
+msgid "Geoblocked: this video is not available in your region or country."
+msgstr "Bloqueo geográfico: este video no está disponible en tu región o país."
+
+#: core/providers/generic.py
+msgid "Login required: this video requires an account. Enable browser cookies in Options > Tools."
+msgstr "Inicio de sesión requerido: este video requiere una cuenta. Activa las cookies del navegador en Opciones > Herramientas."
+
+#: core/providers/generic.py
+msgid "Private video: this content is private or requires permission from the uploader."
+msgstr "Video privado: este contenido es privado o requiere permiso del autor."
+
+#: core/providers/generic.py
+msgid "Rate limited: too many requests. Wait a few minutes before trying again."
+msgstr "Límite de solicitudes: demasiadas solicitudes. Espera unos minutos antes de volver a intentarlo."
+
+#: qt_ui/main_window.py
+msgid "Extractor error"
+msgstr "Error de extractor"
+
+#: qt_ui/main_window.py
+msgid "Would you like to update yt-dlp now and try again?"
+msgstr "¿Deseas actualizar yt-dlp ahora y volver a intentarlo?"
+
+#: qt_ui/tabs/options.py
+msgid "Cookies from browser"
+msgstr "Cookies del navegador"
+
+#: qt_ui/tabs/options.py
+msgid ""
+"Pass browser cookies to yt-dlp for age-restricted or login-required content (YouTube, TikTok, "
+"Instagram)."
+msgstr ""
+"Pasa cookies del navegador a yt-dlp para contenido con restricción de edad o inicio de sesión "
+"requerido (YouTube, TikTok, Instagram)."
 

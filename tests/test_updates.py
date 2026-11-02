@@ -130,6 +130,57 @@ def test_pick_asset_linux():
     assert asset_tar["name"] == "LuckyTwitch-linux-x86_64.tar.gz"
 
 
+def test_pick_asset_windows_luckydownloader():
+    release = {
+        "assets": [
+            {"name": "LuckyDownloader-macos-arm64.dmg", "browser_download_url": "http://mac-arm"},
+            {"name": "LuckyDownloader-Setup.exe", "browser_download_url": "http://win"},
+            {"name": "other.zip", "browser_download_url": "http://other"},
+        ]
+    }
+    asset = updates.pick_asset(release, sys_platform="win32", machine="AMD64")
+    assert asset is not None
+    assert asset["name"] == "LuckyDownloader-Setup.exe"
+
+
+def test_pick_asset_macos_luckydownloader():
+    release = {
+        "assets": [
+            {"name": "LuckyDownloader-macos-x86_64.dmg", "browser_download_url": "http://x86"},
+            {"name": "LuckyDownloader-macos-arm64.dmg", "browser_download_url": "http://arm"},
+        ]
+    }
+    asset_arm = updates.pick_asset(release, sys_platform="darwin", machine="arm64")
+    assert asset_arm is not None
+    assert asset_arm["name"] == "LuckyDownloader-macos-arm64.dmg"
+
+    asset_intel = updates.pick_asset(release, sys_platform="darwin", machine="x86_64")
+    assert asset_intel is not None
+    assert asset_intel["name"] == "LuckyDownloader-macos-x86_64.dmg"
+
+
+def test_pick_asset_linux_luckydownloader():
+    release = {
+        "assets": [
+            {"name": "LuckyDownloader-Setup.exe", "browser_download_url": "http://win"},
+            {"name": "LuckyDownloader-x86_64.AppImage", "browser_download_url": "http://appimage"},
+            {"name": "LuckyDownloader-linux-x86_64.tar.gz", "browser_download_url": "http://tar"},
+        ]
+    }
+    asset = updates.pick_asset(release, sys_platform="linux", machine="x86_64")
+    assert asset is not None
+    assert asset["name"] == "LuckyDownloader-x86_64.AppImage"
+
+    release_tar = {
+        "assets": [
+            {"name": "LuckyDownloader-linux-x86_64.tar.gz", "browser_download_url": "http://tar"},
+        ]
+    }
+    asset_tar = updates.pick_asset(release_tar, sys_platform="linux", machine="x86_64")
+    assert asset_tar is not None
+    assert asset_tar["name"] == "LuckyDownloader-linux-x86_64.tar.gz"
+
+
 def test_pick_asset_none_matching():
     release = {"assets": [{"name": "random.txt"}]}
     assert updates.pick_asset(release, sys_platform="win32") is None
@@ -137,10 +188,14 @@ def test_pick_asset_none_matching():
 
 # --------------------------------------------------------------------------- is_safe_asset_url
 def test_is_safe_asset_url():
-    valid = "https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/v2.2.0/LuckyTwitch-Setup.exe"
-    assert updates.is_safe_asset_url(valid) is True
+    valid_old = "https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/v2.2.0/LuckyTwitch-Setup.exe"
+    valid_new = "https://github.com/ImLuckyWiz/LuckyDownloader/releases/download/v2.12.0/LuckyDownloader-Setup.exe"
+    assert updates.is_safe_asset_url(valid_old) is True
+    assert updates.is_safe_asset_url(valid_new) is True
     assert updates.is_safe_asset_url("http://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/v2.2.0/x.exe") is False
+    assert updates.is_safe_asset_url("http://github.com/ImLuckyWiz/LuckyDownloader/releases/download/v2.12.0/x.exe") is False
     assert updates.is_safe_asset_url("https://malicious.com/LuckyTwitch-Setup.exe") is False
+    assert updates.is_safe_asset_url("https://malicious.com/LuckyDownloader-Setup.exe") is False
     assert updates.is_safe_asset_url("") is False
 
 

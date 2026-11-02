@@ -1,0 +1,32 @@
+# LuckyDownloader Migration Handoff & Progress
+
+## 1. Baseline Test Suite
+
+- **Date:** 2026-11-02
+- **Command:** `pytest`
+- **Result:** 1,591 passed, 31 skipped, 1 warning (129.89s)
+- **Environment:** Windows (win32), Python 3.14.7, PySide6 6.12.0
+- **Rule:** Subsequent phases must maintain all tests passing. The skipped count (31) must not grow without an explicit written reason.
+
+## 2. Working Rules
+
+1. **One phase at a time:** Focus solely on the active phase deliverables.
+2. **Tests must be green:** The full test suite must pass before any phase is marked `done`.
+3. **Phase 1 refactor must not change behavior:** Moving logic to `core/providers/` is purely architectural; existing Twitch features and test outcomes must remain identical.
+4. **Update HANDOFF.md:** Update status and one-line summaries in this document at the conclusion of each phase.
+5. **Stop and report when blocked:** Report issues or blockers immediately instead of making unverified assumptions.
+
+## 3. Phase Checklist
+
+| Phase | Description | Status | Note |
+|---|---|---|---|
+| **Phase 0** | Safety net and transitional release (updater dual-repo/asset support) | done | Updater accepts both LuckyTwitch and LuckyDownloader repo prefixes and asset names (1,594 passed). |
+| **Phase 1** | Provider layer (`core/providers/`, neutral source/job contracts) | done | Introduced Provider ABC, Capability flags, TwitchProvider, GenericProvider, detect_source, neutral SourceInfo & finalize guards (1,637 passed, 31 skipped). |
+| **Phase 2** | Generic source info and format selection (`generic.py`, yt-dlp spikes & fixtures) | done | Offline parsing for YouTube/TikTok/IG/Reddit fixtures, format selection, args builder, naming templates & playlist rejection (1,665 passed, 31 skipped). |
+| **Phase 3** | Generic download flow in the UI (adaptive Plan tab card, Queue, History) | done | Simple card mode for non-timeline sources, async thumbnail loader, 7-column History with site & URL support, Queue delegate fallback thumb, full video enqueueing (1,672 passed, 31 skipped). |
+| **Phase 4** | Reliability for YouTube, TikTok, and Instagram (error mapping, cookies, runtimes) | done | Cookies from browser option in Settings/Tools & job options, mapped errors with suggested actions (login, age, geoblock, rate limit, extractor), extractor update & retry prompt, yt-dlp generic format selector fix verified live with YouTube (1,680 passed, 31 skipped). |
+| **Phase 5** | Rebrand and Release 1 (repo/folder rename handoff, branding assets, link scheme) | not started | User intervention point for folder & repo rename |
+| **Phase 6** | Playlists and channels (Release 2) | not started | |
+| **Phase 7** | Browse tab with provider selector (Release 3) | not started | |
+| **Phase 8** | Subscriptions & watchlist multi-provider | not started | |
+| **Phase 9** | Cut editor for generic sources & internal cleanups | not started | |

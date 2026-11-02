@@ -128,7 +128,10 @@ class QueueRowDelegate(QStyledItemDelegate):
             f_small.setPointSize(7)
             f_small.setBold(True)
             painter.setFont(f_small)
-            painter.drawText(thumb_rect, Qt.AlignmentFlag.AlignCenter, "VOD")
+            src = getattr(getattr(item, "job", None), "source", None)
+            site = getattr(src, "site", "twitch") or "twitch"
+            txt = "VOD" if site == "twitch" else site.upper()[:4]
+            painter.drawText(thumb_rect, Qt.AlignmentFlag.AlignCenter, txt)
         painter.restore()
         painter.setPen(QPen(QColor(BORDER), 1))
         painter.drawRoundedRect(QRectF(thumb_rect).adjusted(0.5, 0.5, -0.5, -0.5), 4.0, 4.0)

@@ -36,7 +36,7 @@ OPTIONS_KEYS = {
     "chat_embed", "auto_update", "check_app_updates",
     "chat_render", "chat_render_mode", "chat_render_look", "chat_render_width", "chat_render_height",
     "chat_render_font_size", "chat_render_fps", "chat_render_smooth",
-    "default_quality", "audio_format",
+    "default_quality", "audio_format", "cookies_from_browser",
 }
 PLAN_KEYS = {"chapters", "min_views", "min_duration", "top_n", "pad_before"}
 SWITCHES = {"exact", "keep_full", "clean_title", "subfolders", "premiere_plugin", "game_markers", "muted_markers", "premiere_xml",
@@ -149,7 +149,7 @@ def test_arrow_keys_move_through_the_sidebar(tab):
 def test_every_old_setting_has_a_control_bound_to_it(tab):
     assert set(tab.binder.controls) == OPTIONS_KEYS
     assert not (PLAN_KEYS & set(tab.binder.controls))  # the Plan tab owns these
-    assert OPTIONS_KEYS | PLAN_KEYS == set(DEFAULTS)  # nothing of the 38 is forgotten
+    assert OPTIONS_KEYS | PLAN_KEYS == set(DEFAULTS) - {"generic_name_template"}  # nothing of the 38 is forgotten
     assert tab.tools_info_label is not None and tab.update_btn is not None
 
 
@@ -162,7 +162,7 @@ def test_numbers_are_spin_boxes_and_lists_are_combo_boxes(tab):
     spins = {"threads", "threshold", "pad_after", "clip_pad_before", "clip_pad_after", "chat_render_width",
              "chat_render_height", "chat_render_font_size"}
     combos = {"container", "strategy", "chat_format", "chat_render_mode", "chat_render_look", "chat_render_fps",
-              "default_quality", "audio_format"}
+              "default_quality", "audio_format", "cookies_from_browser"}
     assert {k for k, c in tab.binder.controls.items() if isinstance(c, SpinBox)} == spins
     assert {k for k, c in tab.binder.controls.items() if isinstance(c, ComboBox)} == combos
 

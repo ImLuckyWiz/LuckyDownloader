@@ -42,8 +42,9 @@ from core.download import (
 from core.errors import Cancelled, EngineError
 from core.i18n import t
 from core.job import Job, JobOptions
+from core.providers import Capability
 from core.muted import muted_from_playlist_url
-from core.planning import Part, make_plan
+from core.planning import Part, Plan, make_plan
 from core.premiere_export import probe_video, write_markers_json, write_premiere_xml
 from core.runtime import Ctx, find_tool
 from core.source_info import (
@@ -124,6 +125,35 @@ def format_duration_tag(seconds: float) -> str:
     return f"{s // 3600:02d}h{s % 3600 // 60:02d}m{s % 60:02d}s"
 
 
+
+GENERIC_NAME_TEMPLATE = "{uploader} - {date} - {title} [{id}]"
+
+
+def format_generic_stem(src: SourceInfo, template: str | None = None, clean: bool = True) -> str:
+    """Format file stem for non-Twitch jobs with uploader, date, title, id."""
+    tpl = template or GENERIC_NAME_TEMPLATE
+    title = clean_title(src.title) if clean else src.title
+    date = src.date or datetime.now().strftime("%Y-%m-%d")
+    data = _SafeDict(
+        uploader=src.uploader or "video",
+        author=src.uploader or "video",
+        channel=src.uploader or "video",
+        streamer=src.uploader or "video",
+        date=date,
+        stream_date=date,
+        title=title,
+        id=src.id or "video",
+        site=getattr(src, "site", "generic"),
+    )
+    try:
+        raw = tpl.format_map(data)
+    except (ValueError, IndexError):
+        raw = f"{data['uploader']} - {data['date']} - {data['title']} [{data['id']}]"
+
+    cleaned = re.sub(r"\s+-\s+-\s+", " - ", raw)
+    cleaned = safe_name(cleaned)
+    return cleaned or "video"
+
 def part_stem(src: SourceInfo, opts: JobOptions, part: Part, total: int, clip: dict | None = None) -> str:
     tag = format_duration_tag
 
@@ -138,6 +168,10 @@ def part_stem(src: SourceInfo, opts: JobOptions, part: Part, total: int, clip: d
 
     data = _SafeDict(
         streamer=src.uploader or "vod",
+        uploader=src.uploader or "video",
+        author=src.uploader or "video",
+        channel=src.uploader or "video",
+        site=getattr(src, "site", "twitch"),
         stream_date=stream_date,
         download_date=download_date,
         date=stream_date,
@@ -156,7 +190,10 @@ def part_stem(src: SourceInfo, opts: JobOptions, part: Part, total: int, clip: d
         quality=q_tag,
         resolution=q_tag,
     )
-    template = opts.name_template
+    is_twitch = bool(src.twitch_vod_id or getattr(src, "site", "twitch") == "twitch")
+    template = getattr(opts, "generic_name_template", None) if not is_twitch else opts.name_template
+    if not template:
+        template = opts.name_template
     if clip:  # single clip download: the clip's own name instead of the stream's
         data.update(
             clip_title=clip.get("title") or "Clip",
@@ -205,6 +242,10 @@ def stream_dir(src: SourceInfo, opts: JobOptions) -> Path:
 
     data = _SafeDict(
         streamer=src.uploader or "vod",
+        uploader=src.uploader or "video",
+        author=src.uploader or "video",
+        channel=src.uploader or "video",
+        site=getattr(src, "site", "twitch"),
         stream_date=stream_date,
         download_date=download_date,
         date=stream_date,
@@ -409,7 +450,7 @@ def _load_chapters(ctx: Ctx, job: Job) -> list[Chapter]:
         return []
     clips = job.clips
     if clips is None:
-        if not job.source.twitch_vod_id:
+        if not job.source.has_capability(Capability.TIMELINE) or not job.source.twitch_vod_id:
             ctx.log(t("Chapters: not a Twitch VOD URL, skipping."))
             return []
         if job.client is None:
@@ -428,6 +469,8 @@ def _load_muted(ctx: Ctx, job: Job) -> list[Chapter]:
     """The stretches Twitch silenced, as chapters, when the .markers.json should carry them (else [])."""
     src, opts = job.source, job.opts
     if not (opts.muted_markers and opts.premiere_plugin) or job.single_clip:
+        return []
+    if not src.has_capability(Capability.TIMELINE):
         return []
     ranges = src.muted  # normally read at «Get info»
     eng = sys.modules.get("luckytwitch_engine")
@@ -471,13 +514,22 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
     if not _find("ffmpeg"):
         raise EngineError(t("ffmpeg was not found. Install it and add it to PATH."))
 
-    plan = make_plan(opts.cut_text, src.duration, opts.strategy, opts.full_threshold)
+    if not src.has_capability(Capability.TIMELINE):
+        dur = max(1.0, float(src.duration or 1.0))
+        plan = Plan(parts=[Part(index=1, start=0.0, end=dur)], strategy="full", coverage=1.0, duration=src.duration or 0.0)
+    else:
+        plan = make_plan(opts.cut_text, src.duration, opts.strategy, opts.full_threshold)
     ctx.log(
         f"{len(plan.parts)} part(s), coverage {plan.coverage * 100:.0f}% → "
         + ("download full VOD, then split" if plan.strategy == "full" else "download only the parts")
     )
     fmt = resolve_format(src.formats, opts.quality)
-    fmt_kw = {"format_id": fmt.format_id} if fmt else {}
+    if not src.has_capability(Capability.TIMELINE):
+        from core.source_info import build_generic_format_string
+        fmt_str = build_generic_format_string(quality=opts.quality, audio_only=bool(fmt and fmt.audio_only))
+        fmt_kw = {"format_id": fmt_str}
+    else:
+        fmt_kw = {"format_id": fmt.format_id} if fmt else {}
     if fmt:
         ctx.log(describe_quality(fmt, opts.quality))
     elif (opts.quality or "").strip().lower() not in ("", QUALITY_BEST):
@@ -492,12 +544,12 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
         if skipped:
             ctx.log("Audio only: skipped " + ", ".join(skipped) + " (they need a video track).")
     chapters_all = _load_ch(ctx, job)
-    games_all = game_chapters(src.segments) if opts.game_markers and not job.single_clip else []
+    games_all = game_chapters(src.segments) if opts.game_markers and not job.single_clip and src.has_capability(Capability.SEGMENTS) else []
     muted_all = _load_mut(ctx, job)
     chat_tool: str | None = None
     if (opts.chat or opts.chat_render) and not job.single_clip:
         what = "Chat download" if opts.chat else "Chat overlay"
-        if not src.twitch_vod_id:
+        if not src.has_capability(Capability.CHAT) or not src.twitch_vod_id:
             ctx.log(t("{what} skipped: it only works for Twitch VODs.").format(what=what))
         else:
             try:
@@ -577,10 +629,12 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
 
     rate_limit = getattr(opts, "rate_limit", "")
     rate_kw = {"rate_limit": rate_limit} if rate_limit else {}
+    cookies_browser = getattr(opts, "cookies_browser", None)
+    cookies_kw = {"cookies_browser": cookies_browser} if cookies_browser else {}
 
     if plan.strategy == "full":
         ctx.stage(0.0, 0.85, "Downloading VOD")
-        full = _dl_full(ctx, src.url, workdir, opts.threads, **fmt_kw, **rate_kw)
+        full = _dl_full(ctx, src.url, workdir, opts.threads, **fmt_kw, **rate_kw, **cookies_kw)
         ctx.stage(0.85, 1.0, "Cutting")
         if opts.exact:
             for i, p in enumerate(plan.parts):
@@ -641,6 +695,8 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
                 "parts": len(results),
                 "folder": str(final_dir),
                 "quality": getattr(opts, "quality", "") or "Best available",
+                "site": getattr(src, "site", "twitch") or "twitch",
+                "url": getattr(src, "url", "") or "",
             })
     except Exception:
         pass

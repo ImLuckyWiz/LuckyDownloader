@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyTwitch Downloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-30 08:17-0300\n"
+"POT-Creation-Date: 2026-11-02 05:55-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -76,7 +76,7 @@ msgstr ""
 msgid "Could not get the playlist address: {error}"
 msgstr ""
 
-#: core/download.py core/source_info.py
+#: core/download.py core/providers/generic.py core/source_info.py
 #, python-brace-format
 msgid ""
 "Could not run yt-dlp:\n"
@@ -225,6 +225,69 @@ msgstr ""
 msgid "«{group}»: a group needs at least two points (use 0 and end)."
 msgstr ""
 
+#: core/providers/generic.py
+msgid "Age-restricted video: sign-in required. Enable browser cookies in Options > Tools."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "Extractor error: the video site layout may have changed. Try updating yt-dlp in Options > Tools."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "Geoblocked: this video is not available in your region or country."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "Login required: this video requires an account. Enable browser cookies in Options > Tools."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "Network error: could not connect to the video host. Check your internet connection."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "Paste a single URL (not multi-line text)."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "Paste a video URL."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "Private video: this content is private or requires permission from the uploader."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "Rate limited: too many requests. Wait a few minutes before trying again."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "Unsupported URL: yt-dlp cannot extract video from this link."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "Video unavailable: the requested video was not found or was removed."
+msgstr ""
+
+#: core/providers/generic.py
+msgid "yt-dlp could not read that URL."
+msgstr ""
+
+#: core/providers/generic.py
+#, python-brace-format
+msgid ""
+"yt-dlp could not read that URL:\n"
+"{error}"
+msgstr ""
+
+#: core/providers/generic.py core/source_info.py
+msgid "yt-dlp returned unreadable data for that URL."
+msgstr ""
+
+#: core/providers/generic.py core/source_info.py
+msgid "yt-dlp took too long to read that URL."
+msgstr ""
+
 #: core/source_info.py
 msgid "Paste a VOD URL or ID."
 msgstr ""
@@ -234,22 +297,11 @@ msgid "Paste a single VOD URL or ID (not multi-line text)."
 msgstr ""
 
 #: core/source_info.py
-#, python-brace-format
-msgid ""
-"yt-dlp could not read that URL:\n"
-"{error}"
+msgid "Playlists and channels are not supported yet (coming in Phase 6). Paste a single video link."
 msgstr ""
 
 #: core/source_info.py
 msgid "yt-dlp did not report the video length for that URL."
-msgstr ""
-
-#: core/source_info.py
-msgid "yt-dlp returned unreadable data for that URL."
-msgstr ""
-
-#: core/source_info.py
-msgid "yt-dlp took too long to read that URL."
 msgstr ""
 
 #: core/status.py qt_ui/queue_model.py
@@ -531,6 +583,10 @@ msgid "Show details"
 msgstr ""
 
 #: qt_ui/dialogs.py
+msgid "Site"
+msgstr ""
+
+#: qt_ui/dialogs.py
 msgid "Streamer"
 msgstr ""
 
@@ -649,6 +705,10 @@ msgstr ""
 
 #: qt_ui/main_window.py
 msgid "Error."
+msgstr ""
+
+#: qt_ui/main_window.py
+msgid "Extractor error"
 msgstr ""
 
 #: qt_ui/main_window.py qt_ui/shell.py
@@ -805,6 +865,10 @@ msgid "VOD opened from a link{details}. Check the cut points, then add it to the
 msgstr ""
 
 #: qt_ui/main_window.py
+msgid "Video loaded. Choose your options and add it to the queue."
+msgstr ""
+
+#: qt_ui/main_window.py
 msgid "View update"
 msgstr ""
 
@@ -814,6 +878,10 @@ msgstr ""
 
 #: qt_ui/main_window.py
 msgid "Wait for the running job to finish (or cancel it) first."
+msgstr ""
+
+#: qt_ui/main_window.py
+msgid "Would you like to update yt-dlp now and try again?"
 msgstr ""
 
 #: qt_ui/main_window.py
@@ -829,7 +897,7 @@ msgstr ""
 msgid "Strategy"
 msgstr ""
 
-#: qt_ui/queue_model.py
+#: qt_ui/queue_model.py qt_ui/tabs/plan.py
 msgid "Video"
 msgstr ""
 
@@ -954,6 +1022,16 @@ msgstr ""
 
 #: qt_ui/shell.py
 msgid "Open on Twitch"
+msgstr ""
+
+#: qt_ui/shell.py
+#, python-brace-format
+msgid "Open on {site}"
+msgstr ""
+
+#: qt_ui/shell.py
+#, python-brace-format
+msgid "Open video on {site} in browser"
 msgstr ""
 
 #: qt_ui/shell.py
@@ -1091,7 +1169,7 @@ msgstr ""
 msgid "Bigger file, but it works offline."
 msgstr ""
 
-#: qt_ui/tabs/options.py qt_ui/welcome/setup_card.py
+#: qt_ui/tabs/options.py qt_ui/tabs/plan.py qt_ui/welcome/setup_card.py
 msgid "Browse…"
 msgstr ""
 
@@ -1157,6 +1235,10 @@ msgstr ""
 
 #: qt_ui/tabs/options.py
 msgid "Container of the finished files."
+msgstr ""
+
+#: qt_ui/tabs/options.py
+msgid "Cookies from browser"
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -1437,6 +1519,12 @@ msgstr ""
 
 #: qt_ui/tabs/options.py
 msgid "Parallel connections per download. 8 is a good default."
+msgstr ""
+
+#: qt_ui/tabs/options.py
+msgid ""
+"Pass browser cookies to yt-dlp for age-restricted or login-required content (YouTube, TikTok, "
+"Instagram)."
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -1770,6 +1858,10 @@ msgid "At"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
+msgid "Audio only"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
 msgid "Auto"
 msgstr ""
 
@@ -1821,6 +1913,14 @@ msgstr ""
 
 #: qt_ui/tabs/plan.py
 msgid "Fix the cut points to add this VOD"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+msgid "Folder:"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+msgid "Format:"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
@@ -1901,6 +2001,10 @@ msgid "Select all"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
+msgid "Select download folder"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
 msgid "Select one clip"
 msgstr ""
 
@@ -1947,6 +2051,14 @@ msgstr ""
 
 #: qt_ui/tabs/plan.py
 msgid "Untitled clip"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+msgid "Video details"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+msgid "Video title…"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
