@@ -163,6 +163,7 @@ def test_info_runner_handles_playlist(qtbot, monkeypatch, sample_playlist):
     bridge = Bridge()
     runner = InfoRunner(bridge)
 
+    monkeypatch.setattr("qt_ui.background_jobs.get_source_info", lambda url: sample_playlist)
     from core import source_info
     monkeypatch.setattr(source_info, "get_source_info", lambda url: sample_playlist)
 

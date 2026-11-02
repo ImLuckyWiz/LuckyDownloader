@@ -1,3 +1,28 @@
+## v2.13.0
+
+LuckyDownloader **v2.13.0** is the official **Release 2**, bringing full support for importing entire playlists and channels, smart download routing with custom provider folders, and robust browser cookie security scoping.
+
+### What's new in 2.13.0:
+- **Playlists & Channels Import (Phase 6):**
+  - Paste any playlist or channel URL (YouTube, etc.) to open the new **Playlist Picker Dialog**.
+  - Select individual videos, use *Select all* / *Select none*, or specify item ranges (e.g. `1-10, 15, 20-25`).
+  - Configure shared download options (Quality, Container format, Audio only, Destination folder, and Duplicate skipping).
+  - Fast async thumbnail loading with clean YouTube fallbacks.
+  - Large playlist safety confirmation before adding to queue.
+- **Provider Folders & Download Routing (Phase 6b):**
+  - **Group by provider subfolder (`provider_subfolders`):** Automatically organize downloads by platform under your download directory (e.g. `Downloads/YouTube/`, `Downloads/Twitch/`, `Downloads/TikTok/`).
+  - **Custom folder per provider (`provider_out_dirs`):** Override the base download directory for specific platforms in Options (e.g. store Twitch VODs on one drive and YouTube videos on another).
+  - **New Template Tokens:** Expose `{site}` and `{provider}` tokens for stream folder templates and file naming.
+  - **Smart Folder Pre-population:** The Plan tab and Playlist dialog automatically pre-populate the destination folder with the detected provider's configured directory.
+- **Cookie Security Scope & Per-Video Control:**
+  - **Safe Domain Scope:** Browser cookies from Options are only shared with platforms that require or benefit from authentication (YouTube, TikTok, Instagram, X/Twitter), never leaking sessions to adult sites or arbitrary URLs.
+  - **Per-Video & Playlist Cookie Toggles:** Easily toggle cookies on or off directly on the Plan tab details card (`Cookies (Browser)`) or when importing a playlist.
+  - **Options Scope Setting:** Choose between *Only known platforms* (default & recommended) or *All supported sites*.
+- **Quality & Error Fixes:**
+  - Fixed YouTube age-restricted downloads failing with `HTTP Error 403: Forbidden` by serving HLS streams via Safari Web client extractor arguments.
+  - Resolved quality detection allowing full 1080p and 720p downloads.
+  - Added *Clear Queue* action with confirmation to quickly empty pending downloads.
+
 ## v2.12.1
 
 LuckyDownloader **v2.12.1** is a patch release fixing video thumbnail aspect ratio rendering for vertical videos (YouTube Shorts, TikTok, Instagram Reels) and resolving an async thumbnail loading issue for generic video sources.
