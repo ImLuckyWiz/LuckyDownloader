@@ -120,7 +120,15 @@ class QueueRowDelegate(QStyledItemDelegate):
         painter.setClipPath(path)
         pix = item.thumb if isinstance(item.thumb, QPixmap) and not item.thumb.isNull() else None
         if pix is not None:
-            painter.drawPixmap(thumb_rect, pix)
+            painter.fillRect(thumb_rect, QColor(BG))
+            scaled = pix.scaled(
+                thumb_rect.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            px = thumb_rect.x() + (thumb_rect.width() - scaled.width()) // 2
+            py = thumb_rect.y() + (thumb_rect.height() - scaled.height()) // 2
+            painter.drawPixmap(px, py, scaled)
         else:
             painter.fillRect(thumb_rect, QColor(BG))
             painter.setPen(QColor(MUTED))

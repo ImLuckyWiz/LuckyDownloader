@@ -245,6 +245,7 @@ class MainWindow(QMainWindow):
         self.vod_strip = VodStrip(top_wrap)
         self.vod_strip.clicked.connect(self.show_plan_tab)
         self.vod_strip.clear_requested.connect(self.clear_vod)
+        self.vod_strip.thumbnail_loaded.connect(self._on_strip_thumbnail_loaded)
         top_lay.addWidget(self.vod_strip)
         main_lay.addWidget(top_wrap)
 
@@ -855,6 +856,12 @@ class MainWindow(QMainWindow):
                 for it in self.tab_queue.items:
                     if getattr(it.job, "source", None) is src and it.thumb is None:
                         self.tab_queue.model.set_thumbnail(it.iid, pm)
+
+    def _on_strip_thumbnail_loaded(self, pm: QPixmap) -> None:
+        if pm is not None and not pm.isNull() and self.source:
+            for it in self.tab_queue.items:
+                if getattr(it.job, "source", None) is self.source and it.thumb is None:
+                    self.tab_queue.model.set_thumbnail(it.iid, pm)
 
     def cut_text(self) -> str:
         """The text of the Plan tab's cut points box."""

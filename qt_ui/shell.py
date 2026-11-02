@@ -10,6 +10,7 @@ hook so icons drop in without restructuring any widget.
 
 from __future__ import annotations
 
+from pathlib import Path
 import webbrowser
 from typing import Callable
 
@@ -469,6 +470,7 @@ class VodStrip(QFrame):
 
     clicked = Signal()
     clear_requested = Signal()
+    thumbnail_loaded = Signal(QPixmap)
     _thumb_loaded = Signal(str)
 
     HEIGHT = 48
@@ -489,7 +491,7 @@ class VodStrip(QFrame):
         self.thumb_label.setObjectName("vodThumb")
         self.thumb_label.setFixedSize(64, 36)
         self.thumb_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.thumb_label.setScaledContents(True)
+        self.thumb_label.setScaledContents(False)
         lay.addWidget(self.thumb_label)
 
         text_col = QVBoxLayout()
@@ -589,7 +591,12 @@ class VodStrip(QFrame):
 
     def set_thumbnail_from_pixmap(self, pm: QPixmap) -> None:
         if pm is not None and not pm.isNull():
-            self.thumb_label.setPixmap(pm)
+            scaled = pm.scaled(
+                self.thumb_label.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self.thumb_label.setPixmap(scaled)
             self.thumb_label.setText("")
 
     def _fetch_thumbnail(self, url: str) -> None:
@@ -608,6 +615,7 @@ class VodStrip(QFrame):
         pm = QPixmap(path_str)
         if not pm.isNull():
             self.set_thumbnail_from_pixmap(pm)
+            self.thumbnail_loaded.emit(pm)
 
     def set_thumbnail_from_pil(self, pil_img) -> None:
         """Convert a PIL image (e.g. first storyboard frame) into a 16:9 QPixmap on the strip."""
@@ -620,7 +628,7 @@ class VodStrip(QFrame):
             qimg = QImage(raw, w, h, w * 3, QImage.Format.Format_RGB888).copy()
             pix = QPixmap.fromImage(qimg)
             self.thumb_label.setText("")
-            self.thumb_label.setPixmap(pix)
+            self.set_thumbnail_from_pixmap(pix)
         except Exception:  # noqa: BLE001
             pass
 

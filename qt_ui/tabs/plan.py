@@ -422,7 +422,7 @@ class PlanTab(ScrollPage):
             f"background-color: {BG}; border: 1px solid {BORDER}; border-radius: 6px; font-weight: bold; color: {MUTED};"
         )
         self.generic_thumb_label.setText(t("Video"))
-        self.generic_thumb_label.setScaledContents(True)
+        self.generic_thumb_label.setScaledContents(False)
         c_lay.addWidget(self.generic_thumb_label, 0, Qt.AlignmentFlag.AlignTop)
 
         right_col = QWidget()
@@ -580,6 +580,7 @@ class PlanTab(ScrollPage):
         import threading
         def work():
             try:
+                from pathlib import Path
                 from luckytwitch_engine import fetch_thumbnail
                 p = fetch_thumbnail(url)
                 if p and Path(p).is_file():

@@ -1,3 +1,11 @@
+## v2.12.1
+
+LuckyDownloader **v2.12.1** is a patch release fixing video thumbnail aspect ratio rendering for vertical videos (YouTube Shorts, TikTok, Instagram Reels) and resolving an async thumbnail loading issue for generic video sources.
+
+### What's new in 2.12.1:
+- **Aspect Ratio Preservation for Vertical Videos:** Fixed video thumbnails for TikTok, YouTube Shorts, and Instagram Reels so they are no longer stretched into horizontal boxes. Thumbnails now preserve their natural aspect ratio centered cleanly in the Plan tab details card, the top VOD/video strip, and Queue rows.
+- **Generic Video Thumbnail Loading:** Fixed a silent exception in the background thumbnail fetcher that prevented real thumbnails from displaying for YouTube and other non-Twitch video sources.
+
 ## v2.12.0
 
 LuckyDownloader **v2.12.0** marks the official project rebranding from LuckyTwitch to **LuckyDownloader**, laying the foundation for broad multi-platform video downloading while maintaining seamless backward compatibility for existing users.

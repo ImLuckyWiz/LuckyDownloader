@@ -227,3 +227,30 @@ def test_extractor_error_prompts_update_and_retries(qtbot, monkeypatch):
     win.on_tools_done("")
     assert win._pending_retry_url is None
     assert runner_mock.called
+
+
+def test_generic_thumbnail_async_load(qtbot, monkeypatch, tmp_path):
+    from PySide6.QtGui import QImage
+    img = QImage(32, 32, QImage.Format.Format_RGB32)
+    img.fill(Qt.GlobalColor.blue)
+    sample_img_path = tmp_path / 'sample_thumb.jpg'
+    img.save(str(sample_img_path))
+
+    import luckytwitch_engine
+    monkeypatch.setattr(luckytwitch_engine, 'fetch_thumbnail', lambda url: sample_img_path)
+
+    from qt_ui.main_window import MainWindow
+    win = MainWindow()
+    qtbot.addWidget(win)
+    win.show()
+
+    src = _make_sample_source('youtube', 120.0)
+    src.thumbnail = 'https://example.com/thumb.jpg'
+
+    win.on_info_ok(src, clips=[], loaded=False, warn='')
+
+    qtbot.waitUntil(lambda: win.vod_strip.thumb_label.pixmap() is not None and not win.vod_strip.thumb_label.pixmap().isNull(), timeout=3000)
+    qtbot.waitUntil(lambda: win.tab_plan.generic_thumb_label.pixmap() is not None and not win.tab_plan.generic_thumb_label.pixmap().isNull(), timeout=3000)
+
+    assert win.vod_strip.thumb_label.text() == ''
+    assert win.tab_plan.generic_thumb_label.text() == ''
