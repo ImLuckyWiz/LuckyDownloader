@@ -309,3 +309,49 @@ def test_run_job_workdir_naming_by_quality(monkeypatch, tmp_path):
     assert workdirs[0] == ".luckytwitch_1_720p60"
     assert workdirs[1] == ".luckytwitch_1_480p"
     assert workdirs[2] == ".luckytwitch_1"
+
+
+def test_run_job_generic_source_cuts(monkeypatch, tmp_path):
+    from core.providers import GenericProvider
+    prov = GenericProvider("youtube")
+    src = eng.SourceInfo(
+        url="https://www.youtube.com/watch?v=generic123",
+        id="generic123",
+        title="Generic Video",
+        uploader="YouTuber",
+        duration=600.0,
+        date="2026-01-01",
+        twitch_vod_id=None,
+        formats=[],
+        site="youtube",
+        provider=prov,
+    )
+    opts = eng.JobOptions(
+        cut_text="0:00:10 - 0:00:30 ; 0:01:00 - 0:02:00",
+        out_dir=str(tmp_path / "out"),
+        strategy="sections",
+        quality="best",
+        cookies_browser="firefox",
+    )
+    job = eng.Job(source=src, opts=opts)
+
+    sec_calls = []
+    raw = tmp_path / "raw.mp4"
+    raw.write_bytes(b"x" * 5000)
+
+    def fake_sec(ctx, url, part, workdir, threads, exact, **kw):
+        sec_calls.append((part.start, part.end, kw))
+        return raw
+
+    _patch_run_job_wiring(monkeypatch, tmp_path, lambda *a, **k: None)
+    monkeypatch.setattr(eng, "download_section", fake_sec)
+
+    ctx, logs = _ctx()
+    results = eng.run_job(job, ctx)
+
+    assert len(results) == 2
+    assert len(sec_calls) == 2
+    assert sec_calls[0][0] == 10.0 and sec_calls[0][1] == 30.0
+    assert sec_calls[1][0] == 60.0 and sec_calls[1][1] == 120.0
+    assert sec_calls[0][2].get("cookies_browser") == "firefox"
+

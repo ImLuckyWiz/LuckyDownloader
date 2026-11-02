@@ -563,11 +563,18 @@ class PlanTab(ScrollPage):
     def set_mode(self, has_timeline: bool) -> None:
         self.mode_timeline = bool(has_timeline)
         self.timeline_card.setVisible(self.mode_timeline)
-        self.cuts_card.setVisible(self.mode_timeline)
+        self.cuts_card.setVisible(True)
+        self.title_row.setVisible(self.mode_timeline)
+        self.quality_row.setVisible(self.mode_timeline and bool(getattr(self.source, "formats", None)))
         self.clips_card.setVisible(self.mode_timeline)
         self.generic_card.setVisible(not self.mode_timeline)
         if not self.mode_timeline:
             self.onboarding_card.setVisible(False)
+            self.cuts_hint.setText(
+                t("Optional: write cut points to trim or split (e.g. 1:00 - 5:00 ; 12:00 - end). Leave blank for full video.")
+            )
+        else:
+            self.cuts_hint.setText(t(CUT_HINT))
         self.update_preview()
 
     def update_generic_card(self, source) -> None:
@@ -1209,15 +1216,59 @@ class PlanTab(ScrollPage):
         if not getattr(self, "mode_timeline", True):
             dur_str = fmt_hms(self.source.duration) if self.source else "0:00:00"
             audio = " (Audio only)" if self.is_audio_only() else ""
-            summary_str = f"1 video \u00b7 {dur_str}{audio}"
             qual = self.current_quality()
             cont = self.current_container()
+            text = self.cut_text()
+            if not text:
+                self._sync_strategy_buttons()
+                self._rebuild_part_cards(None)
+                summary_str = f"1 video \u00b7 {dur_str}{audio}"
+                lines = [
+                    f"Full video download ({dur_str})",
+                    f"Quality: {qual} \u00b7 Container: {cont}{audio}",
+                    t("Leave cut points blank to download the full video, or enter cut points above to trim."),
+                ]
+                self.set_preview("\n".join(lines), "ok", summary_str)
+                self.plan_summary_lbl.setToolTip(summary_str)
+                return
+            dur = self.source.duration if self.source else None
+            opts = self.build_options()
+            try:
+                plan = make_plan(text, dur, opts.strategy, opts.full_threshold)
+            except EngineError as e:
+                self._sync_strategy_buttons()
+                self._rebuild_part_cards(None)
+                self.set_preview(f"\u26a0 {e}", "err", t("Fix the cut points to add this video"))
+                self.plan_summary_lbl.setToolTip(str(e))
+                return
+            self._sync_strategy_buttons(resolved_strategy=plan.strategy)
+            self._rebuild_part_cards(plan)
             lines = [
-                f"Full video download ({dur_str})",
-                f"Quality: {qual} \u00b7 Container: {cont}{audio}",
+                t("Part {n}:  {start} → {end}   ({duration})",
+                  n=p.index, start=fmt_hms(p.start), end=fmt_hms(p.end), duration=fmt_hms(p.duration))
+                for p in plan.parts
             ]
+            if plan.duration:
+                how = (t("download the full video once, then split it") if plan.strategy == "full"
+                       else t("download only these parts"))
+                lines.append(t("→ {how}   (parts cover {pct}% of the video)",
+                               how=how, pct=int(round(plan.coverage * 100))))
+            lines.append(f"Quality: {qual} \u00b7 Container: {cont}{audio}")
+            n = len(plan.parts)
+            parts_count = tn("{n} part", "{n} parts", n)
+            summary_str = (
+                t("{count} · {duration} in total", count=parts_count, duration=fmt_hms(sum(p.duration for p in plan.parts)))
+                + audio
+            )
             self.set_preview("\n".join(lines), "ok", summary_str)
-            self.plan_summary_lbl.setToolTip(summary_str)
+            if plan.duration:
+                strat_desc = t("Full video + split") if plan.strategy == "full" else t("Only the parts")
+                self.plan_summary_lbl.setToolTip(
+                    t("{summary} · {mode} ({pct}% of video covered)",
+                      summary=summary_str, mode=strat_desc, pct=int(round(plan.coverage * 100)))
+                )
+            else:
+                self.plan_summary_lbl.setToolTip(summary_str)
             return
         text = self.cut_text()
         if not text:
@@ -1489,7 +1540,12 @@ class PlanTab(ScrollPage):
             self.reset_title_btn.setText(t("Reset"))
             self.reset_title_btn.setToolTip(t("Reset to original Twitch title"))
         if hasattr(self, "cuts_hint"):
-            self.cuts_hint.setText(t(CUT_HINT))
+            if not getattr(self, "mode_timeline", True):
+                self.cuts_hint.setText(
+                    t("Optional: write cut points to trim or split (e.g. 1:00 - 5:00 ; 12:00 - end). Leave blank for full video.")
+                )
+            else:
+                self.cuts_hint.setText(t(CUT_HINT))
         if hasattr(self, "strat_lbl"):
             self.strat_lbl.setText(t("Strategy:"))
         for key, label, _setting in STRATEGY_CHOICES:

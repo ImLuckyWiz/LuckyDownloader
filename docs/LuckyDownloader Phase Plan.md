@@ -257,11 +257,11 @@ A provider-neutral source record holds id, title, uploader, duration, thumbnail,
 
 **Done when:** existing Twitch watch lists load unchanged, and a pinned YouTube channel shows new items.
 
-## Phase 9: Later (optional)
+## Phase 9: Cut editor for generic sources & internal cleanups (done)
 
 - Cut editor for non-Twitch sources, using yt-dlp section downloads and the storyboard formats yt-dlp exposes.
-- A Home dashboard with a big paste box, recent downloads and new subscription items.
-- Rename the internal modules (`luckytwitch_engine`, `luckytwitch_qt`) in one mechanical commit.
+- Modern facade and entrypoint modules (`luckydownloader_engine.py`, `luckydownloader_qt.py`) alongside existing modules for backward compatibility.
+- Adaptive cut editor in Plan tab: optional cut points for trimming/splitting or blank for full video download, part cards and live preview, queue multi-part section jobs with cookie support.
 
 ## 5. Spikes to do early (during phase 2)
 

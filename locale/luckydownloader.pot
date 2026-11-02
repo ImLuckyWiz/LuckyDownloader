@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 12:03-0300\n"
+"POT-Creation-Date: 2026-11-02 12:19-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -2102,7 +2102,15 @@ msgid "Fix the cut points to add this VOD"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
+msgid "Fix the cut points to add this video"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
 msgid "Full VOD + split"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+msgid "Full video + split"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
@@ -2111,6 +2119,10 @@ msgstr ""
 
 #: qt_ui/tabs/plan.py
 msgid "Lead-in (s)"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+msgid "Leave cut points blank to download the full video, or enter cut points above to trim."
 msgstr ""
 
 #: qt_ui/tabs/plan.py
@@ -2141,6 +2153,17 @@ msgstr ""
 
 #: qt_ui/tabs/plan.py
 msgid "Optional: put the VOD's clips in the files as chapters."
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+msgid ""
+"Optional: write cut points to trim or split (e.g. 1:00 - 5:00 ; 12:00 - end). Leave blank for "
+"full video."
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+#, python-brace-format
+msgid "Part {n}:  {start} → {end}   ({duration})"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
@@ -2246,6 +2269,10 @@ msgid "download the full VOD once, then split it"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
+msgid "download the full video once, then split it"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
 #, python-brace-format
 msgid "{count} · {duration} in total"
 msgstr ""
@@ -2273,6 +2300,11 @@ msgid "{summary} · {mode} ({pct}% of VOD covered)"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
+#, python-brace-format, python-format
+msgid "{summary} · {mode} ({pct}% of video covered)"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
 #, python-brace-format
 msgid "{views} views"
 msgstr ""
@@ -2285,6 +2317,11 @@ msgstr ""
 #: qt_ui/tabs/plan.py
 #, python-brace-format, python-format
 msgid "→ {how}   (parts cover {pct}% of the VOD)"
+msgstr ""
+
+#: qt_ui/tabs/plan.py
+#, python-brace-format, python-format
+msgid "→ {how}   (parts cover {pct}% of the video)"
 msgstr ""
 
 #: qt_ui/tabs/queue.py

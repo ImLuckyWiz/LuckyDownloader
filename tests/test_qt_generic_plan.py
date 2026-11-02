@@ -49,7 +49,9 @@ def test_plan_tab_mode_switching(qtbot):
     tab.set_mode(False)
     assert tab.mode_timeline is False
     assert not tab.timeline_card.isVisible()
-    assert not tab.cuts_card.isVisible()
+    assert tab.cuts_card.isVisible()
+    assert not tab.title_row.isVisible()
+    assert not tab.quality_row.isVisible()
     assert not tab.clips_card.isVisible()
     assert tab.generic_card.isVisible()
     assert not tab.onboarding_card.isVisible()
@@ -311,3 +313,66 @@ def test_generic_plan_provider_folder_prepopulation(qtbot, tmp_path):
     }
     tab.update_generic_card(src_yt)
     assert tab.current_output_dir() == str(custom_dir)
+
+
+def test_generic_plan_cut_editor(qtbot):
+    tab = PlanTab()
+    qtbot.addWidget(tab)
+    src_yt = _make_sample_source("youtube", 300.0)
+    tab.source = src_yt
+    tab.set_mode(False)
+
+    # 1. Blank cut text -> full video
+    tab.set_cut_text("")
+    tab.update_preview()
+    assert "Full video download" in tab.preview_text()
+    assert "1 video · 0:05:00" in tab.plan_summary_lbl.text()
+    assert len(tab.part_cards) == 0
+
+    # 2. Add valid cut points
+    tab.set_cut_text("0:30 - 1:30 ; 2:00 - 3:00")
+    tab.update_preview()
+    assert "Part 1" in tab.preview_text()
+    assert "Part 2" in tab.preview_text()
+    assert "2 parts · 0:02:00 in total" in tab.plan_summary_lbl.text()
+    assert len(tab.part_cards) == 2
+    assert tab.part_cards[0].duration == 60.0
+    assert tab.part_cards[1].duration == 60.0
+
+    # 3. Skip part 1
+    tab.skip_part(1)
+    assert "0:02:00" in tab.cut_text()
+    assert "0:00:30" not in tab.cut_text()
+
+    # 4. Invalid cut points show error
+    tab.set_cut_text("4:00 - 2:00")
+    tab.update_preview()
+    assert "⚠" in tab.preview_text()
+    assert tab.preview_kind == "err"
+
+
+def test_main_window_generic_flow_with_cuts(qtbot, monkeypatch, tmp_path):
+    import core.paths as paths
+    monkeypatch.setattr(paths, "HISTORY_PATH", tmp_path / "history.json")
+
+    from qt_ui.main_window import MainWindow
+    win = MainWindow()
+    qtbot.addWidget(win)
+    win.show()
+
+    src = _make_sample_source("youtube", 600.0)
+    win.on_info_ok(src, clips=[], loaded=False, warn="")
+
+    # Enter cut points on generic video
+    win.tab_plan.set_cut_text("1:00 - 3:00 ; 5:00 - 6:00")
+    win.tab_plan.update_preview()
+
+    win.add_to_queue(start=False)
+
+    assert len(win.tab_queue.items) == 1
+    item = win.tab_queue.items[0]
+    assert item.parts == 2
+    assert item.strategy == "only the parts"
+    assert item.job.opts.cut_text == "1:00 - 3:00 ; 5:00 - 6:00"
+    assert item.job.opts.strategy == "sections"
+

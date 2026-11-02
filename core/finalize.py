@@ -527,8 +527,11 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
         raise EngineError(t("ffmpeg was not found. Install it and add it to PATH."))
 
     if not src.has_capability(Capability.TIMELINE):
-        dur = max(1.0, float(src.duration or 1.0))
-        plan = Plan(parts=[Part(index=1, start=0.0, end=dur)], strategy="full", coverage=1.0, duration=src.duration or 0.0)
+        if opts.cut_text and opts.cut_text.strip():
+            plan = make_plan(opts.cut_text, src.duration, opts.strategy, opts.full_threshold)
+        else:
+            dur = max(1.0, float(src.duration or 1.0))
+            plan = Plan(parts=[Part(index=1, start=0.0, end=dur)], strategy="full", coverage=1.0, duration=src.duration or 0.0)
     else:
         plan = make_plan(opts.cut_text, src.duration, opts.strategy, opts.full_threshold)
     ctx.log(
@@ -688,7 +691,7 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
                     f = _cut(ctx, f, p, opts.container, workdir, offset=max(0.0, p.start - real_start))
                     real_start, real_end = p.start, p.end
             else:
-                f = _dl_sec(ctx, src.url, p, workdir, opts.threads, opts.exact, **fmt_kw, **rate_kw)
+                f = _dl_sec(ctx, src.url, p, workdir, opts.threads, opts.exact, **fmt_kw, **rate_kw, **cookies_kw)
                 real_start, real_end = p.start, p.end
             ctx.stage(lo + (hi - lo) * 0.9, hi, f"Finishing part {p.index}/{total_parts}")
             finish(p, f, real_start, real_end)

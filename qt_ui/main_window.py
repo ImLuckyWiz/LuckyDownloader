@@ -1246,14 +1246,28 @@ class MainWindow(QMainWindow):
             quality = "audio" if audio_only else self.tab_plan.current_quality()
             out_dir = self.tab_plan.current_output_dir() or opts.out_dir
             cookies_browser = opts.cookies_browser if self.tab_plan.is_cookies_enabled() else ""
+            cut_text = self.tab_plan.cut_text()
+            if cut_text:
+                try:
+                    plan = make_plan(cut_text, self.source.duration, opts.strategy, opts.full_threshold)
+                except EngineError as e:
+                    dialogs.warning(self, t("Cut points"), str(e))
+                    return
+                part_count = len(plan.parts)
+                strat = {"full": "full video + split", "sections": "only the parts"}[plan.strategy]
+                job_strategy = plan.strategy
+            else:
+                part_count = 1
+                strat = "full video"
+                job_strategy = "full"
             opts = replace(
                 opts,
-                cut_text="",
+                cut_text=cut_text,
                 quality=quality,
                 container=container,
                 out_dir=out_dir,
                 cookies_browser=cookies_browser,
-                strategy="full",
+                strategy=job_strategy,
                 keep_full=False,
                 sidecar=False,
                 chapters=False,
@@ -1266,8 +1280,7 @@ class MainWindow(QMainWindow):
             )
             job = Job(self.source, opts, clips=None, client=self.client)
             label = f"{self.source.uploader or self.source.site} \u00b7 {self.source.title}"[:70]
-            strat = "full video"
-            self.tab_queue.enqueue(job, label, 1, strat, thumb=self._current_vod_thumb())
+            self.tab_queue.enqueue(job, label, part_count, strat, thumb=self._current_vod_thumb())
             self._sync_queue_badge()
             if self.settings:
                 save_settings(self.settings)

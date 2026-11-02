@@ -209,3 +209,16 @@ def test_engine_monkeypatch_targets_preserved():
     """Tests in test_qt_twitch_dialog.py patch engine.time and engine.requests."""
     assert hasattr(luckytwitch_engine, "time"), "engine.time must be preserved for test monkeypatching"
     assert hasattr(luckytwitch_engine, "requests"), "engine.requests must be preserved for test monkeypatching"
+
+
+def test_luckydownloader_facade_modules():
+    """Assert modern luckydownloader_engine and luckydownloader_qt facade modules exist and export key symbols."""
+    import luckydownloader_engine
+    import luckydownloader_qt
+
+    assert hasattr(luckydownloader_engine, "Job")
+    assert hasattr(luckydownloader_engine, "SourceInfo")
+    assert hasattr(luckydownloader_engine, "run_job")
+    assert hasattr(luckydownloader_qt, "MainWindow")
+    assert hasattr(luckydownloader_qt, "main")
+

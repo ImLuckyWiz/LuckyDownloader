@@ -3510,3 +3510,41 @@ msgstr "Fijar canal en la lista de seguimiento"
 msgid "Unpin channel from Watch List"
 msgstr "Desfijar canal de la lista de seguimiento"
 
+#: qt_ui/tabs/plan.py
+msgid "Fix the cut points to add this video"
+msgstr "Corrige los puntos de corte para añadir este vídeo"
+
+#: qt_ui/tabs/plan.py
+msgid "Full video + split"
+msgstr "Vídeo completo + dividir"
+
+#: qt_ui/tabs/plan.py
+msgid "Leave cut points blank to download the full video, or enter cut points above to trim."
+msgstr "Deja los puntos de corte en blanco para descargar el vídeo completo o ingrésalos arriba para recortar."
+
+#: qt_ui/tabs/plan.py
+msgid ""
+"Optional: write cut points to trim or split (e.g. 1:00 - 5:00 ; 12:00 - end). Leave blank for "
+"full video."
+msgstr ""
+"Opcional: escribe puntos de corte para recortar o dividir (ej. 1:00 - 5:00 ; 12:00 - fin). Déjalo en blanco para el vídeo completo."
+
+#: qt_ui/tabs/plan.py
+#, python-brace-format
+msgid "Part {n}:  {start} → {end}   ({duration})"
+msgstr "Parte {n}:  {start} → {end}   ({duration})"
+
+#: qt_ui/tabs/plan.py
+msgid "download the full video once, then split it"
+msgstr "descargar el vídeo completo una vez y luego dividirlo"
+
+#: qt_ui/tabs/plan.py
+#, python-brace-format, python-format
+msgid "{summary} · {mode} ({pct}% of video covered)"
+msgstr "{summary} · {mode} ({pct}% del vídeo cubierto)"
+
+#: qt_ui/tabs/plan.py
+#, python-brace-format, python-format
+msgid "→ {how}   (parts cover {pct}% of the video)"
+msgstr "→ {how}   (las partes cubren el {pct}% del vídeo)"
+
