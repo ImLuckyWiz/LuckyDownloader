@@ -14,7 +14,7 @@ from __future__ import annotations
 import webbrowser
 from typing import Callable, Sequence
 
-from PySide6.QtCore import QAbstractTableModel, QItemSelectionModel, QModelIndex, QRectF, Qt, Signal
+from PySide6.QtCore import QAbstractTableModel, QEvent, QItemSelectionModel, QModelIndex, QObject, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QTextCharFormat, QTextCursor, QTextOption
 from PySide6.QtWidgets import (
     QAbstractItemView, QBoxLayout, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPlainTextEdit,
@@ -311,19 +311,48 @@ class PlanTab(ScrollPage):
     def is_two_column(self) -> bool:
         return self.lower_layout.direction() == QBoxLayout.Direction.LeftToRight
 
+    def _adjust_clip_columns(self) -> None:
+        """Adapt the Title column width to absorb available table width without horizontal overflow."""
+        if not hasattr(self, "tree"):
+            return
+        head = self.tree.horizontalHeader()
+        title_col = -1
+        fixed_w = 0
+        for col, (_key, _text, width, _anchor, stretch) in enumerate(CLIP_COLUMNS):
+            if stretch:
+                title_col = col
+            else:
+                fixed_w += width
+        if title_col < 0:
+            return
+        avail = self.tree.viewport().width()
+        if avail <= 0:
+            avail = self.tree.width()
+        if avail > 0:
+            title_w = max(140, avail - fixed_w)
+            head.resizeSection(title_col, title_w)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802
+        if watched is getattr(self, "tree", None) and event.type() == QEvent.Type.Resize:
+            self._adjust_clip_columns()
+        return super().eventFilter(watched, event)
+
     def update_responsive_layout(self) -> None:
         wide = self._effective_width() >= WIDE_BREAKPOINT
         target = QBoxLayout.Direction.LeftToRight if wide else QBoxLayout.Direction.TopToBottom
         if self.lower_layout.direction() != target:
             self.lower_layout.setDirection(target)
+            self._adjust_clip_columns()
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
         self.update_responsive_layout()
+        self._adjust_clip_columns()
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
         self.update_responsive_layout()
+        self._adjust_clip_columns()
 
     # ---------------------------- building ---------------------------- #
     def _build_onboarding_card(self) -> None:
@@ -599,6 +628,8 @@ class PlanTab(ScrollPage):
         for col, (_key, _text, width, _anchor, stretch) in enumerate(CLIP_COLUMNS):
             head.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
             head.resizeSection(col, width)
+        self.tree.installEventFilter(self)
+        self._adjust_clip_columns()
         self.tree.setMinimumHeight(HEADER_HEIGHT + 6 * ROW_HEIGHT + 2)  # tkinter: height=6 rows
         self.tree.doubleClicked.connect(self.open_clip)
         self.tree.selectionModel().selectionChanged.connect(self._on_clip_selection_changed)
@@ -979,6 +1010,7 @@ class PlanTab(ScrollPage):
                 msg += t("  [chapters are OFF]")
         self.clips_label.setText(msg)
         self._push_clip_marks()
+        self._adjust_clip_columns()
 
     def _on_clip_selection_changed(self, *_args) -> None:
         self._update_clip_action_buttons()

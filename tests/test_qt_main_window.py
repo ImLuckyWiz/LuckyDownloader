@@ -49,10 +49,10 @@ def win(qtbot, themed, boxes):
 
 def test_window_title_size_and_minimum(win):
     assert win.windowTitle() == "LuckyTwitch Downloader"
-    assert mw.START_SIZE == (1020, 910)
-    assert win.width() >= 900 and win.height() >= 560  # offscreen it is exactly 1020x910; a real screen may clamp it
-    assert (win.minimumSize().width(), win.minimumSize().height()) == (900, 560)
-    assert mw.START_SIZE == (1020, 910) and mw.MIN_SIZE == (900, 560)
+    assert mw.START_SIZE == (1040, 860)
+    assert win.width() >= 950 and win.height() >= 560  # offscreen it is exactly 1040x860; a real screen may clamp it
+    assert (win.minimumSize().width(), win.minimumSize().height()) == (950, 560)
+    assert mw.START_SIZE == (1040, 860) and mw.MIN_SIZE == (950, 560)
 
 
 def test_the_four_tabs_have_the_same_names_in_the_same_order(win):
@@ -133,9 +133,9 @@ def test_keyboard_order_is_entry_then_get_info_then_twitch_api_then_the_tabs(win
 
 
 def test_the_window_can_be_shrunk_to_the_minimum_without_hiding_the_bottom_bar(win):
-    win.resize(900, 560)
+    win.resize(950, 560)
     QApplication.processEvents()
-    assert win.size().width() >= 900 and win.size().height() >= 560
+    assert win.size().width() >= 950 and win.size().height() >= 560
     assert win.status_label.geometry().bottom() <= win.centralWidget().height()
     assert win.progress.isVisible()
 

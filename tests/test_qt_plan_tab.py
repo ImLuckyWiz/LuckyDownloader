@@ -490,8 +490,9 @@ def test_hints_wrap_to_the_width_of_their_card(win):
 
 
 def test_nothing_on_the_plan_tab_is_wider_than_the_page(win):
-    win.resize(900, 700)
+    win.resize(950, 700)
     load_vod(win)
+    load_clips(win)
     win.tab_plan.set_cut_text("0:00:00 - 0:30:00 - end")
     win.tabs.setCurrentWidget(win.tab_plan)
     win.update_preview()
@@ -500,6 +501,42 @@ def test_nothing_on_the_plan_tab_is_wider_than_the_page(win):
     limit = page.scroll.viewport().width()
     for card in (page.timeline_card, page.cuts_card, page.clips_card):
         assert card.width() <= limit + 1
+
+
+def test_clips_table_columns_adapt_to_available_width(win):
+    load_vod(win)
+    load_clips(win)
+    win.tabs.setCurrentWidget(win.tab_plan)
+    page = win.tab_plan
+    head = page.tree.horizontalHeader()
+
+    # Narrow layout (950px min width)
+    win.resize(950, 560)
+    QApplication.processEvents()
+    viewport_w = page.tree.viewport().width()
+    title_w = head.sectionSize(3)
+    fixed_sum = sum(head.sectionSize(c) for c in (0, 1, 2, 4, 5))
+    assert fixed_sum == 473  # 80 + 70 + 75 + 140 + 108
+    assert title_w == max(140, viewport_w - 473)
+    assert head.length() <= viewport_w
+
+    # Standard launch size (1040x860)
+    win.resize(1040, 860)
+    QApplication.processEvents()
+    viewport_w = page.tree.viewport().width()
+    title_w = head.sectionSize(3)
+    assert title_w == max(140, viewport_w - 473)
+    assert head.length() <= viewport_w
+
+    # Wide layout (1200px)
+    win.resize(1200, 800)
+    QApplication.processEvents()
+    viewport_w = page.tree.viewport().width()
+    title_w = head.sectionSize(3)
+    assert title_w == max(140, viewport_w - 473)
+    assert head.length() <= viewport_w or title_w == 140
+    # Card does not exceed scroll viewport in two-column mode
+    assert page.clips_card.width() <= page.scroll.viewport().width()
 
 
 # --------------------------------------------------------------------------- final pass (test_gui_final_pass.py)

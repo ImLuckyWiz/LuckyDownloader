@@ -82,6 +82,10 @@ def test_hit_test_interactive_widgets_in_titlebar():
 
 
 def test_resized_rect_enforces_minimums():
+    # Default minimums (min_w=950, min_h=560)
+    x, y, w, h = resized_rect(100, 100, 1000, 600, Region.RIGHT, dx=-200, dy=0)
+    assert w == 950
+
     # Attempting to shrink past min_w (900)
     x, y, w, h = resized_rect(100, 100, 950, 600, Region.RIGHT, dx=-100, dy=0, min_w=900, min_h=560)
     assert w == 900

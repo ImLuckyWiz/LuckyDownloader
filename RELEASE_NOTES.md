@@ -1,3 +1,11 @@
+## v2.11.1
+
+LuckyTwitch Downloader **v2.11.1** is a patch release fixing right-edge layout clipping in the Plan tab on macOS and narrow window sizes.
+
+### What's new in 2.11.1:
+- **Adaptive Clips Table Columns:** Table columns dynamically adapt to available card width, preventing card overflow in the Plan tab.
+- **Optimized Window Geometry for macOS:** Adjusted launch dimensions (1040×860) and minimum size (950×560) to prevent macOS screen-clamping and preserve visibility of all action buttons and toggle switches.
+
 ## v2.11.0
 
 LuckyTwitch Downloader **v2.11.0** introduces a dedicated **Interface** section in the Options tab for interface language and future appearance customizations.

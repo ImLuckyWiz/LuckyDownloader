@@ -1,7 +1,7 @@
 """The main window (Phase 1 frame, upgraded in Phase 9b to the Left Navigation Rail + Command Bar +
 VOD Strip + Compact Status Bar + Toasts + Keyboard Layer + UI State shell).
 
-Mirrors ``App.build_ui`` of the tkinter app (window 1020x910, minimum 900x560, same texts, same order).
+Mirrors ``App.build_ui`` of the tkinter app (window 1040x860, minimum 950x560, same texts, same order).
 """
 
 from __future__ import annotations
@@ -39,8 +39,8 @@ from qt_ui.titlebar import CustomTitleBar
 from qt_ui.twitch_dialog import TwitchDialog
 
 WINDOW_TITLE = "LuckyTwitch Downloader"
-START_SIZE = (1020, 910)
-MIN_SIZE = (900, 560)
+START_SIZE = (1040, 860)
+MIN_SIZE = (950, 560)
 TAB_NAMES = ("Search", "Plan", "Options", "Queue & log")
 READY_TEXT = "Ready. Paste a VOD URL or ID and press «Get info»."
 

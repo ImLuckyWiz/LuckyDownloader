@@ -134,7 +134,7 @@ def resized_rect(
     edge: Region,
     dx: int,
     dy: int,
-    min_w: int = 900,
+    min_w: int = 950,
     min_h: int = 560,
 ) -> tuple[int, int, int, int]:
     """Calculate new (x, y, w, h) for a manual resize drag on `edge` by delta (dx, dy)."""
