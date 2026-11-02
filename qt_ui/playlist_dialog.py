@@ -259,7 +259,17 @@ class PlaylistPickerDialog(QDialog):
         opt_lay.addWidget(f_lbl, 1, 0)
 
         self.folder_entry = QLineEdit(opt_card)
-        def_dir = str(self.settings.get("out_dir", getattr(paths, "DOWNLOADS_DIR", "")))
+        site = getattr(self.playlist, "site", "generic") or "generic"
+        from core.routing import resolve_provider_base_dir
+        base_dir = self.settings.get("out_dir", getattr(paths, "DOWNLOADS_DIR", ""))
+        provider_subfolders = bool(self.settings.get("provider_subfolders", False))
+        provider_out_dirs = self.settings.get("provider_out_dirs") or {}
+        def_dir = str(resolve_provider_base_dir(
+            base_dir,
+            site_or_provider=site,
+            provider_subfolders=provider_subfolders,
+            provider_out_dirs=provider_out_dirs,
+        ))
         self.folder_entry.setText(def_dir)
         opt_lay.addWidget(self.folder_entry, 1, 1, 1, 3)
 

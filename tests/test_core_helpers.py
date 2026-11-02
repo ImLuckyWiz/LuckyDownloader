@@ -56,19 +56,22 @@ def test_resource_path_points_into_the_project():
 # ------------------------------------------------------------------ settings
 def test_defaults_are_the_42_documented_keys_with_the_documented_types():
     d = settings.DEFAULTS
-    assert len(d) == 44
-    assert sum(isinstance(v, bool) for v in d.values()) == 16
-    assert sum(isinstance(v, str) for v in d.values()) == 28
+    assert len(d) == 47
+    assert sum(isinstance(v, bool) for v in d.values()) == 17
+    assert sum(isinstance(v, str) for v in d.values()) == 29
+    assert sum(isinstance(v, dict) for v in d.values()) == 1
     expected_bools = {
         "exact", "keep_full", "chapters", "sidecar", "premiere_xml",
         "premiere_plugin", "game_markers", "muted_markers", "chat",
         "chat_embed", "chat_render", "chat_render_smooth", "subfolders", "auto_update", "clean_title",
-        "check_app_updates",
+        "check_app_updates", "provider_subfolders",
     }
     assert {k for k, v in d.items() if isinstance(v, bool)} == expected_bools
     for k, v in d.items():
         if k in expected_bools:
             assert isinstance(v, bool), f"{k} should be bool"
+        elif isinstance(v, dict):
+            assert isinstance(v, dict), f"{k} should be dict"
         else:
             assert isinstance(v, str), f"{k} should be str" 
 

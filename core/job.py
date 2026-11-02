@@ -28,6 +28,8 @@ class JobOptions:
     clip_filter: ClipFilter = field(default_factory=ClipFilter)
     sidecar: bool = False  # write a .clips.json next to each part
     subfolders: bool = True  # out_dir/<streamer>/<stream>/parts
+    provider_subfolders: bool = False  # group downloads under out_dir/<Provider>/...
+    provider_out_dirs: dict[str, str] = field(default_factory=dict)
     folder_template: str = "{date} - {title} - {id}"  # name of the per-stream folder
     clip_name_template: str = "{clip_title}"  # file name when a single clip is downloaded
     generic_name_template: str = "{uploader} - {date} - {title} [{id}]"  # file name for generic (non-Twitch) downloads

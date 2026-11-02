@@ -125,6 +125,8 @@ def build_options(settings: dict, cut_text: str = "", quality: str | None = None
         chat_render_fps=0 if fps not in ("30", "60") else int(fps),
         chat_render_smooth=flag(s, "chat_render_smooth"),
         subfolders=flag(s, "subfolders"),
+        provider_subfolders=flag(s, "provider_subfolders"),
+        provider_out_dirs=dict(s.get("provider_out_dirs") or {}) if isinstance(s.get("provider_out_dirs"), dict) else {},
         folder_template=text(s, "folder_template").strip() or DEFAULTS["folder_template"],
         clip_name_template=text(s, "clip_name_template").strip() or DEFAULTS["clip_name_template"],
         generic_name_template=text(s, "generic_name_template").strip() or DEFAULTS.get("generic_name_template", "{uploader} - {date} - {title} [{id}]"),

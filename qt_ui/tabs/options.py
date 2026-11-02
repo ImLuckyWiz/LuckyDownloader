@@ -383,6 +383,39 @@ class OptionsTab(QWidget):
         self.match_counter.setText(tn("{n} match", "{n} matches", matched))
         self.match_counter.setVisible(True)
 
+
+    def _sync_provider_dir_display(self) -> None:
+        p_key = self.provider_select_combo.currentData() or "youtube"
+        pod = self.settings.get("provider_out_dirs") or {}
+        custom = pod.get(p_key, "")
+        self.provider_dir_entry.setText(custom)
+        def_dir = str(self.settings.get("out_dir") or DEFAULTS["out_dir"])
+        self.provider_dir_entry.setPlaceholderText(t("Default ({dir})", dir=def_dir))
+
+    def _browse_provider_dir(self) -> None:
+        p_key = self.provider_select_combo.currentData() or "youtube"
+        pod = dict(self.settings.get("provider_out_dirs") or {})
+        from core import paths
+        current = pod.get(p_key, "") or str(self.settings.get("out_dir") or paths.DOWNLOADS_DIR)
+        from PySide6.QtWidgets import QFileDialog
+        chosen = QFileDialog.getExistingDirectory(self, t("Select folder for {provider}", provider=self.provider_select_combo.currentText()), current)
+        if chosen:
+            pod[p_key] = chosen
+            self.settings["provider_out_dirs"] = pod
+            self.provider_dir_entry.setText(chosen)
+            from core.settings import save_settings
+            save_settings(self.settings)
+
+    def _clear_provider_dir(self) -> None:
+        p_key = self.provider_select_combo.currentData() or "youtube"
+        pod = dict(self.settings.get("provider_out_dirs") or {})
+        if p_key in pod:
+            del pod[p_key]
+            self.settings["provider_out_dirs"] = pod
+            self.provider_dir_entry.setText("")
+            from core.settings import save_settings
+            save_settings(self.settings)
+
     def _sync_folder_template(self) -> None:
         """«Stream folder name» is greyed out while «Organize in subfolders» is off."""
         on = flag(self.settings, "subfolders")
@@ -444,17 +477,57 @@ class OptionsTab(QWidget):
         row = self._add_setting_row(adv, "subfolders", N_("Organize in subfolders"), N_("Folder / Streamer / Stream / parts."), "output", card, adv)
         self._switch(row, "subfolders")
 
+        row = self._add_setting_row(adv, "provider_subfolders", N_("Group by provider subfolder"), N_("Save into out_dir/<Provider>/... (e.g. Downloads/YouTube/, Downloads/Twitch/)."), "output", card, adv)
+        self._switch(row, "provider_subfolders")
+
         self.folder_entry = self._template_row(
             adv, N_("Stream folder name"), N_("Name of the folder that holds one stream's files."), "folder_template",
             [
                 "streamer", "stream_date", "download_date", "date", "year", "month",
-                "day", "game", "quality", "id", "title", "duration",
+                "day", "game", "quality", "id", "title", "duration", "site", "provider",
             ],
-            divider=False, per_row=6,
+            divider=True, per_row=7,
             info=N_("{stream_date} is when the stream aired, {download_date} today's date, {date} alias for stream date. "
                  "{year}, {month}, {day} are broadcast dates. {game} is the dominant stream game. "
-                 "{duration} is the total stream length. {quality} is the video quality."),
+                 "{duration} is the total stream length. {quality} is the video quality. "
+                 "{site} or {provider} is the platform name (YouTube, Twitch, etc.)."),
             section_key="output", card=card, adv=adv)
+
+        # Custom folder per provider
+        p_row = adv.add_row(
+            t("Custom folder per provider"),
+            t("Override the base download directory for a specific provider (YouTube, Twitch, TikTok, etc.)."),
+            divider=False,
+        )
+        p_box = QWidget()
+        p_lay = QHBoxLayout(p_box)
+        p_lay.setContentsMargins(0, 0, 0, 0)
+        p_lay.setSpacing(8)
+
+        self.provider_select_combo = ComboBox()
+        for p_name, p_key in [("YouTube", "youtube"), ("Twitch", "twitch"), ("TikTok", "tiktok"), ("Instagram", "instagram"), ("Twitter / X", "twitter")]:
+            self.provider_select_combo.addItem(p_name, p_key)
+
+        self.provider_dir_entry = QLineEdit()
+        self.provider_dir_entry.setPlaceholderText(t("Default ({dir})", dir=str(self.settings.get("out_dir") or DEFAULTS["out_dir"])))
+        self.provider_dir_entry.setReadOnly(True)
+
+        self.provider_dir_browse = QPushButton(t("Browse…"))
+        self.provider_dir_browse.setProperty("variant", "ghost")
+        self.provider_dir_browse.clicked.connect(self._browse_provider_dir)
+
+        self.provider_dir_clear = QPushButton(t("Reset"))
+        self.provider_dir_clear.setProperty("variant", "ghost")
+        self.provider_dir_clear.clicked.connect(self._clear_provider_dir)
+
+        self.provider_select_combo.currentIndexChanged.connect(self._sync_provider_dir_display)
+
+        p_lay.addWidget(self.provider_select_combo)
+        p_lay.addWidget(self.provider_dir_entry, 1)
+        p_lay.addWidget(self.provider_dir_browse)
+        p_lay.addWidget(self.provider_dir_clear)
+        p_row.add_control(p_box)
+        self._sync_provider_dir_display()
 
         qcard = self._card(f, N_("Quality"), N_("What to download when a VOD offers several qualities (Twitch VODs)."))
         row = self._add_setting_row(

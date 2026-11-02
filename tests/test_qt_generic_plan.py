@@ -285,3 +285,29 @@ def test_generic_thumbnail_async_load(qtbot, monkeypatch, tmp_path):
 
     assert win.vod_strip.thumb_label.text() == ''
     assert win.tab_plan.generic_thumb_label.text() == ''
+
+
+def test_generic_plan_provider_folder_prepopulation(qtbot, tmp_path):
+    tab = PlanTab()
+    qtbot.addWidget(tab)
+    src_yt = _make_sample_source('youtube', 120.0)
+
+    # 1. Defaults: subfolders=False, no custom dir -> out_dir
+    tab.settings = {"out_dir": str(tmp_path), "provider_subfolders": False, "provider_out_dirs": {}}
+    tab.update_generic_card(src_yt)
+    assert tab.current_output_dir() == str(tmp_path)
+
+    # 2. provider_subfolders=True -> out_dir / "YouTube"
+    tab.settings = {"out_dir": str(tmp_path), "provider_subfolders": True, "provider_out_dirs": {}}
+    tab.update_generic_card(src_yt)
+    assert tab.current_output_dir() == str(tmp_path / "YouTube")
+
+    # 3. Custom provider out_dir -> custom path
+    custom_dir = tmp_path / "CustomYT"
+    tab.settings = {
+        "out_dir": str(tmp_path),
+        "provider_subfolders": True,
+        "provider_out_dirs": {"youtube": str(custom_dir)},
+    }
+    tab.update_generic_card(src_yt)
+    assert tab.current_output_dir() == str(custom_dir)

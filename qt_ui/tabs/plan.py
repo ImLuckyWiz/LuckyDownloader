@@ -601,6 +601,20 @@ class PlanTab(ScrollPage):
             self.generic_cookies_box.setVisible(False)
             self.generic_cookies_toggle.setChecked(False)
 
+        # Resolve provider base folder
+        if hasattr(self, "generic_folder_entry"):
+            from core.routing import resolve_provider_base_dir
+            base_dir = self.settings.get("out_dir", getattr(paths, "DOWNLOADS_DIR", ""))
+            provider_subfolders = bool(self.settings.get("provider_subfolders", False))
+            provider_out_dirs = self.settings.get("provider_out_dirs") or {}
+            resolved_dir = resolve_provider_base_dir(
+                base_dir,
+                site_or_provider=site_str,
+                provider_subfolders=provider_subfolders,
+                provider_out_dirs=provider_out_dirs,
+            )
+            self.generic_folder_entry.setText(str(resolved_dir))
+
     def _fetch_generic_thumbnail(self, url: str) -> None:
         import threading
         def work():

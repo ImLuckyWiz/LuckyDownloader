@@ -165,13 +165,15 @@ def part_stem(src: SourceInfo, opts: JobOptions, part: Part, total: int, clip: d
     download_date = datetime.now().strftime("%Y-%m-%d")
     game = dominant_game(getattr(src, "segments", None), part.start, part.end)
     duration_str = tag(max(0.0, part.end - part.start))
+    site = getattr(src, "site", "twitch") or "twitch"
 
     data = _SafeDict(
         streamer=src.uploader or "vod",
         uploader=src.uploader or "video",
         author=src.uploader or "video",
         channel=src.uploader or "video",
-        site=getattr(src, "site", "twitch"),
+        site=site,
+        provider=site,
         stream_date=stream_date,
         download_date=download_date,
         date=stream_date,
@@ -226,7 +228,15 @@ def part_stem(src: SourceInfo, opts: JobOptions, part: Part, total: int, clip: d
 
 def stream_dir(src: SourceInfo, opts: JobOptions) -> Path:
     """Where the files of this VOD go: out_dir/<streamer>/<stream>/ (or out_dir if disabled)."""
-    base = Path(opts.out_dir)
+    from core.routing import resolve_provider_base_dir
+
+    site = getattr(src, "site", "twitch") or "twitch"
+    base = resolve_provider_base_dir(
+        opts.out_dir,
+        site_or_provider=site,
+        provider_subfolders=getattr(opts, "provider_subfolders", False),
+        provider_out_dirs=getattr(opts, "provider_out_dirs", None),
+    )
     if not opts.subfolders:
         return base
 
@@ -245,7 +255,8 @@ def stream_dir(src: SourceInfo, opts: JobOptions) -> Path:
         uploader=src.uploader or "video",
         author=src.uploader or "video",
         channel=src.uploader or "video",
-        site=getattr(src, "site", "twitch"),
+        site=site,
+        provider=site,
         stream_date=stream_date,
         download_date=download_date,
         date=stream_date,

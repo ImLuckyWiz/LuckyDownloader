@@ -30,7 +30,7 @@ from qt_ui.widgets import Collapsible, ComboBox, SpinBox, Toggle  # noqa: E402
 
 # every setting the Options tab edits (the other five of the 38 belong to the Plan tab)
 OPTIONS_KEYS = {
-    "out_dir", "container", "threads", "strategy", "threshold", "name_template", "clean_title", "subfolders", "folder_template",
+    "out_dir", "container", "threads", "strategy", "threshold", "name_template", "clean_title", "subfolders", "provider_subfolders", "folder_template",
     "exact", "keep_full", "title_tpl", "pad_after", "gap_title", "sidecar", "premiere_xml", "premiere_plugin",
     "game_markers", "muted_markers", "clip_name_template", "clip_pad_before", "clip_pad_after", "chat", "chat_format",
     "chat_embed", "auto_update", "check_app_updates",
@@ -39,7 +39,7 @@ OPTIONS_KEYS = {
     "default_quality", "audio_format", "cookies_from_browser", "cookies_scope",
 }
 PLAN_KEYS = {"chapters", "min_views", "min_duration", "top_n", "pad_before"}
-SWITCHES = {"exact", "keep_full", "clean_title", "subfolders", "premiere_plugin", "game_markers", "muted_markers", "premiere_xml",
+SWITCHES = {"exact", "keep_full", "clean_title", "subfolders", "provider_subfolders", "premiere_plugin", "game_markers", "muted_markers", "premiere_xml",
             "sidecar", "chat", "chat_embed", "chat_render", "chat_render_smooth", "auto_update", "check_app_updates"}
 
 
@@ -149,7 +149,7 @@ def test_arrow_keys_move_through_the_sidebar(tab):
 def test_every_old_setting_has_a_control_bound_to_it(tab):
     assert set(tab.binder.controls) == OPTIONS_KEYS
     assert not (PLAN_KEYS & set(tab.binder.controls))  # the Plan tab owns these
-    assert OPTIONS_KEYS | PLAN_KEYS == set(DEFAULTS) - {"generic_name_template"}  # nothing of the 38 is forgotten
+    assert OPTIONS_KEYS | PLAN_KEYS == set(DEFAULTS) - {"generic_name_template", "provider_out_dirs"}  # nothing of the 38 is forgotten
     assert tab.tools_info_label is not None and tab.update_btn is not None
 
 
@@ -175,7 +175,7 @@ UP_FRONT = {
     "chat": {"chat", "chat_render"},
 }
 IN_ADVANCED = {
-    "output": {"threads", "name_template", "subfolders", "folder_template"},
+    "output": {"threads", "name_template", "subfolders", "provider_subfolders", "folder_template"},
     "cuts": {"threshold"},
     "premiere": {"premiere_xml", "sidecar"},
     "chat": {"chat_format", "chat_embed", "chat_render_mode", "chat_render_look", "chat_render_width",
@@ -407,7 +407,7 @@ def test_every_template_field_has_chips_for_its_tokens(tab):
         },
         "folder_template": {
             "streamer", "stream_date", "download_date", "date", "year", "month", "day",
-            "game", "quality", "id", "title", "duration",
+            "game", "quality", "id", "title", "duration", "site", "provider",
         },
         "title_tpl": {"title", "creator", "views", "duration"},
         "clip_name_template": {"clip_title", "creator", "views", "clip_id", "clip_duration",
@@ -898,3 +898,35 @@ def test_app_updates_card_and_check_now_signal(tab, qtbot):
     tab.binder.set("check_app_updates", True)
     assert tab.settings["check_app_updates"] is True
 
+
+
+def test_options_tab_provider_routing_controls(tab, qtbot, tmp_path):
+    # Verify provider_subfolders switch
+    switch = control(tab, "provider_subfolders")
+    assert isinstance(switch, Toggle)
+    assert tab.binder.get("provider_subfolders") is False
+
+    # Toggle switch
+    switch.click()
+    assert tab.binder.get("provider_subfolders") is True
+
+    # Check custom provider folders controls
+    assert hasattr(tab, "provider_select_combo")
+    assert hasattr(tab, "provider_dir_entry")
+    assert hasattr(tab, "provider_dir_browse")
+    assert hasattr(tab, "provider_dir_clear")
+
+    # Select YouTube
+    tab.provider_select_combo.setCurrentIndex(0)
+    assert tab.provider_dir_entry.text() == ""
+
+    # Simulate setting a custom directory
+    custom_yt = tmp_path / "MyYouTube"
+    tab.settings.setdefault("provider_out_dirs", {})["youtube"] = str(custom_yt)
+    tab._sync_provider_dir_display()
+    assert tab.provider_dir_entry.text() == str(custom_yt)
+
+    # Click clear
+    tab._clear_provider_dir()
+    assert tab.provider_dir_entry.text() == ""
+    assert "youtube" not in tab.settings.get("provider_out_dirs", {})

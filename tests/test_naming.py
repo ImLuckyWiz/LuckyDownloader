@@ -306,3 +306,31 @@ def test_expanded_naming_tokens_in_stream_dir():
     p2 = stream_dir(src, opts2)
     assert p2 == Path("OUT") / "Streamer" / f"{today} - 2026-10-27 - Cyberpunk 2077 - 720p60"
 
+
+
+def test_site_and_provider_tokens_and_provider_routing_in_stream_dir():
+    src_yt = make_src(site="youtube", uploader="YouTuber", id="dQw4w9WgXcQ", twitch_vod_id=None, title="Never Gonna Give You Up")
+
+    # 1. Test {site} and {provider} tokens in folder_template
+    opts_tokens = make_opts(folder_template="{site} - {provider} - {id}")
+    p = stream_dir(src_yt, opts_tokens)
+    assert p == Path("OUT") / "YouTuber" / "youtube - youtube - dQw4w9WgXcQ"
+
+    # 2. Test {site} and {provider} tokens in part_stem
+    opts_name = make_opts(generic_name_template="{provider} - {site} - {id} - part{n}")
+    stem = part_stem(src_yt, opts_name, Part(1, 0, 100), 1)
+    assert stem == "youtube - youtube - dQw4w9WgXcQ"
+
+    # 3. Test provider_subfolders routing in stream_dir
+    opts_sub = make_opts(provider_subfolders=True, folder_template="{title}")
+    p_sub = stream_dir(src_yt, opts_sub)
+    assert p_sub == Path("OUT") / "YouTube" / "YouTuber" / "Never Gonna Give You Up"
+
+    # 4. Test provider_out_dirs custom override in stream_dir
+    opts_custom = make_opts(
+        provider_out_dirs={"youtube": "E:/MyYouTubeArchive"},
+        provider_subfolders=True,
+        folder_template="{title}"
+    )
+    p_custom = stream_dir(src_yt, opts_custom)
+    assert p_custom == Path("E:/MyYouTubeArchive") / "YouTuber" / "Never Gonna Give You Up"

@@ -47,6 +47,8 @@ DEFAULTS = {
     "chat_render_fps": "Like the video",
     "chat_render_smooth": False,
     "subfolders": True,
+    "provider_subfolders": False,
+    "provider_out_dirs": {},
     "clean_title": True,
     "default_quality": "Best available",
     "audio_format": "m4a · keep Twitch's audio",

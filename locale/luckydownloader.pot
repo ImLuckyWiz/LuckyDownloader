@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 10:25-0300\n"
+"POT-Creation-Date: 2026-11-02 10:55-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -1372,7 +1372,16 @@ msgid "Cookies scope"
 msgstr ""
 
 #: qt_ui/tabs/options.py
+msgid "Custom folder per provider"
+msgstr ""
+
+#: qt_ui/tabs/options.py
 msgid "Cuts"
+msgstr ""
+
+#: qt_ui/tabs/options.py
+#, python-brace-format
+msgid "Default ({dir})"
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -1484,6 +1493,10 @@ msgstr ""
 
 #: qt_ui/tabs/options.py
 msgid "Gap chapter name"
+msgstr ""
+
+#: qt_ui/tabs/options.py
+msgid "Group by provider subfolder"
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -1648,6 +1661,10 @@ msgid "Overlay type"
 msgstr ""
 
 #: qt_ui/tabs/options.py
+msgid "Override the base download directory for a specific provider (YouTube, Twitch, TikTok, etc.)."
+msgstr ""
+
+#: qt_ui/tabs/options.py
 msgid "Parallel connections per download. 8 is a good default."
 msgstr ""
 
@@ -1681,8 +1698,16 @@ msgstr ""
 msgid "Redraws on every frame instead of 5 times a second. Slower."
 msgstr ""
 
+#: qt_ui/tabs/options.py qt_ui/tabs/plan.py qt_ui/widgets.py
+msgid "Reset"
+msgstr ""
+
 #: qt_ui/tabs/options.py
 msgid "Restrict browser cookies to known platforms (YouTube, TikTok, Instagram, X) or allow on all sites."
+msgstr ""
+
+#: qt_ui/tabs/options.py
+msgid "Save into out_dir/<Provider>/... (e.g. Downloads/YouTube/, Downloads/Twitch/)."
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -1727,6 +1752,11 @@ msgstr ""
 
 #: qt_ui/tabs/options.py
 msgid "Seconds the chapter lasts after the clip ends."
+msgstr ""
+
+#: qt_ui/tabs/options.py
+#, python-brace-format
+msgid "Select folder for {provider}"
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -1934,7 +1964,8 @@ msgstr ""
 msgid ""
 "{stream_date} is when the stream aired, {download_date} today's date, {date} alias for stream "
 "date. {year}, {month}, {day} are broadcast dates. {game} is the dominant stream game. {duration} "
-"is the total stream length. {quality} is the video quality."
+"is the total stream length. {quality} is the video quality. {site} or {provider} is the platform "
+"name (YouTube, Twitch, etc.)."
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -2105,10 +2136,6 @@ msgstr ""
 #: qt_ui/tabs/plan.py
 #, python-brace-format
 msgid "Quality: {quality}{size}"
-msgstr ""
-
-#: qt_ui/tabs/plan.py qt_ui/widgets.py
-msgid "Reset"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
