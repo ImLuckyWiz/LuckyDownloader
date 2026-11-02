@@ -193,3 +193,4 @@ def test_browse_tab_pin_button_toggles_youtube_channel(qtbot, tmp_path, monkeypa
     tab.pin_btn.click()
     assert not tab.pin_btn.isChecked()
     assert not watchlist.is_watched("@veritasium", provider="youtube", path=target)
+    tab.shutdown()

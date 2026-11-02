@@ -200,6 +200,7 @@ def test_main_window_generic_flow(qtbot, monkeypatch, tmp_path):
     assert win.source is None
     assert win.tab_plan.mode_timeline is True
     assert not win.vod_strip.isVisible()
+    win.close()
 
 
 def test_main_window_topbar_input_routing(qtbot, monkeypatch):
@@ -233,6 +234,7 @@ def test_main_window_topbar_input_routing(qtbot, monkeypatch):
     win.on_get_info()
     assert runner_mock.called
     assert runner_mock.call_args[0][0] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    win.close()
 
 
 def test_extractor_error_prompts_update_and_retries(qtbot, monkeypatch):
@@ -260,6 +262,7 @@ def test_extractor_error_prompts_update_and_retries(qtbot, monkeypatch):
     win.on_tools_done("")
     assert win._pending_retry_url is None
     assert runner_mock.called
+    win.close()
 
 
 def test_generic_thumbnail_async_load(qtbot, monkeypatch, tmp_path):
@@ -287,6 +290,7 @@ def test_generic_thumbnail_async_load(qtbot, monkeypatch, tmp_path):
 
     assert win.vod_strip.thumb_label.text() == ''
     assert win.tab_plan.generic_thumb_label.text() == ''
+    win.close()
 
 
 def test_generic_plan_provider_folder_prepopulation(qtbot, tmp_path):
@@ -375,4 +379,5 @@ def test_main_window_generic_flow_with_cuts(qtbot, monkeypatch, tmp_path):
     assert item.strategy == "only the parts"
     assert item.job.opts.cut_text == "1:00 - 3:00 ; 5:00 - 6:00"
     assert item.job.opts.strategy == "sections"
+    win.close()
 

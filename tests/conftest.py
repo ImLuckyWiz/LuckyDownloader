@@ -64,3 +64,17 @@ def _collect_garbage_at_a_known_moment(request):
         app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         app.processEvents()
     gc.collect()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    try:
+        from PySide6.QtCore import QEvent
+        from PySide6.QtWidgets import QApplication
+
+        app = QApplication.instance()
+        if app is not None:
+            app.closeAllWindows()
+            app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            app.processEvents()
+    except Exception:
+        pass
