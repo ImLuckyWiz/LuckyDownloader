@@ -194,6 +194,8 @@ def test_run_ytdlp_appends_cookies_flag(monkeypatch, tmp_path: Path):
         captured_cmd.extend(cmd)
         return FakeProc()
 
+    import luckytwitch_engine as eng
+    monkeypatch.setattr(eng, "find_tool", lambda name: "fake_ytdlp")
     monkeypatch.setattr("core.download.find_tool", lambda name: "fake_ytdlp")
     monkeypatch.setattr("subprocess.Popen", fake_popen)
 

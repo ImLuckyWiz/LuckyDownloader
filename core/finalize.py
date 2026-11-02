@@ -495,7 +495,8 @@ def _load_muted(ctx: Ctx, job: Job) -> list[Chapter]:
 def run_job(job: Job, ctx: Ctx) -> list[Path]:
     src, opts = job.source, job.opts
     eng = sys.modules.get("luckytwitch_engine")
-    _find = getattr(eng, "find_tool", find_tool) if eng else find_tool
+    import core.tools
+    _find = find_tool if find_tool is not getattr(core.tools, "find_tool", None) else (getattr(eng, "find_tool", find_tool) if eng else find_tool)
     _dl_full = getattr(eng, "download_full", download_full) if eng else download_full
     _dl_sec = getattr(eng, "download_section", download_section) if eng else download_section
     _dl_align = getattr(eng, "download_section_aligned", download_section_aligned) if eng else download_section_aligned

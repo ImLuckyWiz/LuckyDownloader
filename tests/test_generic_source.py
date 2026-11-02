@@ -492,6 +492,7 @@ def test_generic_run_job_uses_generic_format_string_and_cookies(monkeypatch, tmp
         captured_kw.update(kw)
         return raw
 
+    monkeypatch.setattr(eng, "find_tool", lambda name: "fake_" + name)
     monkeypatch.setattr(eng, "download_full", fake_dl_full)
     monkeypatch.setattr(eng, "finalize_part", lambda *a, **k: tmp_path / "out" / "final.mp4")
 

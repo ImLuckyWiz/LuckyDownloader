@@ -145,7 +145,8 @@ def mp4_movie_timescale(path: Path) -> int | None:
 def run_ffmpeg(ctx: Ctx, args: list[str], total: float | None = None) -> str:
     """Run ffmpeg, report progress when `total` (seconds of output) is known."""
     eng = sys.modules.get("luckytwitch_engine")
-    _find = getattr(eng, "find_tool", find_tool) if eng else find_tool
+    import core.tools
+    _find = find_tool if find_tool is not getattr(core.tools, "find_tool", None) else (getattr(eng, "find_tool", find_tool) if eng else find_tool)
     ffmpeg = _find("ffmpeg")
     if not ffmpeg:
         raise EngineError(t("ffmpeg was not found. Install it and add it to PATH."))
@@ -308,7 +309,8 @@ def run_ytdlp(
     watch_dir: folder where the download lands, used as a fallback progress source.
     """
     eng = sys.modules.get("luckytwitch_engine")
-    _find = getattr(eng, "find_tool", find_tool) if eng else find_tool
+    import core.tools
+    _find = find_tool if find_tool is not getattr(core.tools, "find_tool", None) else (getattr(eng, "find_tool", find_tool) if eng else find_tool)
     _subp = getattr(eng, "subprocess", subprocess) if eng else subprocess
     ytdlp = _find("yt-dlp")
     if not ytdlp:
@@ -616,7 +618,8 @@ def write_local_playlist(segments: list[Segment], dest: Path) -> None:
 def get_playlist_url(ctx: Ctx, url: str, format_id: str | None = None) -> str:
     """The media playlist (.m3u8) yt-dlp would download, chosen with the same quality flags."""
     eng = sys.modules.get("luckytwitch_engine")
-    _find = getattr(eng, "find_tool", find_tool) if eng else find_tool
+    import core.tools
+    _find = find_tool if find_tool is not getattr(core.tools, "find_tool", None) else (getattr(eng, "find_tool", find_tool) if eng else find_tool)
     _subp = getattr(eng, "subprocess", subprocess) if eng else subprocess
     ytdlp = _find("yt-dlp")
     if not ytdlp:
