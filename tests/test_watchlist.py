@@ -123,3 +123,73 @@ def test_search_tab_pin_button_toggles_streamer(qtbot, tmp_path, monkeypatch):
     tab.pin_btn.click()
     assert not tab.pin_btn.isChecked()
     assert not watchlist.is_watched("pokimane", path=target)
+
+
+def test_watchlist_old_format_backward_compat(tmp_path: Path):
+    target = tmp_path / "old_watchlist.json"
+    target.write_text('[{"login": "shroud", "name": "Shroud", "last_vod_id": "123"}]', encoding="utf-8")
+    watchers = watchlist.load_watchlist(target)
+    assert len(watchers) == 1
+    w = watchers[0]
+    assert w.login == "shroud"
+    assert w.provider == "twitch"
+    assert w.url == "https://www.twitch.tv/shroud"
+    assert w.last_vod_id == "123"
+    assert watchlist.is_watched("shroud", path=target)
+
+
+def test_watchlist_youtube_channel_pinning_and_check(tmp_path: Path, monkeypatch):
+    target = tmp_path / "watchlist.json"
+    watchlist.add_to_watchlist("@veritasium", "Veritasium", provider="youtube", path=target)
+    assert watchlist.is_watched("@veritasium", provider="youtube", path=target)
+    assert not watchlist.is_watched("@veritasium", provider="twitch", path=target)
+
+    from core.providers import YOUTUBE_PROVIDER
+
+    fake_videos = [
+        {"id": "yt_new", "title": "New Video", "date": "2026-11-01", "url": "https://youtu.be/yt_new"},
+        {"id": "yt_old", "title": "Old Video", "date": "2026-10-01", "url": "https://youtu.be/yt_old"},
+    ]
+    monkeypatch.setattr(YOUTUBE_PROVIDER, "fetch_channel_videos", lambda target, limit=6: (fake_videos, None))
+
+    w = watchlist.load_watchlist(target)[0]
+    # First check: sets baseline without notification
+    updated, new_items = watchlist.check_channel_new_items(None, w, throttle_seconds=0)
+    assert new_items == []
+    assert updated.last_vod_id == "yt_new"
+
+    # Second check with a newer item: detects new item!
+    newer_videos = [
+        {"id": "yt_brand_new", "title": "Brand New Video", "date": "2026-11-02", "url": "https://youtu.be/yt_brand_new"},
+    ] + fake_videos
+    monkeypatch.setattr(YOUTUBE_PROVIDER, "fetch_channel_videos", lambda target, limit=6: (newer_videos, None))
+
+    updated2, new_items2 = watchlist.check_channel_new_items(None, updated, throttle_seconds=0)
+    assert len(new_items2) == 1
+    assert new_items2[0]["id"] == "yt_brand_new"
+    assert updated2.last_vod_id == "yt_brand_new"
+
+
+def test_browse_tab_pin_button_toggles_youtube_channel(qtbot, tmp_path, monkeypatch):
+    import core.paths as paths
+    target = tmp_path / "luckytwitch_watchlist.json"
+    monkeypatch.setattr(paths, "WATCHLIST_PATH", target)
+
+    from qt_ui.tabs.search import SearchTab
+    tab = SearchTab()
+    qtbot.addWidget(tab)
+
+    tab.set_provider("youtube")
+    tab.sv_channel = {"id": "@veritasium", "name": "Veritasium"}
+    tab._sync_pin()
+    assert not tab.pin_btn.isChecked()
+
+    # Click pin
+    tab.pin_btn.click()
+    assert tab.pin_btn.isChecked()
+    assert watchlist.is_watched("@veritasium", provider="youtube", path=target)
+
+    # Click unpin
+    tab.pin_btn.click()
+    assert not tab.pin_btn.isChecked()
+    assert not watchlist.is_watched("@veritasium", provider="youtube", path=target)

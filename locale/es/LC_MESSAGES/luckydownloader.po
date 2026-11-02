@@ -3502,3 +3502,11 @@ msgstr[1] "{n} videos"
 msgid "Browse"
 msgstr "Explorar"
 
+#: qt_ui/tabs/search.py
+msgid "Pin channel to Watch List"
+msgstr "Fijar canal en la lista de seguimiento"
+
+#: qt_ui/tabs/search.py
+msgid "Unpin channel from Watch List"
+msgstr "Desfijar canal de la lista de seguimiento"
+

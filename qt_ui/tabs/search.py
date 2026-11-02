@@ -833,22 +833,32 @@ class SearchTab(QWidget):
         from core import watchlist
         if not self.sv_channel:
             return
-        login = str(self.sv_channel.get("login") or "").lower().strip()
+        prov = self.current_provider_name()
+        login = str(self.sv_channel.get("login") or self.sv_channel.get("id") or "").strip()
+        if prov == "twitch":
+            login = login.lower()
         name = str(self.sv_channel.get("name") or login)
-        if watchlist.is_watched(login):
-            watchlist.remove_from_watchlist(login)
+        if watchlist.is_watched(login, provider=prov):
+            watchlist.remove_from_watchlist(login, provider=prov)
         else:
-            watchlist.add_to_watchlist(login, name)
+            watchlist.add_to_watchlist(login, name=name, provider=prov)
         self._sync_pin()
 
     def _sync_pin(self) -> None:
         if not hasattr(self, "pin_btn"):
             return
         from core import watchlist
-        login = str(self.sv_channel.get("login") or "").lower().strip() if self.sv_channel else ""
-        watched = bool(login and watchlist.is_watched(login))
+        prov = self.current_provider_name()
+        login = str(self.sv_channel.get("login") or self.sv_channel.get("id") or "").strip() if self.sv_channel else ""
+        if prov == "twitch":
+            login = login.lower()
+        watched = bool(login and watchlist.is_watched(login, provider=prov))
         self.pin_btn.setChecked(watched)
-        self.pin_btn.setToolTip(t("Unpin streamer from Watch List") if watched else t("Pin streamer to Watch List"))
+        if prov == "twitch":
+            tip = t("Unpin streamer from Watch List") if watched else t("Pin streamer to Watch List")
+        else:
+            tip = t("Unpin channel from Watch List") if watched else t("Pin channel to Watch List")
+        self.pin_btn.setToolTip(tip)
 
     def refresh_language(self) -> None:
         """Update SearchTab text labels dynamically when language changes."""

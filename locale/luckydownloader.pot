@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 11:54-0300\n"
+"POT-Creation-Date: 2026-11-02 12:03-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -2537,6 +2537,10 @@ msgid "Pick a streamer"
 msgstr ""
 
 #: qt_ui/tabs/search.py
+msgid "Pin channel to Watch List"
+msgstr ""
+
+#: qt_ui/tabs/search.py
 msgid "Pin streamer to Watch List"
 msgstr ""
 
@@ -2680,6 +2684,10 @@ msgstr ""
 msgid ""
 "Twitch deletes VODs after a while, and some streamers don't save them. Try another kind of video "
 "in the list above."
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Unpin channel from Watch List"
 msgstr ""
 
 #: qt_ui/tabs/search.py
