@@ -323,6 +323,8 @@ def run_ytdlp(
         "--retries", "10",
         "--fragment-retries", "10",
         "--continue",
+        "--remote-components", "ejs:github",
+        "--extractor-args", "youtube:formats=missing_pot",
         "--quiet", "--progress", "--newline",
         "--progress-template", PROGRESS_TEMPLATE,
     ]
