@@ -264,3 +264,29 @@ def test_ffmpeg_progress_without_speed_still_reports_fraction():
     pr.feed("speed=N/A")
     frac, text = pr.feed("progress=continue")
     assert frac == pytest.approx(0.5) and "ETA" not in text
+
+
+def test_hls_rejects_unsafe_urls():
+    from core.download import _is_safe_hls_url
+    assert not _is_safe_hls_url("file:///etc/passwd")
+    assert not _is_safe_hls_url("http://example.com/chunk\n.ts")
+    assert not _is_safe_hls_url("")
+    assert _is_safe_hls_url("https://cdn.example.com/chunk.ts")
+
+
+def test_parse_hls_playlist_skips_unsafe_segments():
+    from core.download import parse_hls_playlist
+    m3u8 = """#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:10
+#EXTINF:10.0,
+https://cdn.example.com/safe1.ts
+#EXTINF:10.0,
+file:///etc/passwd
+#EXTINF:10.0,
+https://cdn.example.com/safe2.ts
+#EXT-X-ENDLIST"""
+    segs = parse_hls_playlist(m3u8, "https://cdn.example.com/playlist.m3u8")
+    assert len(segs) == 2
+    assert segs[0].url == "https://cdn.example.com/safe1.ts"
+    assert segs[1].url == "https://cdn.example.com/safe2.ts"

@@ -1,3 +1,15 @@
+## v2.14.2
+
+LuckyDownloader **v2.14.2** strengthens data persistence, auto-updater integrity, deep-link security, and first-run migration reliability:
+
+- **Crash-Safe Settings & State Storage:** All settings, download history, watchlist, recent searches, and window state files are now saved atomically via temporary files so power loss or forced termination never leaves truncated JSON files. Any unreadable settings file is backed up to `.corrupt` before restoring defaults, and `config.json` permissions are restricted to the current user (`0600`) on macOS and Linux.
+- **Safer Deep Links (`luckydownloader://`):** Opening a deep link now auto-fetches metadata only for known supported video platforms (`Twitch`, `YouTube`, `Kick`, `TikTok`), while arbitrary generic URLs are pre-filled for manual confirmation. Local/loopback address checks now also block numeric, hexadecimal, and octal IP representations.
+- **Updater & Tool Download Integrity:** App updates are now staged inside the application data directory (`updates/`) with tag sanitization and re-verified against their expected SHA-256 checksum immediately before launching the installer. Automatic `ffmpeg` and `ffprobe` downloads on macOS now use pinned release archives verified against SHA-256 digests prior to extraction.
+- **One-Time Legacy Migration & Safe Uninstaller Detection:** Added a migration marker so settings and history from legacy `LuckyTwitch` installations are imported only once on first upgrade without re-copying removed files, included recent search history in migration, and improved uninstaller path handling on Windows and macOS.
+- **HLS Playlist & File Manager Hardening:** Validated segment and initialization URLs in HLS playlists to ensure only valid `http`/`https` URLs are processed, and sanitized file paths before highlighting files in Windows Explorer.
+
+---
+
 ## v2.14.1
 
 LuckyDownloader **v2.14.1** brings stability, data-pipeline, and safety improvements across downloading, watchlist tracking, and timeline processing:

@@ -256,13 +256,58 @@ def _extract_ffmpeg(archive: Path) -> None:
         raise EngineError(t("The ffmpeg archive did not contain ffmpeg."))
 
 
+_MAC_FFMPEG_SHA256: dict[str, str] = {
+    "https://ffmpeg.martin-riedl.de/download/macos/arm64/1793460248_N-128220-gbea9d176f7/ffmpeg.zip": (
+        "8094d88c459b6e0ab3bd69e96729485b50cb859451ba92c3779818d38d4b656d"
+    ),
+    "https://ffmpeg.martin-riedl.de/download/macos/arm64/1793460248_N-128220-gbea9d176f7/ffprobe.zip": (
+        "4587e2f13de2fa368067ad903def39306ba697cc07c1bb27da5753161628ce76"
+    ),
+    "https://ffmpeg.martin-riedl.de/download/macos/amd64/1767299902_N-122320-g38e89fe502/ffmpeg.zip": (
+        "6f0736d424b7426f8cbb7bba5c5448d94c976c138c669593b1f40ba534ed192f"
+    ),
+    "https://ffmpeg.martin-riedl.de/download/macos/amd64/1767299902_N-122320-g38e89fe502/ffprobe.zip": (
+        "46852ce00ae6f722ed30be269f310ea96c106a4246f2905d3147c5e02293081c"
+    ),
+    "https://www.osxexperts.net/ffmpeg80arm.zip": (
+        "0d4efcaf6a098430a708e0af694a84792938921fa126162787ae98c6151d7a95"
+    ),
+    "https://www.osxexperts.net/ffprobe80arm.zip": (
+        "b46eb342707ec0d31d3e8337bb56831e59c9e20918f414fd7a9d65a32fcb348f"
+    ),
+    "https://www.osxexperts.net/ffmpeg80intel.zip": (
+        "2d24d22db78c87f394a5822867acd5c5dc5e762cd261a44bd26923f3a5af3e07"
+    ),
+    "https://www.osxexperts.net/ffprobe80intel.zip": (
+        "0b6576104a95c1b39d4939e2df86f8f7cf1d55287ff57da48777d94605d12feb"
+    ),
+    "https://evermeet.cx/ffmpeg/ffmpeg-9.0.2.zip": (
+        "4acc0be580f9b2788029eb7bd4d645ff87968911b0a62aeeb3940d42d54558d5"
+    ),
+    "https://evermeet.cx/ffmpeg/ffprobe-9.0.2.zip": (
+        "24a9c968cd4da72d99c7245e914b921815835eb6dff01d99868031aebaf1d439"
+    ),
+}
+
+
 def _mac_ffmpeg_sources(tool: str) -> list[tuple[str, str]]:
     """(label, url) candidates for a macOS static build, native architecture first."""
-    arm = platform.machine().lower() == "arm64"
-    riedl = f"https://ffmpeg.martin-riedl.de/redirect/latest/macos/{'arm64' if arm else 'amd64'}/release/{tool}.zip"
+    arm = platform.machine().lower() in ("arm64", "aarch64")
+    riedl_ver = "arm64/1793460248_N-128220-gbea9d176f7" if arm else "amd64/1767299902_N-122320-g38e89fe502"
+    riedl = f"https://ffmpeg.martin-riedl.de/download/macos/{riedl_ver}/{tool}.zip"
     osx = f"https://www.osxexperts.net/{tool}80{'arm' if arm else 'intel'}.zip"
-    ever = f"https://evermeet.cx/ffmpeg/getrelease/{tool}/zip"
+    ever = f"https://evermeet.cx/ffmpeg/{tool}-9.0.2.zip"
     return [("martin-riedl.de", riedl), ("osxexperts.net", osx), ("evermeet.cx", ever)]
+
+
+def _verify_mac_ffmpeg_archive(archive: Path, url: str, tool: str) -> None:
+    """Verify a downloaded macOS ffmpeg/ffprobe archive against its pinned SHA-256 digest."""
+    filename = f"{tool}.zip"
+    expected = _MAC_FFMPEG_SHA256.get(url, "").strip().lower()
+    if not expected:
+        raise EngineError(t("No checksum is published for {filename}.").format(filename=filename))
+    if _sha256(archive).lower() != expected:
+        raise EngineError(t("Checksum mismatch for {filename}: the download is corrupted, try again.").format(filename=filename))
 
 
 def _download_with_retry(ctx: "Ctx", url: str, dest: Path, attempts: int = 3) -> None:
@@ -292,6 +337,7 @@ def _install_ffmpeg_macos(ctx: "Ctx") -> None:
                 ctx.stage(i / 2, (i + 1) / 2, f"Downloading {tool}")
                 try:
                     _download_with_retry(ctx, url, archive)
+                    _verify_mac_ffmpeg_archive(archive, url, tool)
                     with zipfile.ZipFile(archive) as z:
                         member = next((n for n in z.namelist()
                                        if PurePosixPath(n).name == tool and not n.startswith("__MACOSX")), None)

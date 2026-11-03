@@ -312,8 +312,8 @@ def load_state() -> dict:
 def save_state(state: dict) -> None:
     """Save update state to UPDATE_STATE_PATH."""
     try:
-        paths.UPDATE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        paths.UPDATE_STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        from core.files import atomic_write_json
+        atomic_write_json(paths.UPDATE_STATE_PATH, state)
     except OSError:
         pass
 
@@ -338,8 +338,8 @@ def is_installed_setup() -> bool:
 
 
 def get_update_temp_dir() -> Path:
-    """Return the temporary folder used for staging installer downloads."""
-    dest = Path(tempfile.gettempdir()) / "LuckyTwitch-update"
+    """Return the folder used for staging installer downloads (inside DATA_DIR/updates)."""
+    dest = paths.DATA_DIR / "updates"
     dest.mkdir(parents=True, exist_ok=True)
     return dest
 
@@ -354,18 +354,24 @@ def cleanup_stale_installer() -> None:
         p = Path(path_str)
         if p.is_file():
             p.unlink(missing_ok=True)
-        if p.parent.name == "LuckyTwitch-update" and p.parent.is_dir():
-            shutil.rmtree(p.parent, ignore_errors=True)
+        if p.parent.name in ("LuckyTwitch-update", "updates") and p.parent.is_dir():
+            # If inside updates directory, delete the installer file (do not wipe whole updates dir)
+            if p.parent.name == "LuckyTwitch-update":
+                shutil.rmtree(p.parent, ignore_errors=True)
     except OSError:
         pass
     state["installer_path"] = ""
     save_state(state)
 
 
-def launch_installer(installer_path: Path | str) -> bool:
+def launch_installer(installer_path: Path | str, expected_sha256: str = "", expected_size: int = 0) -> bool:
     """Launch the Windows installer detached with silent and relaunch parameters.
-    Returns True if the process was launched, False if OSError was raised.
+    Optionally re-verifies expected_sha256 if provided before executing.
+    Returns True if the process was launched, False if OSError was raised or verification failed.
     """
+    if expected_sha256:
+        if not verify_download(Path(installer_path), expected_size, expected_sha256):
+            return False
     cmd = [
         str(installer_path),
         "/SILENT",

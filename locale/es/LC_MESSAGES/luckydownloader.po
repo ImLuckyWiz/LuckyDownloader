@@ -3559,3 +3559,7 @@ msgstr "Omitido (ya registrado en el archivo de descargas)."
 msgid "Unsafe work directory path"
 msgstr "Ruta de directorio de trabajo no segura"
 
+#: qt_ui/update_dialog.py
+msgid "Update verification failed."
+msgstr "Fall? la verificaci?n de la actualizaci?n."
+

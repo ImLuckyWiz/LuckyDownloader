@@ -137,3 +137,31 @@ def detect_source(text: str) -> tuple[Provider | None, str]:
             return TWITCH_PROVIDER, f"https://www.twitch.tv/{user}"
 
     return None, ""
+
+
+_KNOWN_PROVIDER_DOMAINS: tuple[tuple[str, str], ...] = (
+    ("twitch.tv", "twitch"),
+    ("youtube.com", "youtube"),
+    ("youtu.be", "youtube"),
+    ("kick.com", "kick"),
+    ("tiktok.com", "tiktok"),
+    ("instagram.com", "instagram"),
+    ("twitter.com", "twitter"),
+    ("x.com", "twitter"),
+)
+
+
+def detect_provider(text: str) -> Provider:
+    """Return the Provider for *text*, distinguishing known platforms from arbitrary generic URLs."""
+    prov, cleaned = detect_source(text)
+    if prov is TWITCH_PROVIDER:
+        return TWITCH_PROVIDER
+    target = cleaned or (text or "").strip()
+    try:
+        host = (urlsplit(target if "://" in target else f"https://{target}").hostname or "").lower()
+    except Exception:
+        host = ""
+    for domain, site_id in _KNOWN_PROVIDER_DOMAINS:
+        if host == domain or host.endswith("." + domain):
+            return TWITCH_PROVIDER if site_id == "twitch" else GenericProvider(site_id)
+    return GENERIC_PROVIDER

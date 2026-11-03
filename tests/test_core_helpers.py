@@ -365,3 +365,87 @@ def test_ensure_data_dir_runs_uninstaller_when_frozen(tmp_path, monkeypatch):
     paths.ensure_data_dir()
     assert len(migrated) == 1
     assert len(uninstalled) == 1
+
+
+def test_settings_corrupt_file_backup(tmp_path, monkeypatch):
+    test_file = tmp_path / "settings.json"
+    monkeypatch.setattr(paths, "SETTINGS_PATH", test_file)
+    test_file.write_text("NOT VALID JSON {{{", encoding="utf-8")
+    loaded = settings.load_settings()
+    assert loaded["container"] == settings.DEFAULTS["container"]
+    assert (tmp_path / "settings.json.corrupt").exists()
+
+
+def test_settings_list_json_backup(tmp_path, monkeypatch):
+    test_file = tmp_path / "settings.json"
+    monkeypatch.setattr(paths, "SETTINGS_PATH", test_file)
+    test_file.write_text("[]", encoding="utf-8")
+    loaded = settings.load_settings()
+    assert loaded["container"] == settings.DEFAULTS["container"]
+    assert (tmp_path / "settings.json.corrupt").exists()
+
+
+def test_migration_sentinel_prevents_re_migration(tmp_path):
+    src = tmp_path / "legacy"
+    src.mkdir()
+    (src / "config.json").write_text("{}", encoding="utf-8")
+    dest = tmp_path / "dest"
+    
+    res1 = paths.migrate_from_legacy(src, dest)
+    assert "config.json" in res1
+    assert (dest / ".migrated_from_luckytwitch").exists()
+    
+    (dest / "config.json").unlink()
+    
+    res2 = paths.migrate_from_legacy(src, dest)
+    assert res2 == []
+    assert not (dest / "config.json").exists()
+
+
+def test_mac_ffmpeg_sources_have_pinned_sha256_and_verify(tmp_path, monkeypatch):
+    import hashlib
+    import zipfile
+    from core import tools
+    from core.errors import EngineError
+    from core.runtime import Ctx
+
+    for arch in ("arm64", "x86_64"):
+        monkeypatch.setattr(tools.platform, "machine", lambda a=arch: a)
+        for tool in ("ffmpeg", "ffprobe"):
+            sources = tools._mac_ffmpeg_sources(tool)
+            assert len(sources) == 3
+            for _label, url in sources:
+                digest = tools._MAC_FFMPEG_SHA256.get(url, "")
+                assert len(digest) == 64
+
+    monkeypatch.setattr(tools, "TOOLS_DIR", tmp_path)
+
+    # Create valid zip archives for ffmpeg and ffprobe
+    zips = {}
+    for tool in ("ffmpeg", "ffprobe"):
+        zp = tmp_path / f"src_{tool}.zip"
+        with zipfile.ZipFile(zp, "w") as z:
+            z.writestr(tool, f"fake-{tool}-binary")
+        zips[tool] = zp
+
+    # 1. Mismatched SHA-256 must fail and not extract binaries
+    monkeypatch.setattr(
+        tools,
+        "_download_with_retry",
+        lambda ctx, url, dest, attempts=3: dest.write_bytes(zips["ffmpeg"].read_bytes()),
+    )
+    with pytest.raises(EngineError):
+        tools._install_ffmpeg_macos(Ctx())
+    assert not (tmp_path / "ffmpeg").exists()
+
+    # 2. Matching SHA-256 extracts both binaries
+    def fake_dl_matching(ctx, url, dest, attempts=3):
+        tool = "ffprobe" if "ffprobe" in url else "ffmpeg"
+        data = zips[tool].read_bytes()
+        dest.write_bytes(data)
+        monkeypatch.setitem(tools._MAC_FFMPEG_SHA256, url, hashlib.sha256(data).hexdigest())
+
+    monkeypatch.setattr(tools, "_download_with_retry", fake_dl_matching)
+    tools._install_ffmpeg_macos(Ctx())
+    assert (tmp_path / "ffmpeg").read_text(encoding="utf-8") == "fake-ffmpeg-binary"
+    assert (tmp_path / "ffprobe").read_text(encoding="utf-8") == "fake-ffprobe-binary"

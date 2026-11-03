@@ -76,9 +76,9 @@ def save_watchlist(watchers: list[WatchedChannel], path: Path | None = None) -> 
     """Save watch list to JSON safely."""
     f = _watchlist_file(path)
     try:
-        f.parent.mkdir(parents=True, exist_ok=True)
         raw = [asdict(w) for w in watchers]
-        f.write_text(json.dumps(raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        from core.files import atomic_write_json
+        atomic_write_json(f, raw, ensure_ascii=False)
     except OSError:
         pass
 

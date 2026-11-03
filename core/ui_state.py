@@ -68,7 +68,7 @@ def save_ui_state(state: UIState | dict[str, Any], path: Path | None = None) -> 
     target = path or getattr(paths, "UI_STATE_PATH", paths.DATA_DIR / "luckytwitch_ui.json")
     try:
         data = asdict(state) if isinstance(state, UIState) else dict(state)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        from core.files import atomic_write_json
+        atomic_write_json(target, data)
     except Exception:  # noqa: BLE001
         pass

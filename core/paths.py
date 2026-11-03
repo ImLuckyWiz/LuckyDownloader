@@ -9,6 +9,7 @@ Tests monkeypatch the attributes of THIS module (the other core modules read the
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -85,11 +86,16 @@ def migrate_from_legacy(src: Path | None = None, dest: Path | None = None) -> li
     if src is None or not src.is_dir() or src == dest:
         return []
 
+    sentinel = dest / ".migrated_from_luckytwitch"
+    if sentinel.exists():
+        return []
+
     migrated: list[str] = []
     files_to_copy = [
         "config.json",
         "luckytwitch_settings.json",
         "luckytwitch_recent.json",
+        "luckytwitch_recent_searches.json",
         "luckytwitch_history.json",
         "luckytwitch_watchlist.json",
         "luckytwitch_ui.json",
@@ -123,6 +129,12 @@ def migrate_from_legacy(src: Path | None = None, dest: Path | None = None) -> li
                         migrated.append(f"tools/{tool_file.name}")
         except OSError:
             pass
+
+    try:
+        dest.mkdir(parents=True, exist_ok=True)
+        sentinel.write_text("1", encoding="utf-8")
+    except OSError:
+        pass
 
     return migrated
 
@@ -171,8 +183,12 @@ def _extract_uninstaller_exe(cmd: str) -> Path | None:
         end = s.find('"', 1)
         exe = s[1:end] if end != -1 else s.strip('"')
     else:
-        parts = s.split(maxsplit=1)
-        exe = parts[0] if parts else ""
+        m = re.match(r"^(.+?\.exe)\b", s, re.IGNORECASE)
+        if m:
+            exe = m.group(1).strip()
+        else:
+            parts = s.split(maxsplit=1)
+            exe = parts[0] if parts else ""
     if exe:
         try:
             p = Path(exe)
@@ -230,41 +246,7 @@ def find_legacy_uninstaller(current_exe_dir: Path | None = None) -> Path | None:
                 except OSError:
                     pass
 
-            # Enumerate subkeys for LuckyTwitch
-            try:
-                with winreg.OpenKey(root, r"Software\Microsoft\Windows\CurrentVersion\Uninstall") as uninst_key:
-                    num_subkeys = winreg.QueryInfoKey(uninst_key)[0]
-                    for i in range(num_subkeys):
-                        try:
-                            child_name = winreg.EnumKey(uninst_key, i)
-                            with winreg.OpenKey(uninst_key, child_name) as ck:
-                                disp_name = ""
-                                try:
-                                    disp_name, _ = winreg.QueryValueEx(ck, "DisplayName")
-                                except OSError:
-                                    pass
-                                loc = ""
-                                try:
-                                    loc, _ = winreg.QueryValueEx(ck, "InstallLocation")
-                                except OSError:
-                                    pass
-                                d_str = str(disp_name).lower()
-                                l_str = str(loc).lower()
-                                if "luckydownloader" in d_str or "luckydownloader" in l_str:
-                                    continue
-                                if "luckytwitch" in d_str or "luckytwitch" in l_str:
-                                    for val_name in ("QuietUninstallString", "UninstallString"):
-                                        try:
-                                            cmd, _ = winreg.QueryValueEx(ck, val_name)
-                                            p = _extract_uninstaller_exe(str(cmd))
-                                            if p and (current_exe_dir is None or p.resolve().parent != current_exe_dir):
-                                                return p
-                                        except OSError:
-                                            pass
-                        except OSError:
-                            pass
-            except OSError:
-                pass
+            pass
     except Exception:
         pass
 
@@ -319,16 +301,7 @@ def cleanup_legacy_shortcuts() -> list[str]:
             except OSError:
                 pass
     elif sys.platform == "darwin":
-        for cand in (
-            Path("/Applications/LuckyTwitch.app"),
-            Path.home() / "Applications" / "LuckyTwitch.app",
-        ):
-            if cand.exists():
-                try:
-                    shutil.rmtree(cand, ignore_errors=True)
-                    removed.append(str(cand))
-                except OSError:
-                    pass
+        pass
     elif sys.platform.startswith("linux"):
         desktop = Path.home() / ".local" / "share" / "applications" / "luckytwitch.desktop"
         if desktop.is_file():

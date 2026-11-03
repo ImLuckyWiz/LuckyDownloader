@@ -359,7 +359,7 @@ def test_get_update_temp_dir():
     d = updates.get_update_temp_dir()
     assert d.exists()
     assert d.is_dir()
-    assert "LuckyTwitch-update" in str(d)
+    assert d == updates.paths.DATA_DIR / "updates"
 
 
 def test_cleanup_stale_installer(monkeypatch, tmp_path):

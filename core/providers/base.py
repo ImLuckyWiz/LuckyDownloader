@@ -33,6 +33,11 @@ class Provider(ABC):
         ...
 
     @property
+    def site(self) -> str:
+        """Alias for provider name (e.g. 'twitch', 'youtube', 'generic')."""
+        return self.name
+
+    @property
     def display_name(self) -> str:
         """Human-readable provider name for UI display."""
         return self.name.capitalize()

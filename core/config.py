@@ -21,8 +21,13 @@ def read_config() -> dict:
 
 
 def write_config(data: dict) -> None:
-    paths.CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    paths.CONFIG_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    try:
+        from core.files import atomic_write_json
+        atomic_write_json(paths.CONFIG_PATH, data, chmod_mode=0o600)
+    except Exception:
+        pass
+
+
 
 
 def load_credentials():

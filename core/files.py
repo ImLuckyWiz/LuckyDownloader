@@ -2,10 +2,62 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+
+
+def atomic_write_json(
+    path: Path | str,
+    data: object,
+    *,
+    indent: int = 2,
+    ensure_ascii: bool = True,
+    chmod_mode: int | None = None,
+) -> None:
+    """Atomically serialize *data* as UTF-8 JSON to *path* via temp file + os.replace."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(data, indent=indent, ensure_ascii=ensure_ascii)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{target.name}.",
+        suffix=".tmp",
+        dir=str(target.parent),
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        if chmod_mode is not None and sys.platform != "win32":
+            try:
+                os.chmod(tmp_name, chmod_mode)
+            except OSError:
+                pass
+        os.replace(tmp_name, target)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
+def backup_corrupt_json(path: Path | str) -> None:
+    """Rename a corrupted JSON file to <name>.corrupt so user data isn't silently overwritten."""
+    target = Path(path)
+    if not target.exists():
+        return
+    try:
+        backup = target.with_suffix(target.suffix + ".corrupt")
+        os.replace(target, backup)
+    except OSError:
+        pass
+
+
 
 
 def open_in_file_manager(path: Path, select: bool = False) -> None:
@@ -16,7 +68,8 @@ def open_in_file_manager(path: Path, select: bool = False) -> None:
             # Explorer wants  /select,"C:\full path\file.mp4"  as ONE command line. Passing a list lets
             # Python quote the whole "/select,..." argument when the path has spaces, and Explorer then
             # ignores it and opens the Documents folder. So the command line is built by hand.
-            subprocess.Popen(f'explorer /select,"{os.path.normpath(str(path))}"')
+            norm = os.path.normpath(str(path)).replace('"', "")
+            subprocess.Popen(f'explorer /select,"{norm}"')
         else:
             os.startfile(os.path.normpath(str(path if path.is_dir() else path.parent)))  # type: ignore[attr-defined]
     elif sys.platform == "darwin":

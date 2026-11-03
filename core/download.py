@@ -14,7 +14,7 @@ import threading
 import time
 from dataclasses import dataclass, replace
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -512,6 +512,13 @@ class Segment:
         return self.end - self.start
 
 
+def _is_safe_hls_url(url: str) -> bool:
+    if not url or any(ch in url for ch in ("\r", "\n", "\x00")):
+        return False
+    parsed = urlparse(url)
+    return parsed.scheme.lower() in ("http", "https") and bool(parsed.netloc)
+
+
 def _hls_attrs(text: str) -> dict[str, str]:
     """Attributes of a tag like  URI="x",BYTERANGE="10@0"  ->  {"URI": "x", "BYTERANGE": "10@0"}."""
     return {k.upper(): v.strip('"') for k, v in re.findall(r'([A-Za-z0-9-]+)=("[^"]*"|[^,]*)', text)}
@@ -544,7 +551,8 @@ def parse_hls_playlist(text: str, base_url: str) -> list[Segment]:
                 attrs = _hls_attrs(rest)
                 if "URI" not in attrs:
                     raise ValueError(f"bad line: {line}")
-                init = (urljoin(base_url, attrs["URI"]), attrs.get("BYTERANGE"))
+                init_u = urljoin(base_url, attrs["URI"])
+                init = (init_u, attrs.get("BYTERANGE")) if _is_safe_hls_url(init_u) else None
             elif tag == "#EXT-X-BYTERANGE":
                 try:
                     length_s, _, offset_s = rest.partition("@")
@@ -562,6 +570,10 @@ def parse_hls_playlist(text: str, base_url: str) -> list[Segment]:
         if pending is None:
             raise ValueError("segment without #EXTINF")
         seg_url = urljoin(base_url, line)
+        if not _is_safe_hls_url(seg_url):
+            pending = None
+            pending_range = None
+            continue
         byterange = None
         if pending_range is not None:
             length, offset = pending_range

@@ -1412,7 +1412,9 @@ class MainWindow(QMainWindow):
         self.tab_options.refresh_name_examples()
         self.log(f"Link: {req.url}" + (f" ({req.label})" if req.label else "") + (f", cut points: {req.cuts}" if req.cuts else ""))
         self._link_pending = req.label
-        self.on_get_info()
+        from core.providers.detect import detect_provider
+        if detect_provider(req.url).site != "generic":
+            self.on_get_info()
 
     def use_vod(self, url: str) -> None:
         """«Use this VOD» in the Search tab: the link goes into the entry, the Plan tab opens, «Get info» runs."""

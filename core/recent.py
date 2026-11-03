@@ -25,7 +25,8 @@ def load_recent() -> list[dict]:
 
 def save_recent(items: list[dict]) -> None:
     try:
-        paths.RECENT_PATH.write_text(json.dumps(items, indent=2, ensure_ascii=False), encoding="utf-8")
+        from core.files import atomic_write_json
+        atomic_write_json(paths.RECENT_PATH, items, ensure_ascii=False)
     except OSError:
         pass
 
@@ -48,6 +49,7 @@ def load_recent_searches() -> list[dict]:
 
 def save_recent_searches(items: list[dict]) -> None:
     try:
-        paths.RECENT_SEARCHES_PATH.write_text(json.dumps(items, indent=2, ensure_ascii=False), encoding="utf-8")
+        from core.files import atomic_write_json
+        atomic_write_json(paths.RECENT_SEARCHES_PATH, items, ensure_ascii=False)
     except OSError:
         pass

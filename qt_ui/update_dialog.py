@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import sys
+from pathlib import Path
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
@@ -158,7 +160,9 @@ class UpdateDialog(QDialog):
         from qt_ui.background_jobs import UpdateDownloadRunner
         from qt_ui.bridge import Bridge
 
-        dest = updates.get_update_temp_dir() / f"LuckyDownloader-Setup-{self.info.tag}.exe"
+        safe_tag = re.sub(r"[^A-Za-z0-9._-]", "_", self.info.tag or "latest")[:40]
+        ext = ".exe" if sys.platform == "win32" else (".dmg" if sys.platform == "darwin" else ".AppImage")
+        dest = updates.get_update_temp_dir() / f"LuckyDownloader-Setup-{safe_tag}{ext}"
         self.progress_container.setVisible(True)
         self.progress_bar.setValue(0)
         self.progress_label.setText(t("Downloading LuckyDownloader {tag}...").format(tag=self.info.tag))
@@ -216,6 +220,12 @@ class UpdateDialog(QDialog):
         state = updates.load_state()
         state["installer_path"] = dest_str
         updates.save_state(state)
+
+        # Re-verify download digest if available before launching installer
+        if getattr(self.info, "sha256", ""):
+            if not updates.verify_download(Path(dest_str), getattr(self.info, "asset_size", 0), self.info.sha256):
+                self.progress_label.setText(t("Update verification failed."))
+                return
 
         ok = updates.launch_installer(dest_str)
         if not ok:

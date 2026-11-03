@@ -266,6 +266,17 @@ def test_not_supported_outside_windows(monkeypatch):
         wl.register()
 
 
+def test_blocked_host_encodings():
+    assert wl._blocked_host("2130706433")
+    assert wl._blocked_host("0x7f000001")
+    assert wl._blocked_host("0177.0.0.1")
+    assert wl._blocked_host("127.0.0.1")
+    assert wl._blocked_host("localhost")
+    assert not wl._blocked_host("example.com")
+    assert not wl._blocked_host("twitch.tv")
+    assert not wl._blocked_host("youtube.com")
+
+
 def test_launch_command_for_the_packaged_app_and_for_source(monkeypatch):
     assert wl.launch_command(exe="C:\\App\\LuckyTwitch.exe") == '"C:\\App\\LuckyTwitch.exe" "%1"'
     monkeypatch.delattr(wl.sys, "frozen", raising=False)

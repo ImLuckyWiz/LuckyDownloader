@@ -67,11 +67,18 @@ def _clean(text: str, limit: int, field: str, multiline: bool = False) -> str:
 def _blocked_host(host: str) -> bool:
     """Addresses that only make sense on this computer or its network: a web page has no business asking
     the app to read those."""
-    host = host.strip("[]").lower().rstrip(".")
-    if host == "localhost" or host.endswith(".localhost") or host.endswith(".local") or host.endswith(".internal"):
+    h = host.strip("[]").lower().rstrip(".")
+    if not h or h == "localhost" or h.endswith(".localhost") or h.endswith(".local") or h.endswith(".internal"):
         return True
+    if h.isdigit() or h.startswith("0x"):
+        return True
+    # Block octal/hex dotted quads such as 0177.0.0.1
+    parts = h.split(".")
+    if len(parts) == 4 and all(p.isdigit() or p.startswith("0x") for p in parts):
+        if any(len(p) > 1 and p.startswith("0") for p in parts):
+            return True
     try:
-        ip = ipaddress.ip_address(host)
+        ip = ipaddress.ip_address(h)
     except ValueError:
         return False
     return not ip.is_global

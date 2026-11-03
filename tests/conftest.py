@@ -68,25 +68,36 @@ def _collect_garbage_at_a_known_moment(request):
 
 def pytest_sessionfinish(session, exitstatus):
     try:
+        import gc
         from PySide6.QtCore import QEvent
         from PySide6.QtWidgets import QApplication
+
+        try:
+            from qt_ui.i18n_bus import language_bus
+            language_bus().changed.disconnect()
+        except Exception:
+            pass
 
         app = QApplication.instance()
         if app is not None:
             app.closeAllWindows()
             app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
             app.processEvents()
+        gc.collect()
     except Exception:
         pass
 
 
 def pytest_unconfigure(config):
-    """On Linux headless runners, PySide6 offscreen teardown triggers a known glibc SIGSEGV
+    """On Linux and macOS headless runners, PySide6 offscreen teardown can trigger a SIGSEGV
     during Python interpreter shutdown (Py_FinalizeEx) after all tests have completely passed.
-    Calling os._exit(0) when all tests passed bypasses this dangling C++ pointer crash.
+    Calling os._exit(0) when all tests passed with 0 failures/errors bypasses this C++ teardown crash.
     """
-    if sys.platform.startswith("linux"):
+    if sys.platform.startswith("linux") or sys.platform == "darwin":
         tr = config.pluginmanager.get_plugin("terminalreporter")
         failed = len(tr.stats.get("failed", [])) if tr else 0
-        if failed == 0:
+        errors = len(tr.stats.get("error", [])) if tr else 0
+        if failed == 0 and errors == 0:
+            sys.stdout.flush()
+            sys.stderr.flush()
             os._exit(0)

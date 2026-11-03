@@ -28,14 +28,14 @@ This index maps **all 67 findings (`A-01`..`L-05`)** from [`docs/REVIEW_2026_11.
 - [x] **Plan 01 - Step 11 (RELEASE `v2.14.1`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.1`), commit & git tag `v2.14.1` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 02 — [`docs/PLAN_02_SECURITY_ATOMIC_STORAGE_AND_UPDATER.md`](./PLAN_02_SECURITY_ATOMIC_STORAGE_AND_UPDATER.md) -> Release `v2.14.2`
-- [ ] **Plan 02 - Step 1** (`G-02`, `C-06`): Add `atomic_write_json`, `.corrupt` backup, and `0o600` on `config.json` — `[Model: Gemini Flash]`
-- [ ] **Plan 02 - Step 2** (`C-01`): Harden deep links (`luckydownloader://`) and SSRF host check — `[Model: Gemini Flash]`
-- [ ] **Plan 02 - Step 3** (`C-02`): Stage updates in `DATA_DIR/updates` and re-verify hash before launch — `[Model: Gemini Flash]`
-- [ ] **Plan 02 - Step 4** (`C-03`, `G-04`): Fix legacy migration sentinel and unsafe uninstaller cleanup — `[Model: Gemini Flash]`
-- [ ] **Plan 02 - Step 5** (`C-04`): Validate segment and init URLs in `parse_hls_playlist` — `[Model: Gemini Flash]`
-- [ ] **Plan 02 - Step 6** (`C-07`): Sanitize quotes in `reveal_in_file_manager` — `[Model: Gemini Flash]`
-- [ ] **Plan 02 - Step 7** (`C-05`): Add SHA-256 verification to macOS `ffmpeg`/`ffprobe` auto-downloader — `[Model: Argon / Claude Sonnet]`
-- [ ] **Plan 02 - Step 8 (RELEASE `v2.14.2`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.2`), commit & git tag `v2.14.2` — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 02 - Step 1** (`G-02`, `C-06`): Add `atomic_write_json`, `.corrupt` backup, and `0o600` on `config.json` — `[Model: Gemini Flash]`
+- [x] **Plan 02 - Step 2** (`C-01`): Harden deep links (`luckydownloader://`) and SSRF host check — `[Model: Gemini Flash]`
+- [x] **Plan 02 - Step 3** (`C-02`): Stage updates in `DATA_DIR/updates` and re-verify hash before launch — `[Model: Gemini Flash]`
+- [x] **Plan 02 - Step 4** (`C-03`, `G-04`): Fix legacy migration sentinel and unsafe uninstaller cleanup — `[Model: Gemini Flash]`
+- [x] **Plan 02 - Step 5** (`C-04`): Validate segment and init URLs in `parse_hls_playlist` — `[Model: Gemini Flash]`
+- [x] **Plan 02 - Step 6** (`C-07`): Sanitize quotes in `reveal_in_file_manager` — `[Model: Gemini Flash]`
+- [x] **Plan 02 - Step 7** (`C-05`): Add SHA-256 verification to macOS `ffmpeg`/`ffprobe` auto-downloader — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 02 - Step 8 (RELEASE `v2.14.2`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.2`), commit & git tag `v2.14.2` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 03 — [`docs/PLAN_03_QT_UI_PARALLEL_QUEUE_AND_WIN32.md`](./PLAN_03_QT_UI_PARALLEL_QUEUE_AND_WIN32.md) -> Release `v2.14.3`
 - [ ] **Plan 03 - Step 1** (`D-01`): Fix `MainWindow.closeEvent` leaking parallel queue workers — `[Model: Gemini Flash]`

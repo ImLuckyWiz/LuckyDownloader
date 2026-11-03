@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-03 00:22-0300\n"
+"POT-Creation-Date: 2026-11-03 04:18-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -3181,6 +3181,10 @@ msgstr ""
 
 #: qt_ui/update_dialog.py
 msgid "Update ready to install."
+msgstr ""
+
+#: qt_ui/update_dialog.py
+msgid "Update verification failed."
 msgstr ""
 
 #: qt_ui/update_dialog.py

@@ -645,6 +645,12 @@ def test_the_previous_vod_is_forgotten_so_its_cuts_cannot_be_reused(qtbot, win, 
     assert win._info_from_link is None
 
 
+def test_a_generic_host_link_populates_entry_without_auto_fetching(reads):
+    reads.open_link("luckydownloader://open?url=https%3A%2F%2Funknown-host.example.com%2Fvideo.mp4")
+    assert reads.vod_entry.text() == "https://unknown-host.example.com/video.mp4"
+    assert reads._read_calls == []
+
+
 def test_a_bad_link_says_why_and_changes_nothing(reads, boxes):
     reads.tab_plan.set_cut_text("keep me")
     reads.open_link("luckytwitch://open?url=file:///etc/passwd")
