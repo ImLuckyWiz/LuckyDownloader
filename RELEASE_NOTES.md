@@ -1,3 +1,15 @@
+## v2.14.3
+
+LuckyDownloader **v2.14.3** improves desktop UI responsiveness, parallel download queue accuracy, and native Windows frame handling:
+
+- **Parallel Queue Progress & Bandwidth Sharing:** Concurrent downloads now report accurate aggregated overall progress alongside individual row progress bars, and configured bandwidth rate limits are split evenly across active parallel workers.
+- **Clean Shutdown & Background Worker Cancellation:** Closing the application while parallel downloads are active now cancels all worker contexts cleanly, and idle queue progress shimmer animations pause automatically when no job is running or the queue view is hidden.
+- **Responsive Twitch Credentials Verification:** Validating custom Twitch application credentials now runs asynchronously in the background without freezing the interface.
+- **Thumbnail & Dialog Reliability:** Prevented stale thumbnail images from overwriting newer selections when switching sources quickly, removed duplicate History dialog and language-switch signal connections, and updated the Keyboard Shortcuts dialog (`?`) to list all timeline and queue shortcuts (`S`, `Del`, `←`/`→`, `+`/`-`/`0`, `F2`).
+- **Windows Frameless Window & Multi-Monitor Enhancements:** Improved titlebar button click responsiveness along the top window edge when maximized, hardened 64-bit Win32/DWM native handle interoperability, and fixed auto-hide taskbar detection on secondary monitors.
+
+---
+
 ## v2.14.2
 
 LuckyDownloader **v2.14.2** strengthens data persistence, auto-updater integrity, deep-link security, and first-run migration reliability:

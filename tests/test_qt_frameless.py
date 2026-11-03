@@ -188,3 +188,55 @@ def test_frame_controller_grips_mode(qtbot):
 
     assert ctrl.grips is not None
     assert len(ctrl.grips.grips) == 8
+
+def test_hit_test_top_edge_fitts_law_over_caption_buttons():
+    w, h = 1000, 700
+    client_rects = [(950, 0, 50, 32)]  # Close button flush at top-right
+    max_button_rect = (900, 0, 50, 32) # Maximize button flush at top edge
+
+    # Topmost pixels (y = 1, 2) inside Close button must return CLIENT, not TOP or TOPRIGHT
+    assert hit_test(975, 1, w, h, client_rects=client_rects, max_button_rect=max_button_rect) == Region.CLIENT
+    assert hit_test(999, 1, w, h, client_rects=client_rects, max_button_rect=max_button_rect) == Region.CLIENT
+
+    # Topmost pixels (y = 1, 2) inside Maximize button must return MAXBUTTON, not TOP
+    assert hit_test(925, 1, w, h, client_rects=client_rects, max_button_rect=max_button_rect) == Region.MAXBUTTON
+
+    # Normal top border away from buttons still returns TOP
+    assert hit_test(500, 1, w, h, client_rects=client_rects, max_button_rect=max_button_rect) == Region.TOP
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Win32 ctypes declarations only")
+def test_win32_ctypes_argtypes_and_restype_declared():
+    import ctypes
+    from ctypes import wintypes
+    import qt_ui.frameless as fl
+
+    assert fl.user32.MonitorFromWindow.restype == wintypes.HMONITOR
+    assert fl.user32.MonitorFromRect.restype == wintypes.HMONITOR
+    assert fl.user32.GetMonitorInfoW.argtypes == [wintypes.HMONITOR, ctypes.c_void_p]
+    assert fl.user32.GetMonitorInfoW.restype == wintypes.BOOL
+    assert fl.shell32.SHAppBarMessage.restype == ctypes.c_size_t
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Win32 autohide check only")
+def test_get_autohide_taskbar_edges_secondary_monitor(monkeypatch):
+    import ctypes
+    from ctypes import wintypes
+    import qt_ui.frameless as fl
+    from qt_ui.frameless import NativeFrame, RECT
+
+    class DummyWindow:
+        pass
+
+    nf = NativeFrame(DummyWindow())
+    rc_mon = RECT(1920, 0, 3840, 1080)
+    rc_work = RECT(1920, 0, 3840, 1080)
+
+    def fake_shappbar(msg, p_data):
+        if msg == fl.ABM_GETSTATE:
+            return fl.ABS_AUTOHIDE
+        return 0
+
+    monkeypatch.setattr(fl.shell32, "SHAppBarMessage", fake_shappbar)
+    edges = nf.get_autohide_taskbar_edges(hmon=123, rc_monitor=rc_mon, rc_work=rc_work)
+    assert edges == (False, False, False, True)

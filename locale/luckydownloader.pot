@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-03 04:18-0300\n"
+"POT-Creation-Date: 2026-11-03 07:05-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -1133,6 +1133,10 @@ msgid "Collapse"
 msgstr ""
 
 #: qt_ui/shell.py
+msgid "Cut at cursor / remove cut / nudge / zoom (on Timeline)"
+msgstr ""
+
+#: qt_ui/shell.py
 #, python-brace-format
 msgid "Downloaded on {date}"
 msgstr ""
@@ -1213,6 +1217,10 @@ msgid "Show this keyboard shortcuts sheet"
 msgstr ""
 
 #: qt_ui/shell.py
+msgid "Show welcome overview"
+msgstr ""
+
+#: qt_ui/shell.py
 msgid "Sign in with Twitch API credentials"
 msgstr ""
 
@@ -1226,10 +1234,6 @@ msgstr ""
 
 #: qt_ui/shell.py
 msgid "Switch to Browse, Plan, Options, or Queue & log"
-msgstr ""
-
-#: qt_ui/shell.py
-msgid "Timeline playhead / mark in / mark out / split (on Timeline)"
 msgstr ""
 
 #: qt_ui/shell.py

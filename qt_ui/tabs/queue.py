@@ -120,9 +120,13 @@ class QueueRowDelegate(QStyledItemDelegate):
             self._shimmer_timer = QTimer(self.table)
             self._shimmer_timer.setInterval(40)
             def _tick():
+                m = self.table.model()
+                if not self.table.isVisible() or (m is not None and getattr(m, "running_item", lambda: None)() is None):
+                    if self._shimmer_timer is not None and self._shimmer_timer.isActive():
+                        self._shimmer_timer.stop()
+                    return
                 self._shimmer_phase = (self._shimmer_phase + 0.03) % 1.0
-                if self.table.isVisible():
-                    self.table.viewport().update()
+                self.table.viewport().update()
             self._shimmer_timer.timeout.connect(_tick)
         if not self._shimmer_timer.isActive():
             self._shimmer_timer.start()
@@ -704,7 +708,6 @@ class QueueTab(QWidget):
     def enqueue(self, job: object, label: str, n_parts: int, strat: str, thumb: object = None) -> QueueItem:
         item = self.model.add(job, label, n_parts, strat, thumb=thumb)
         self.refresh_summary()
-        language_bus().changed.connect(self.refresh_language)
         self.log(f"Queued: {label} ({n_parts} parts, {strat})")
         if thumb is None:
             self._ensure_thumbnail(item)
@@ -730,10 +733,10 @@ class QueueTab(QWidget):
     def set_item_status(self, iid: str, status: str) -> None:
         self.model.set_status(iid, status)
         self.refresh_summary()
-        language_bus().changed.connect(self.refresh_language)
 
     def _on_progress(self, frac: float, text: str) -> None:
-        self.model.set_running_progress(frac, text)
+        if not self.runner.is_running():
+            self.model.set_running_progress(frac, text)
         if frac < 0:
             self.queue_progress.setRange(0, 0)
             self.queue_progress.setVisible(True)
@@ -817,12 +820,10 @@ class QueueTab(QWidget):
         self.refresh_summary()
         if self.table.selectionModel():
             self.table.selectionModel().clearSelection()
-        language_bus().changed.connect(self.refresh_language)
 
     def clear_finished(self) -> None:
         self.model.clear_finished()
         self.refresh_summary()
-        language_bus().changed.connect(self.refresh_language)
 
     def clear_all_jobs(self) -> None:
         if not self.model.items:
@@ -876,7 +877,9 @@ class QueueTab(QWidget):
         if r_lim:
             for it in todo:
                 if hasattr(it.job, "opts") and not getattr(it.job.opts, "rate_limit", ""):
-                    it.job.opts.rate_limit = r_lim
+                    from qt_ui.queue_runner import split_rate_limit
+                    it.job.opts._base_rate_limit = r_lim
+                    it.job.opts.rate_limit = split_rate_limit(r_lim, max_c)
         self.runner.start(todo, model=self.model, max_concurrent=max_c)
 
     def cancel_current(self) -> None:
@@ -897,7 +900,6 @@ class QueueTab(QWidget):
         self.queue_progress.setVisible(False)
         self.runner.finish()
         self.refresh_summary()
-        language_bus().changed.connect(self.refresh_language)
 
     # ---------------------------- folders ---------------------------- #
     def open_output_folder(self, path: Path | None = None, select: bool = False) -> None:

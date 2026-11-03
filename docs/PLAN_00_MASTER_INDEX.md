@@ -38,19 +38,19 @@ This index maps **all 67 findings (`A-01`..`L-05`)** from [`docs/REVIEW_2026_11.
 - [x] **Plan 02 - Step 8 (RELEASE `v2.14.2`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.2`), commit & git tag `v2.14.2` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 03 — [`docs/PLAN_03_QT_UI_PARALLEL_QUEUE_AND_WIN32.md`](./PLAN_03_QT_UI_PARALLEL_QUEUE_AND_WIN32.md) -> Release `v2.14.3`
-- [ ] **Plan 03 - Step 1** (`D-01`): Fix `MainWindow.closeEvent` leaking parallel queue workers — `[Model: Gemini Flash]`
-- [ ] **Plan 03 - Step 2** (`D-02`): Fix `QueueTab` signal leak on `language_bus().changed` — `[Model: Gemini Flash]`
-- [ ] **Plan 03 - Step 3** (`D-03`): Remove duplicate `history_btn.clicked` connection — `[Model: Gemini Flash]`
-- [ ] **Plan 03 - Step 4** (`D-04`): Aggregate parallel worker progress and rate limits — `[Model: Argon / Claude Sonnet]`
-- [ ] **Plan 03 - Step 5** (`D-05`): Stop `QueueRowDelegate._shimmer_timer` when no job is running — `[Model: Gemini Flash]`
-- [ ] **Plan 03 - Step 6** (`D-06`): Move `TwitchClient.refresh_token()` off the Qt GUI thread — `[Model: Argon / Claude Sonnet]`
-- [ ] **Plan 03 - Step 7** (`D-07`): Guard async thumbnail callbacks against stale URLs — `[Model: Gemini Flash]`
-- [ ] **Plan 03 - Step 8** (`D-08`): Synchronize `ShortcutsDialog` with actual `MainWindow` shortcuts — `[Model: Gemini Flash]`
-- [ ] **Plan 03 - Step 9** (`D-09`): Fix double translation `t(t(...))` and dead `row_number` attribute — `[Model: Gemini Flash]`
-- [ ] **Plan 03 - Step 10** (`E-01`): Fix top 6 px resize border blocking titlebar caption buttons — `[Model: Gemini Flash]`
-- [ ] **Plan 03 - Step 11** (`E-02`): Add explicit 64-bit `ctypes` `argtypes`/`restype` in `qt_ui/frameless.py` — `[Model: Argon / Claude Sonnet]`
-- [ ] **Plan 03 - Step 12** (`E-03`): Check per-monitor auto-hide taskbar alongside `ABM_GETSTATE` — `[Model: Gemini Flash]`
-- [ ] **Plan 03 - Step 13 (RELEASE `v2.14.3`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.3`), commit & git tag `v2.14.3` — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 03 - Step 1** (`D-01`): Fix `MainWindow.closeEvent` leaking parallel queue workers — `[Model: Gemini Flash]`
+- [x] **Plan 03 - Step 2** (`D-02`): Fix `QueueTab` signal leak on `language_bus().changed` — `[Model: Gemini Flash]`
+- [x] **Plan 03 - Step 3** (`D-03`): Remove duplicate `history_btn.clicked` connection — `[Model: Gemini Flash]`
+- [x] **Plan 03 - Step 4** (`D-04`): Aggregate parallel worker progress and rate limits — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 03 - Step 5** (`D-05`): Stop `QueueRowDelegate._shimmer_timer` when no job is running — `[Model: Gemini Flash]`
+- [x] **Plan 03 - Step 6** (`D-06`): Move `TwitchClient.refresh_token()` off the Qt GUI thread — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 03 - Step 7** (`D-07`): Guard async thumbnail callbacks against stale URLs — `[Model: Gemini Flash]`
+- [x] **Plan 03 - Step 8** (`D-08`): Synchronize `ShortcutsDialog` with actual `MainWindow` shortcuts — `[Model: Gemini Flash]`
+- [x] **Plan 03 - Step 9** (`D-09`): Fix double translation `t(t(...))` and dead `row_number` attribute — `[Model: Gemini Flash]`
+- [x] **Plan 03 - Step 10** (`E-01`): Fix top 6 px resize border blocking titlebar caption buttons — `[Model: Gemini Flash]`
+- [x] **Plan 03 - Step 11** (`E-02`): Add explicit 64-bit `ctypes` `argtypes`/`restype` in `qt_ui/frameless.py` — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 03 - Step 12** (`E-03`): Check per-monitor auto-hide taskbar alongside `ABM_GETSTATE` — `[Model: Gemini Flash]`
+- [x] **Plan 03 - Step 13 (RELEASE `v2.14.3`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.3`), commit & git tag `v2.14.3` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 04 — [`docs/PLAN_04_PREMIERE_CEP_PLUGIN_HARDENING.md`](./PLAN_04_PREMIERE_CEP_PLUGIN_HARDENING.md) -> Release `v2.14.4`
 - [ ] **Plan 04 - Step 1** (`F-01`): Remove unused `--enable-nodejs`/`--mixed-context` and gate `.debug` on dev flag — `[Model: Gemini Flash]`

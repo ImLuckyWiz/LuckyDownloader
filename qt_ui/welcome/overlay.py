@@ -75,7 +75,7 @@ class WelcomeOverlay(QWidget):
         center_lay.addWidget(self.title_lbl, 0, Qt.AlignmentFlag.AlignCenter)
 
         # Subtitle / Tagline
-        self.subtitle_lbl = QLabel(t(t("Fast Twitch VODs, precision clip cutting, and animated chat overlays.")), scroll_widget)
+        self.subtitle_lbl = QLabel(t("Fast Twitch VODs, precision clip cutting, and animated chat overlays."), scroll_widget)
         self.subtitle_lbl.setStyleSheet(f"color: {MUTED}; font-size: 11pt;")
         self.subtitle_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         center_lay.addWidget(self.subtitle_lbl, 0, Qt.AlignmentFlag.AlignCenter)

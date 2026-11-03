@@ -93,11 +93,17 @@ def pytest_unconfigure(config):
     during Python interpreter shutdown (Py_FinalizeEx) after all tests have completely passed.
     Calling os._exit(0) when all tests passed with 0 failures/errors bypasses this C++ teardown crash.
     """
-    if sys.platform.startswith("linux") or sys.platform == "darwin":
+    if True:
         tr = config.pluginmanager.get_plugin("terminalreporter")
         failed = len(tr.stats.get("failed", [])) if tr else 0
         errors = len(tr.stats.get("error", [])) if tr else 0
-        if failed == 0 and errors == 0:
+        if failed == 0 and errors == 0 and len(tr.stats.get("passed", [])) > 0:
             sys.stdout.flush()
             sys.stderr.flush()
+            if sys.platform == "win32":
+                import ctypes
+                k32 = ctypes.windll.kernel32
+                k32.GetCurrentProcess.restype = ctypes.c_void_p
+                k32.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+                k32.TerminateProcess(k32.GetCurrentProcess(), 0)
             os._exit(0)

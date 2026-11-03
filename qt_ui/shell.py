@@ -607,17 +607,24 @@ class VodStrip(QFrame):
 
     def _fetch_thumbnail(self, url: str) -> None:
         import threading
+        self._expected_thumb_url = url
         def work():
             try:
                 from luckytwitch_engine import fetch_thumbnail
                 p = fetch_thumbnail(url)
                 if p and Path(p).is_file():
-                    self._thumb_loaded.emit(str(p))
+                    self._thumb_loaded.emit(f"{url}:::{p}")
             except Exception:
                 pass
         threading.Thread(target=work, daemon=True).start()
 
-    def _on_thumb_file(self, path_str: str) -> None:
+    def _on_thumb_file(self, payload: str) -> None:
+        if ":::" in payload:
+            url, path_str = payload.split(":::", 1)
+        else:
+            url, path_str = "", payload
+        if url and url != getattr(self, "_expected_thumb_url", None):
+            return
         pm = QPixmap(path_str)
         if not pm.isNull():
             self.set_thumbnail_from_pixmap(pm)
@@ -675,9 +682,10 @@ class ShortcutsDialog(QDialog):
             ("Ctrl+,", t("Open Options (Settings)")),
             ("Ctrl+Enter", t("Add current VOD to queue and start (on Plan)")),
             ("Ctrl+Shift+Enter", t("Add current VOD to queue without starting (on Plan)")),
-            ("Space / I / O / S", t("Timeline playhead / mark in / mark out / split (on Timeline)")),
+            ("S / Del / ← → / + - 0", t("Cut at cursor / remove cut / nudge / zoom (on Timeline)")),
             ("Ctrl+Z / Ctrl+Y", t("Undo / redo timeline edit")),
             ("F1", t("Show this keyboard shortcuts sheet")),
+            ("F2", t("Show welcome overview")),
         ]
 
     def __init__(self, parent: QWidget | None = None):

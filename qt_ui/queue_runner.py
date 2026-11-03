@@ -11,6 +11,7 @@ with a fake (nothing is downloaded).
 
 from __future__ import annotations
 
+import re
 import threading
 from typing import Sequence
 
@@ -22,6 +23,30 @@ from core.i18n import N_, t
 from qt_ui.queue_model import QueueItem, QueueModel
 
 
+def split_rate_limit(rate_limit: str, workers: int) -> str:
+    """Divide a yt-dlp rate limit string (e.g. '10M', '5M', '500K') across ``workers``."""
+    raw = (rate_limit or "").strip()
+    if not raw or workers <= 1:
+        return raw
+    m = re.match(r"^(\d+(?:\.\d+)?)\s*([KMGkmg]?)$", raw)
+    if not m:
+        return raw
+    val = float(m.group(1))
+    unit = m.group(2).upper()
+    per_worker = val / workers
+    if per_worker >= 1.0 and per_worker.is_integer():
+        return f"{int(per_worker)}{unit}"
+    if unit == "G":
+        kb = round(val * 1024 * 1024 / workers)
+        return f"{kb // 1024}M" if kb % 1024 == 0 else f"{kb}K"
+    if unit == "M":
+        kb = round(val * 1024 / workers)
+        return f"{max(1, kb)}K"
+    if unit == "K":
+        return f"{max(1, round(per_worker))}K"
+    return f"{max(1, round(per_worker))}"
+
+
 class QueueRunner(QObject):
     def __init__(self, bridge: Bridge, parent: QObject | None = None, max_concurrent: int = 1):
         super().__init__(parent)
@@ -29,6 +54,7 @@ class QueueRunner(QObject):
         self.max_concurrent = max(1, int(max_concurrent))
         self.ctx: Ctx | None = None  # the context of the running job (for cancel button backward compatibility)
         self.active_contexts: dict[str, Ctx] = {}  # iid -> Ctx for currently running jobs
+        self._worker_progress: dict[str, float] = {}  # iid -> progress fraction for active jobs
         self.worker: threading.Thread | None = None  # coordinator thread (joined by tests)
         self.workers: list[threading.Thread] = []  # active worker threads
         self._lock = threading.RLock()
@@ -48,6 +74,8 @@ class QueueRunner(QObject):
             return
         concurrency = max(1, int(max_concurrent if max_concurrent is not None else self.max_concurrent))
         self._cancel_all_event.clear()
+        with self._lock:
+            self._worker_progress.clear()
         bridge = self.bridge
         fallback = list(items)
         seen: set[str] = set()
@@ -75,7 +103,17 @@ class QueueRunner(QObject):
                 return nxt, total
 
         def on_item_progress(iid: str, frac: float, text: str) -> None:
-            bridge.progress.emit(frac, text)
+            with self._lock:
+                self._worker_progress[iid] = float(frac)
+                if len(self._worker_progress) > 1:
+                    vals = list(self._worker_progress.values())
+                    if all(v < 0 for v in vals):
+                        overall_frac = -1.0
+                    else:
+                        overall_frac = sum(max(0.0, min(1.0, v)) for v in vals) / len(vals)
+                else:
+                    overall_frac = float(frac)
+            bridge.progress.emit(overall_frac, text)
             if model is not None:
                 model.set_progress(iid, frac, text)
 
@@ -96,8 +134,14 @@ class QueueRunner(QObject):
                 )
                 with self._lock:
                     self.active_contexts[it.iid] = ctx
+                    self._worker_progress[it.iid] = 0.0
                     self.ctx = ctx
 
+                opts = getattr(it.job, "opts", None)
+                if opts is not None and getattr(opts, "rate_limit", ""):
+                    base_limit = getattr(opts, "_base_rate_limit", None) or opts.rate_limit
+                    opts._base_rate_limit = base_limit
+                    opts.rate_limit = split_rate_limit(base_limit, concurrency)
                 bridge.job.emit(cur_n, total)
                 bridge.item.emit(it.iid, N_("running…"))
                 try:
@@ -116,6 +160,7 @@ class QueueRunner(QObject):
                 finally:
                     with self._lock:
                         self.active_contexts.pop(it.iid, None)
+                        self._worker_progress.pop(it.iid, None)
                         self.ctx = next(iter(self.active_contexts.values()), None)
 
         def coordinator():
@@ -131,6 +176,7 @@ class QueueRunner(QObject):
             with self._lock:
                 self.workers = []
                 self.active_contexts.clear()
+                self._worker_progress.clear()
                 self.ctx = None
             bridge.queue_done.emit()
 

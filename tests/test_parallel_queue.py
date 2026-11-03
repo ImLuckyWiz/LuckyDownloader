@@ -245,3 +245,70 @@ def test_ctx_attach_proc_closes_popen_cancel_race(monkeypatch):
     assert len(killed) == 1
     assert ctx.proc is None
 
+
+def test_parallel_worker_progress_aggregation_and_rate_limit_split(qtbot):
+    import types
+    import qt_ui.queue_runner as qr_mod
+    from qt_ui.queue_runner import split_rate_limit
+
+    assert split_rate_limit("10M", 1) == "10M"
+    assert split_rate_limit("10M", 2) == "5M"
+    assert split_rate_limit("500K", 2) == "250K"
+    assert split_rate_limit("5M", 2) == "2560K"
+
+    bridge = Bridge()
+    runner = QueueRunner(bridge, max_concurrent=2)
+    model = QueueModel()
+    bridge.item.connect(model.set_status)
+
+    both_started = threading.Barrier(2, timeout=3.0)
+    first_reported = threading.Event()
+    second_reported = threading.Event()
+    allow_finish = threading.Event()
+    emitted_progress = []
+    bridge.progress.connect(lambda f, t: emitted_progress.append((f, t)))
+
+    j1 = types.SimpleNamespace(id=1, opts=types.SimpleNamespace(rate_limit="10M"))
+    j2 = types.SimpleNamespace(id=2, opts=types.SimpleNamespace(rate_limit="10M"))
+
+    def fake_run(job, ctx):
+        both_started.wait()
+        if job.id == 1:
+            ctx._progress(0.8, "Job 1 progress")
+            first_reported.set()
+            second_reported.wait(timeout=3.0)
+        else:
+            first_reported.wait(timeout=3.0)
+            ctx._progress(0.2, "Job 2 progress")
+            second_reported.set()
+        allow_finish.wait(timeout=3.0)
+        return [Path("ok.mp4")]
+
+    orig_run = qr_mod.run_job
+    qr_mod.run_job = fake_run
+    try:
+        it1 = model.add(j1, "Job 1", 1, "auto")
+        it2 = model.add(j2, "Job 2", 1, "auto")
+
+        runner.start(model.items, model=model, max_concurrent=2)
+        assert second_reported.wait(timeout=3.0)
+
+        # Each row keeps its individual progress
+        assert it1.progress == pytest.approx(0.8)
+        assert it2.progress == pytest.approx(0.2)
+        # Rate limit was divided across the 2 workers
+        assert j1.opts.rate_limit == "5M"
+        assert j2.opts.rate_limit == "5M"
+
+        allow_finish.set()
+        with qtbot.waitSignal(bridge.queue_done, timeout=5000):
+            pass
+
+        # Mean progress when Job 1 was at 0.8 and Job 2 at 0.0 -> 0.4, then Job 2 at 0.2 -> 0.5
+        fracs = [round(f, 2) for f, _ in emitted_progress]
+        assert 0.4 in fracs
+        assert 0.5 in fracs
+    finally:
+        qr_mod.run_job = orig_run
+
+

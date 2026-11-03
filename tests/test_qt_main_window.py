@@ -316,3 +316,25 @@ def test_main_window_on_update_checked_flows(win, monkeypatch, tmp_path):
     win.on_update_checked(None, "")
     assert not win.update_pill.isVisible()
 
+
+
+def test_close_event_cancels_runner_directly(qtbot, monkeypatch):
+    from unittest.mock import MagicMock
+    from PySide6.QtGui import QCloseEvent
+    from qt_ui.main_window import MainWindow
+
+    monkeypatch.setattr("qt_ui.main_window.dialogs.ask_yes_no", lambda *a, **k: True)
+    win = mw.MainWindow(settings=dict(DEFAULTS), client=object())
+    qtbot.addWidget(win)
+
+    cancelled = []
+    fake_runner = MagicMock()
+    fake_runner.is_running.side_effect = [True, False]
+    fake_runner.cancel = lambda: cancelled.append(True)
+    fake_runner.ctx = None
+    win.tab_queue.runner = fake_runner
+
+    ev = QCloseEvent()
+    win.closeEvent(ev)
+    assert ev.isAccepted()
+    assert cancelled == [True]

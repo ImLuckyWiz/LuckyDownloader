@@ -871,10 +871,6 @@ msgid "Signed in to Twitch API (click to manage credentials)"
 msgstr "Sesión iniciada en la API de Twitch (haz clic para gestionar credenciales)"
 
 #: qt_ui/shell.py
-msgid "Timeline playhead / mark in / mark out / split (on Timeline)"
-msgstr "Cabezal de línea de tiempo / marcar entrada / salida / dividir (en línea de tiempo)"
-
-#: qt_ui/shell.py
 msgid "Toggle navigation sidebar"
 msgstr "Alternar barra lateral de navegación"
 
@@ -3562,4 +3558,12 @@ msgstr "Ruta de directorio de trabajo no segura"
 #: qt_ui/update_dialog.py
 msgid "Update verification failed."
 msgstr "Fall? la verificaci?n de la actualizaci?n."
+
+#: qt_ui/shell.py
+msgid "Cut at cursor / remove cut / nudge / zoom (on Timeline)"
+msgstr "Cortar en el cursor / eliminar corte / desplazar / zoom (en línea de tiempo)"
+
+#: qt_ui/shell.py
+msgid "Show welcome overview"
+msgstr "Mostrar resumen de bienvenida"
 

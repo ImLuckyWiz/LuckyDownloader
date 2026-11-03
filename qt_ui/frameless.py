@@ -75,6 +75,20 @@ def hit_test(
     if x < 0 or y < 0 or x >= width or y >= height:
         return Region.NOWHERE
 
+    # Check interactive titlebar controls (maximize button, client widgets) first
+    # so top-edge Fitts's Law clicks on Minimize/Maximize/Close buttons are never swallowed
+    # by the top resize border or top corners.
+    if y < bar_height:
+        if max_button_rect:
+            mx, my, mw, mh = max_button_rect
+            if mx <= x < mx + mw and my <= y < my + mh:
+                return Region.MAXBUTTON
+
+        if client_rects:
+            for cx, cy, cw, ch in client_rects:
+                if cx <= x < cx + cw and cy <= y < cy + ch:
+                    return Region.CLIENT
+
     # 1. When maximized, borders cannot be resized
     if not maximized:
         # Check corners first
@@ -107,20 +121,8 @@ def hit_test(
         if right:
             return Region.RIGHT
 
-    # 2. Inside the Title Bar area
+    # 2. Inside the Title Bar area (caption background)
     if y < bar_height:
-        # Check maximize button for Snap Layouts
-        if max_button_rect:
-            mx, my, mw, mh = max_button_rect
-            if mx <= x < mx + mw and my <= y < my + mh:
-                return Region.MAXBUTTON
-
-        # Check client widgets in the bar (buttons, inputs)
-        if client_rects:
-            for cx, cy, cw, ch in client_rects:
-                if cx <= x < cx + cw and cy <= y < cy + ch:
-                    return Region.CLIENT
-
         return Region.CAPTION
 
     return Region.CLIENT
@@ -313,6 +315,35 @@ if sys.platform == "win32":
     ABE_RIGHT = 2
     ABE_BOTTOM = 3
 
+    shell32 = ctypes.windll.shell32
+
+    user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.GetWindowLongW.restype = wintypes.LONG
+    user32.SetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.LONG]
+    user32.SetWindowLongW.restype = wintypes.LONG
+    user32.SetWindowPos.argtypes = [
+        wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT,
+    ]
+    user32.SetWindowPos.restype = wintypes.BOOL
+    user32.IsZoomed.argtypes = [wintypes.HWND]
+    user32.IsZoomed.restype = wintypes.BOOL
+    user32.MonitorFromRect.argtypes = [ctypes.POINTER(RECT), wintypes.DWORD]
+    user32.MonitorFromRect.restype = wintypes.HMONITOR
+    user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+    user32.MonitorFromWindow.restype = wintypes.HMONITOR
+    user32.GetMonitorInfoW.argtypes = [wintypes.HMONITOR, ctypes.c_void_p]
+    user32.GetMonitorInfoW.restype = wintypes.BOOL
+    user32.ScreenToClient.argtypes = [wintypes.HWND, ctypes.POINTER(POINT)]
+    user32.ScreenToClient.restype = wintypes.BOOL
+
+    dwmapi.DwmExtendFrameIntoClientArea.argtypes = [wintypes.HWND, ctypes.POINTER(MARGINS)]
+    dwmapi.DwmExtendFrameIntoClientArea.restype = wintypes.LONG
+    dwmapi.DwmSetWindowAttribute.argtypes = [wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD]
+    dwmapi.DwmSetWindowAttribute.restype = wintypes.LONG
+
+    shell32.SHAppBarMessage.argtypes = [wintypes.DWORD, ctypes.c_void_p]
+    shell32.SHAppBarMessage.restype = ctypes.c_size_t
+
 
 class NativeFrame:
     """Manages native Win32 window styles, DWM frame extension, and message handling."""
@@ -360,8 +391,8 @@ class NativeFrame:
 
         return True
 
-    def get_autohide_taskbar_edges(self) -> tuple[bool, bool, bool, bool]:
-        """Check if any edge of the primary display has an auto-hiding taskbar."""
+    def get_autohide_taskbar_edges(self, hmon: int | None = None, rc_monitor: RECT | None = None, rc_work: RECT | None = None) -> tuple[bool, bool, bool, bool]:
+        """Check if any edge has an auto-hiding taskbar (primary or target monitor)."""
         if sys.platform != "win32":
             return (False, False, False, False)
         try:
@@ -369,13 +400,24 @@ class NativeFrame:
             abd = APPBARDATA()
             abd.cbSize = ctypes.sizeof(APPBARDATA)
             state = shell32.SHAppBarMessage(ABM_GETSTATE, ctypes.byref(abd))
-            if not (state & ABS_AUTOHIDE):
-                return (False, False, False, False)
+            has_autohide = bool(state & ABS_AUTOHIDE)
 
-            # Check taskbar position
-            if shell32.SHAppBarMessage(ABM_GETTASKBARPOS, ctypes.byref(abd)):
+            # Check primary taskbar position via ABM_GETTASKBARPOS
+            if has_autohide and shell32.SHAppBarMessage(ABM_GETTASKBARPOS, ctypes.byref(abd)):
                 edge = abd.uEdge
-                return (edge == ABE_LEFT, edge == ABE_TOP, edge == ABE_RIGHT, edge == ABE_BOTTOM)
+                # If target monitor is specified and intersects taskbar, or if primary monitor
+                if rc_monitor is None or (
+                    abd.rc.left < rc_monitor.right and abd.rc.right > rc_monitor.left and
+                    abd.rc.top < rc_monitor.bottom and abd.rc.bottom > rc_monitor.top
+                ):
+                    return (edge == ABE_LEFT, edge == ABE_TOP, edge == ABE_RIGHT, edge == ABE_BOTTOM)
+
+            # Secondary monitor check: when rc_work == rc_monitor on a maximized monitor with global autohide,
+            # apply 1px bottom inset to avoid Windows DWM blanking out the autohide taskbar
+            if has_autohide and rc_monitor is not None and rc_work is not None:
+                if (rc_monitor.left == rc_work.left and rc_monitor.top == rc_work.top and
+                    rc_monitor.right == rc_work.right and rc_monitor.bottom == rc_work.bottom):
+                    return (False, False, False, True)
         except Exception:
             pass
         return (False, False, False, False)
@@ -420,7 +462,11 @@ class NativeFrame:
                         if user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
                             work_area = (mi.rcWork.left, mi.rcWork.top, mi.rcWork.right, mi.rcWork.bottom)
 
-                    autohide = self.get_autohide_taskbar_edges() if is_zoomed else (False, False, False, False)
+                    autohide = (
+                        self.get_autohide_taskbar_edges(hmon=hmon, rc_monitor=mi.rcMonitor, rc_work=mi.rcWork)
+                        if is_zoomed
+                        else (False, False, False, False)
+                    )
                     new_client = calculate_client_rect(proposed, is_zoomed, work_area, autohide)
 
                     params.rgrc[0].left = new_client[0]

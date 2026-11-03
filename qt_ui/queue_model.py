@@ -252,7 +252,7 @@ class QueueModel(QAbstractTableModel):
                 self.beginResetModel()
                 self.items = running
                 for idx, item in enumerate(self.items, start=1):
-                    item.row_number = idx
+                    item.n = idx
                 self.endResetModel()
                 return removed
             else:

@@ -624,18 +624,25 @@ class PlanTab(ScrollPage):
 
     def _fetch_generic_thumbnail(self, url: str) -> None:
         import threading
+        self._expected_thumb_url = url
         def work():
             try:
                 from pathlib import Path
                 from luckytwitch_engine import fetch_thumbnail
                 p = fetch_thumbnail(url)
                 if p and Path(p).is_file():
-                    self.generic_thumb_loaded.emit(str(p))
+                    self.generic_thumb_loaded.emit(f"{url}:::{p}")
             except Exception:
                 pass
         threading.Thread(target=work, daemon=True).start()
 
-    def _on_generic_thumb_file(self, path_str: str) -> None:
+    def _on_generic_thumb_file(self, payload: str) -> None:
+        if ":::" in payload:
+            url, path_str = payload.split(":::", 1)
+        else:
+            url, path_str = "", payload
+        if url and url != getattr(self, "_expected_thumb_url", None):
+            return
         pm = QPixmap(path_str)
         if not pm.isNull():
             scaled = pm.scaled(self.generic_thumb_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)

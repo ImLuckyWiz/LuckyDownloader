@@ -601,3 +601,30 @@ def test_copy_code_button_copies_device_code_to_clipboard(qtbot, dlg):
     dlg.copy_code_btn.click()
     assert QApplication.clipboard().text() == "WXYZ-1234"
     assert dlg.copy_code_btn.text() == "Copied!"
+
+
+def test_save_own_app_runs_refresh_token_off_gui_thread(qtbot, dlg, host, monkeypatch):
+    gate = threading.Event()
+    refresh_threads = []
+
+    class SlowClient:
+        def __init__(self, client_id, client_secret=None, **kw):
+            self.client_id = client_id
+            self.client_secret = client_secret
+
+        def refresh_token(self):
+            refresh_threads.append(threading.current_thread())
+            gate.wait(timeout=3.0)
+
+    monkeypatch.setattr(td, "TwitchClient", SlowClient)
+    dlg.id_edit.setText("cid-async")
+    dlg.sec_edit.setText("sec-async")
+    dlg.save_btn.click()
+
+    assert not dlg.save_btn.isEnabled()
+    gate.set()
+    qtbot.waitUntil(lambda: dlg.save_btn.isEnabled(), timeout=3000)
+    assert len(refresh_threads) == 1
+    assert refresh_threads[0] is not threading.main_thread()
+    assert config_file() == {"client_id": "cid-async", "client_secret": "sec-async"}
+

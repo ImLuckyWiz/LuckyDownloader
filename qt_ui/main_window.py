@@ -238,7 +238,6 @@ class MainWindow(QMainWindow):
         self.info_btn.clicked.connect(self.on_get_info)
         self.api_btn.clicked.connect(self.ask_credentials)
         self.command_bar.history_btn.clicked.connect(self.open_history_dialog)
-        self.command_bar.history_btn.clicked.connect(self.open_history_dialog)
         self.command_bar.set_signed_in(self._client is not None)
         top_lay.addWidget(self.command_bar)
 
@@ -1062,7 +1061,9 @@ class MainWindow(QMainWindow):
             if not dialogs.ask_yes_no(self, t("Quit"), t("A job is running. Cancel it and quit?")):
                 event.ignore()
                 return
-            if runner.ctx:
+            if hasattr(runner, "cancel"):
+                runner.cancel()
+            elif getattr(runner, "ctx", None):
                 runner.ctx.cancel()
         self._info_timer.stop()
         self._link_timer.stop()

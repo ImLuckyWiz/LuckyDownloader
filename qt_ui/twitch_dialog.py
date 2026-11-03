@@ -49,6 +49,8 @@ class LoginSignals(QObject):
     ok = Signal(str, str)  # (access token, refresh token)
     error = Signal(str)
     cancelled = Signal()
+    own_app_ok = Signal(str, str, object)
+    own_app_error = Signal(str, str)
 
 
 class TwitchDialog(QDialog):
@@ -65,6 +67,8 @@ class TwitchDialog(QDialog):
         self.signals.ok.connect(self.finish_login)
         self.signals.error.connect(self.fail_login)
         self.signals.cancelled.connect(self.on_cancelled)
+        self.signals.own_app_ok.connect(self._finish_save_own_app)
+        self.signals.own_app_error.connect(self._fail_save_own_app)
 
         box = QVBoxLayout(self)
         box.setContentsMargins(15, 15, 15, 15)
@@ -277,20 +281,47 @@ class TwitchDialog(QDialog):
         if not cid or not sec:
             dialogs.warning(self, t("Missing data"), t("Fill in both fields."))
             return
+        self.save_btn.setEnabled(False)
         test = TwitchClient(cid, sec)
-        try:
-            test.refresh_token()
-        except ValueError as e:
-            dialogs.error(self, t("Error"), str(e))
+        signals = self.signals
+
+        def work():
+            try:
+                test.refresh_token()
+            except ValueError as e:
+                signals.own_app_error.emit("value", str(e))
+                return
+            except requests.RequestException as e:
+                signals.own_app_error.emit("network", str(e))
+                return
+            except Exception as e:  # noqa: BLE001
+                signals.own_app_error.emit("value", str(e))
+                return
+            signals.own_app_ok.emit(cid, sec, test)
+
+        th = threading.Thread(target=work, daemon=True)
+        th.start()
+        th.join(timeout=0.02)
+        if not th.is_alive():
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()
+
+    def _finish_save_own_app(self, cid: str, sec: str, client: object) -> None:
+        if self.closed:
             return
-        except requests.RequestException as e:
-            dialogs.error(self, t("Network error"), str(e))
-            return
+        self.save_btn.setEnabled(True)
         save_login_tokens(None, None)  # own app replaces a signed-in account
         save_credentials(cid, sec)
-        self.host.client = test
+        self.host.client = client
         self.host.set_status(t("Twitch API credentials saved."))
         self.refresh_status()
+
+    def _fail_save_own_app(self, kind: str, msg: str) -> None:
+        if self.closed:
+            return
+        self.save_btn.setEnabled(True)
+        title = t("Network error") if kind == "network" else t("Error")
+        dialogs.error(self, title, msg)
 
     # ---------------------------- closing ---------------------------- #
     def done(self, result: int) -> None:  # noqa: D401 (Qt name) every way of closing ends up here
