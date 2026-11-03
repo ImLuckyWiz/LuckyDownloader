@@ -194,3 +194,48 @@ def test_browse_tab_pin_button_toggles_youtube_channel(qtbot, tmp_path, monkeypa
     assert not tab.pin_btn.isChecked()
     assert not watchlist.is_watched("@veritasium", provider="youtube", path=target)
     tab.shutdown()
+
+
+def test_check_all_watchers_saves_updated_state(tmp_path: Path):
+    target = tmp_path / "watchlist.json"
+    w = WatchedStreamer(login="streamer", last_vod_id="100", last_checked_at=1000.0)
+    watchlist.save_watchlist([w], path=target)
+
+    class FakeClient:
+        def get_channel_videos(self, login, first=6):
+            return [{"id": "101", "created_at": "2026-10-28T12:00:00Z"}]
+
+    results = watchlist.check_all_watchers(FakeClient(), path=target, throttle_seconds=0)
+    assert "streamer" in results
+    assert results["streamer"][0]["id"] == "101"
+
+    # Verify that the file on disk was updated
+    reloaded = watchlist.load_watchlist(target)
+    assert len(reloaded) == 1
+    assert reloaded[0].last_vod_id == "101"
+    assert reloaded[0].last_checked_at > 1000.0
+
+
+def test_watchlist_no_substring_matching_or_empty_string_wipe(tmp_path: Path):
+    target = tmp_path / "watchlist.json"
+    watchlist.add_to_watchlist("channel", "Channel", path=target)
+    assert len(watchlist.load_watchlist(target)) == 1
+
+    # Empty string should not match or remove anything
+    assert not watchlist.is_watched("", path=target)
+    assert not watchlist.is_watched("   ", path=target)
+    watchlist.remove_from_watchlist("", path=target)
+    assert len(watchlist.load_watchlist(target)) == 1
+    watchlist.remove_from_watchlist("   ", path=target)
+    assert len(watchlist.load_watchlist(target)) == 1
+
+    # Substring 'ann' should NOT match 'channel' or 'https://www.twitch.tv/channel'
+    assert not watchlist.is_watched("ann", path=target)
+    watchlist.remove_from_watchlist("ann", path=target)
+    assert len(watchlist.load_watchlist(target)) == 1
+
+    # Exact match should remove it
+    watchlist.remove_from_watchlist("channel", path=target)
+    assert len(watchlist.load_watchlist(target)) == 0
+
+

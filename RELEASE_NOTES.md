@@ -1,3 +1,16 @@
+## v2.14.1
+
+LuckyDownloader **v2.14.1** brings stability, data-pipeline, and safety improvements across downloading, watchlist tracking, and timeline processing:
+
+- **Watchlist Reliability:** Fixed an issue where updated channel check dates were not properly saved to disk, and improved channel lookup accuracy to avoid accidental partial matches.
+- **Download Pipeline & Storage Safety:** Added per-job isolation for temporary download work folders to prevent collisions during concurrent downloads, and sanitized source identifiers to prevent unsafe folder paths.
+- **Download Archive Integration:** Added proper support for yt-dlp download archives (`--download-archive`), ensuring skipped items are handled cleanly without error.
+- **Process Cancellation:** Hardened process cancellation to ensure background tasks cleanly terminate without hanging.
+- **Filename & Chapter Formatting:** Strengthened filename sanitization to handle Windows reserved names and long titles safely, and improved template error handling for custom filename and chapter patterns.
+- **Timeline & Cut Safety:** Fixed cut point calculation for sources with unknown duration and improved overall pipeline type safety.
+
+---
+
 ## v2.14.0
 
 LuckyDownloader **v2.14.0** is the official **Release 3**, introducing the multi-platform **Browse Tab** with YouTube video and channel search, **Multi-Provider Subscriptions & Watchlist** (pinning and tracking YouTube channels alongside Twitch streamers), and a **Cut Editor for Generic Sources** (enabling trimming, splitting, and section downloads via yt-dlp across YouTube, TikTok, and other platforms).

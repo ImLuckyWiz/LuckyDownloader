@@ -116,6 +116,7 @@ class Ctx:
         self._log = log or (lambda m: None)
         self._progress = progress or (lambda f, t: None)
         self.cancel_event = threading.Event()
+        self._lock = threading.Lock()
         self.proc: subprocess.Popen | None = None
         self._lo, self._hi, self._label = 0.0, 1.0, ""
         self._log_step, self._log_t = -1, float("-inf")
@@ -162,9 +163,21 @@ class Ctx:
     def cancelled(self) -> bool:
         return self.cancel_event.is_set()
 
+    def attach_proc(self, proc: subprocess.Popen | None) -> None:
+        with self._lock:
+            self.proc = proc
+            cancelled = self.cancel_event.is_set()
+        if cancelled and proc is not None:
+            kill_process_tree(proc)
+            with self._lock:
+                if self.proc is proc:
+                    self.proc = None
+            raise Cancelled("Cancelled.")
+
     def cancel(self) -> None:
-        self.cancel_event.set()
-        proc = self.proc
+        with self._lock:
+            self.cancel_event.set()
+            proc = self.proc
         if proc:
             kill_process_tree(proc)
 

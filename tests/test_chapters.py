@@ -85,6 +85,10 @@ def test_untitled_clip_gets_a_default_title():
 def test_broken_title_template_falls_back_to_the_clip_title():
     (ch,) = make_chapters([clip(100, title="Hi")], ClipFilter(title_template="{title"))
     assert ch.title == "Hi"
+    (ch2,) = make_chapters([clip(100, title="Hi")], ClipFilter(title_template="{title.foo}"))
+    assert ch2.title == "Hi"
+    (ch3,) = make_chapters([clip(100, title="Hi")], ClipFilter(title_template="{duration[0]}"))
+    assert ch3.title == "Hi"
 
 
 def test_unknown_title_token_stays_as_it_is():

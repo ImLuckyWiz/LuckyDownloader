@@ -60,7 +60,7 @@ def parse_cut_points(text: str, duration: float | None = None) -> list[Part]:
         points: list[float] = []
         for tok in g:
             if tok.lower() in END_WORDS:
-                if duration is None:
+                if duration is None or duration <= 0:
                     raise PlanError(t("«end» needs the VOD length: press «Get info» first."))
                 points.append(duration)
             else:
@@ -70,7 +70,7 @@ def parse_cut_points(text: str, duration: float | None = None) -> list[Part]:
                 t("«{group}»: a group needs at least two points (use 0 and end).").format(group=' '.join(g))
             )
         for a, b in zip(points, points[1:]):
-            if duration is not None:
+            if duration is not None and duration > 0:
                 if a >= duration:
                     raise PlanError(t("{point} is beyond the end of the VOD ({duration}).").format(point=fmt_hms(a), duration=fmt_hms(duration)))
                 if b > duration + 2:

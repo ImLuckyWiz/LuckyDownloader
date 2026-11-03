@@ -105,11 +105,12 @@ def _run_tdcli(ctx: Ctx, cmd: list[str], dest: Path, what: str,
         )
     except OSError as e:
         raise EngineError(t("Could not run TwitchDownloaderCLI:\n{error}").format(error=e)) from e
-    ctx.proc = proc
+
     tail: list[str] = []
     warnings: list[str] = []
     ok = False
     try:
+        ctx.attach_proc(proc)
         assert proc.stdout is not None
         for line in proc.stdout:  # text mode: the program's «\r» progress updates arrive as separate lines
             line = line.strip()
@@ -134,7 +135,7 @@ def _run_tdcli(ctx: Ctx, cmd: list[str], dest: Path, what: str,
         ok = True
         return warnings
     finally:
-        ctx.proc = None
+        ctx.attach_proc(None)
         if not ok:
             try:  # a cancelled / failed run leaves an empty or half-written file behind
                 dest.unlink(missing_ok=True)

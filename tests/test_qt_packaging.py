@@ -95,6 +95,17 @@ def test_installer_isolates_prereleases_and_keeps_stable_identity():
     assert '#define EffectiveAppName "LuckyDownloader (Beta)"' in iss
 
 
+def test_installer_auto_uninstalls_legacy_luckytwitch():
+    iss = (ROOT / "installer.iss").read_text(encoding="utf-8")
+    assert "procedure UninstallLegacyLuckyTwitch()" in iss
+    assert "function PrepareToInstall(var NeedsRestart: Boolean): String;" in iss
+    assert "ScanAndUninstallRoot(HKCU);" in iss
+    assert "ScanAndUninstallRoot(HKLM);" in iss
+    assert "CleanLegacyShortcuts();" in iss
+    assert "CheckAndCleanFolder(ExpandConstant('{autopf}\\LuckyTwitch'));" in iss
+    assert "/VERYSILENT /NORESTART /SUPPRESSMSGBOXES" in iss
+
+
 @pytest.mark.parametrize(
     "version, expected_pre",
     [

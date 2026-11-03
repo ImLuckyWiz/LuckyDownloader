@@ -18,17 +18,17 @@ from urllib.parse import urljoin
 
 import requests
 
-from core.errors import Cancelled, EngineError
+from core.errors import ArchiveSkippedError, Cancelled, EngineError
 from core.i18n import t, tn
 from core.planning import Part
 from core.runtime import Ctx, _NO_WINDOW, _tool_env, find_tool
 from core.source_info import YTDLP_MISSING
 from core.timeutil import fmt_hms
 
-if sys.version_info >= (3, 11):
-    from typing import Any, TYPE_CHECKING
-    if TYPE_CHECKING:
-        from core.job import JobOptions
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.job import JobOptions
 
 
 _FF_PROGRESS_KEYS = {"out_time_us", "out_time_ms", "total_size", "speed", "progress"}
@@ -164,7 +164,7 @@ def run_ffmpeg(ctx: Ctx, args: list[str], total: float | None = None) -> str:
         creationflags=flags,
         start_new_session=sys.platform != "win32",
     )
-    ctx.proc = proc
+    ctx.attach_proc(proc)
     errors: list[str] = []
     progress = FfmpegProgress(total)
     try:
@@ -180,7 +180,7 @@ def run_ffmpeg(ctx: Ctx, args: list[str], total: float | None = None) -> str:
                 errors.append(line)
         proc.wait()
     finally:
-        ctx.proc = None
+        ctx.attach_proc(None)
     ctx.check_cancel()
     if proc.returncode != 0:
         raise EngineError("ffmpeg failed:\n" + "\n".join(errors[-8:]))
@@ -302,6 +302,7 @@ def run_ytdlp(
     format_id: str | None = None,
     rate_limit: str | None = None,
     cookies_browser: str | None = None,
+    download_archive: str | None = None,
 ) -> None:
     """
     Run the yt-dlp binary, forwarding progress to ctx. Cancel kills the whole process tree.
@@ -335,6 +336,8 @@ def run_ytdlp(
         cmd += ["--limit-rate", str(rate_limit).strip()]
     if cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""):
         cmd += ["--cookies-from-browser", str(cookies_browser).strip().lower()]
+    if download_archive and str(download_archive).strip():
+        cmd += ["--download-archive", str(download_archive).strip()]
     ffmpeg = _find("ffmpeg")
     if ffmpeg:
         cmd += ["--ffmpeg-location", str(Path(ffmpeg).parent)]
@@ -355,7 +358,7 @@ def run_ytdlp(
         )
     except OSError as e:
         raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
-    ctx.proc = proc
+    ctx.attach_proc(proc)
     last_real = [time.monotonic()]
     stop = threading.Event()
     watcher = None
@@ -384,7 +387,7 @@ def run_ytdlp(
         stop.set()
         if watcher:
             watcher.join(timeout=2)
-        ctx.proc = None
+        ctx.attach_proc(None)
     ctx.check_cancel()
     if proc.returncode != 0:
         raise EngineError("Download failed:\n" + "\n".join(tail[-8:]))
@@ -415,6 +418,7 @@ def download_full(
     format_id: str | None = None,
     rate_limit: str | None = None,
     cookies_browser: str | None = None,
+    download_archive: str | None = None,
     **kwargs: Any,
 ) -> Path:
     workdir.mkdir(parents=True, exist_ok=True)
@@ -430,11 +434,15 @@ def download_full(
         kw["rate_limit"] = str(rate_limit).strip()
     if cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""):
         kw["cookies_browser"] = str(cookies_browser).strip().lower()
+    if download_archive and str(download_archive).strip():
+        kw["download_archive"] = str(download_archive).strip()
     eng = sys.modules.get("luckytwitch_engine")
     _ytdlp = getattr(eng, "run_ytdlp", run_ytdlp) if eng else run_ytdlp
     _ytdlp(ctx, ["-o", _out_template(workdir, "full"), url], threads, **kw)
     media = _find_media(workdir)
     if not media:
+        if download_archive and str(download_archive).strip():
+            raise ArchiveSkippedError(t("Skipped (already recorded in download archive)."))
         raise EngineError(t("yt-dlp finished but no video file was found."))
     done.write_text("ok")
     return media
@@ -450,6 +458,7 @@ def download_section(
     format_id: str | None = None,
     rate_limit: str | None = None,
     cookies_browser: str | None = None,
+    download_archive: str | None = None,
     **kwargs: Any,
 ) -> Path:
     pdir = workdir / f"part{part.index}"
@@ -466,10 +475,14 @@ def download_section(
         kw["rate_limit"] = str(rate_limit).strip()
     if cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""):
         kw["cookies_browser"] = str(cookies_browser).strip().lower()
+    if download_archive and str(download_archive).strip():
+        kw["download_archive"] = str(download_archive).strip()
     eng = sys.modules.get("luckytwitch_engine")
     _ytdlp = getattr(eng, "run_ytdlp", run_ytdlp) if eng else run_ytdlp
     _ytdlp(ctx, args + [url], threads, total_secs=part.duration, watch_dir=pdir, **kw)
     media = _find_media(pdir)
+    if not media and download_archive and str(download_archive).strip():
+        raise ArchiveSkippedError(t("Skipped (already recorded in download archive)."))
     if not media or media.stat().st_size < 4096:
         raise EngineError(t("Part {index} ({start}–{end}) came out empty. Try again, or use strategy «full» to download the whole VOD and split it.").format(index=part.index, start=fmt_hms(part.start), end=fmt_hms(part.end)))
     return media

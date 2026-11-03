@@ -533,3 +533,62 @@ def test_get_source_info_passes_cookies_and_remote_components(monkeypatch):
     assert "--extractor-args" in captured_cmd
     idx_ea = captured_cmd.index("--extractor-args")
     assert captured_cmd[idx_ea + 1] == "youtube:player_client=web_safari,web"
+
+
+def test_source_info_sanitizes_id_path_traversal():
+    info = {"id": "../../etc/passwd", "title": "Evil ID", "duration": 10}
+    src = parse_generic_source_info(info, "https://example.com/video")
+    assert "/" not in src.id
+    assert "\\" not in src.id
+    assert src.id == ".._.._etc_passwd"
+
+
+def test_generic_source_does_not_call_download_section_aligned(monkeypatch, tmp_path):
+    import luckytwitch_engine as eng
+    from core.providers import GenericProvider
+    prov = GenericProvider("youtube")
+    src = eng.SourceInfo(
+        url="https://www.youtube.com/watch?v=generic123",
+        id="generic123",
+        title="Generic Video",
+        uploader="YouTuber",
+        duration=600.0,
+        date="2026-01-01",
+        twitch_vod_id=None,
+        formats=[],
+        site="youtube",
+        provider=prov,
+    )
+    opts = eng.JobOptions(
+        cut_text="0:00:10 - 0:00:30",
+        out_dir=str(tmp_path / "out"),
+        strategy="sections",
+        quality="best",
+    )
+    job = eng.Job(source=src, opts=opts)
+
+    raw = tmp_path / "raw.mp4"
+    raw.write_bytes(b"x" * 5000)
+
+    aligned_called = []
+    def fake_aligned(*args, **kwargs):
+        aligned_called.append(True)
+        return raw, 10.0, 30.0
+
+    sec_called = []
+    def fake_sec(ctx, url, part, workdir, threads, exact, **kw):
+        sec_called.append(True)
+        return raw
+
+    monkeypatch.setattr(eng, "find_tool", lambda n: "fake_tool")
+    monkeypatch.setattr(eng, "download_section_aligned", fake_aligned)
+    monkeypatch.setattr(eng, "download_section", fake_sec)
+    monkeypatch.setattr(eng, "finalize_part", lambda ctx, file, stem, container, chs, tags, duration, copy: tmp_path / "out.mp4")
+
+    ctx = eng.Ctx(log=lambda m: None)
+    eng.run_job(job, ctx)
+
+    assert not aligned_called, "download_section_aligned should not be called for generic sources"
+    assert len(sec_called) == 1
+
+

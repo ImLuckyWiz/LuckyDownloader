@@ -15,3 +15,8 @@ class PlanError(EngineError):
 
 class Cancelled(EngineError):
     """The user cancelled the job."""
+
+
+class ArchiveSkippedError(EngineError):
+    """The video was skipped because it is already recorded in the download archive."""
+

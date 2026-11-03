@@ -3520,14 +3520,17 @@ msgstr "Vídeo completo + dividir"
 
 #: qt_ui/tabs/plan.py
 msgid "Leave cut points blank to download the full video, or enter cut points above to trim."
-msgstr "Deja los puntos de corte en blanco para descargar el vídeo completo o ingrésalos arriba para recortar."
+msgstr ""
+"Deja los puntos de corte en blanco para descargar el vídeo completo o ingrésalos arriba para "
+"recortar."
 
 #: qt_ui/tabs/plan.py
 msgid ""
 "Optional: write cut points to trim or split (e.g. 1:00 - 5:00 ; 12:00 - end). Leave blank for "
 "full video."
 msgstr ""
-"Opcional: escribe puntos de corte para recortar o dividir (ej. 1:00 - 5:00 ; 12:00 - fin). Déjalo en blanco para el vídeo completo."
+"Opcional: escribe puntos de corte para recortar o dividir (ej. 1:00 - 5:00 ; 12:00 - fin). Déjalo"
+" en blanco para el vídeo completo."
 
 #: qt_ui/tabs/plan.py
 #, python-brace-format
@@ -3547,4 +3550,12 @@ msgstr "{summary} · {mode} ({pct}% del vídeo cubierto)"
 #, python-brace-format, python-format
 msgid "→ {how}   (parts cover {pct}% of the video)"
 msgstr "→ {how}   (las partes cubren el {pct}% del vídeo)"
+
+#: core/download.py
+msgid "Skipped (already recorded in download archive)."
+msgstr "Omitido (ya registrado en el archivo de descargas)."
+
+#: core/finalize.py
+msgid "Unsafe work directory path"
+msgstr "Ruta de directorio de trabajo no segura"
 

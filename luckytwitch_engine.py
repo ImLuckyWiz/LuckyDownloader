@@ -95,7 +95,7 @@ from core.download import (
     select_segments,
     write_local_playlist,
 )
-from core.errors import Cancelled, EngineError, PlanError
+from core.errors import ArchiveSkippedError, Cancelled, EngineError, PlanError
 from core.finalize import (
     _load_chapters,
     _load_muted,

@@ -127,14 +127,17 @@ def remove_from_watchlist(
     path: Path | None = None,
 ) -> list[WatchedChannel]:
     """Unpin a channel from the watch list."""
-    clean_login = login.strip()
+    clean_login = (login or "").strip()
+    if not clean_login:
+        return load_watchlist(path)
     clean_prov = provider.lower().strip()
     if clean_prov == "twitch":
         clean_login = clean_login.lower()
+    clean_url = clean_login.rstrip("/").lower()
     watchers = [
         w for w in load_watchlist(path)
         if not (
-            (w.login == clean_login or (w.url and clean_login in w.url))
+            (w.login == clean_login or (w.url and w.url.rstrip("/").lower() == clean_url))
             and (not clean_prov or w.provider == clean_prov)
         )
     ]
@@ -148,14 +151,17 @@ def is_watched(
     path: Path | None = None,
 ) -> bool:
     """Check if a channel / streamer login or URL is pinned."""
-    clean_login = str(login or "").strip()
+    clean_login = (login or "").strip()
+    if not clean_login:
+        return False
     clean_prov = provider.lower().strip()
     if clean_prov == "twitch":
         clean_login = clean_login.lower()
+    clean_url = clean_login.rstrip("/").lower()
     for w in load_watchlist(path):
         if clean_prov and w.provider != clean_prov:
             continue
-        if w.login == clean_login or (w.url and clean_login in w.url):
+        if w.login == clean_login or (w.url and w.url.rstrip("/").lower() == clean_url):
             return True
     return False
 
@@ -238,13 +244,15 @@ def check_all_watchers(
     results: dict[str, list[dict]] = {}
     changed = False
 
-    for w in watchers:
+    for idx, w in enumerate(watchers):
+        prev_state = (w.last_checked_at, w.last_vod_id, w.last_seen_date)
         updated, new_items = check_channel_new_items(client, w, throttle_seconds=throttle_seconds)
-        if new_items:
-            key = f"{w.provider}:{w.login}" if w.provider != "twitch" else w.login
-            results[key] = new_items
-        if updated.last_checked_at != w.last_checked_at or updated.last_vod_id != w.last_vod_id:
+        watchers[idx] = updated
+        if (updated.last_checked_at, updated.last_vod_id, updated.last_seen_date) != prev_state:
             changed = True
+        if new_items:
+            key = f"{updated.provider}:{updated.login}" if updated.provider != "twitch" else updated.login
+            results[key] = new_items
 
     if changed:
         save_watchlist(watchers, path)

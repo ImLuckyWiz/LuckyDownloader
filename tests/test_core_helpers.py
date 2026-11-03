@@ -260,3 +260,108 @@ def test_migrate_from_legacy_copies_files_without_deleting_or_overwriting(tmp_pa
     assert paths.migrate_from_legacy(src=tmp_path / "nonexistent", dest=dest) == []
     assert paths.migrate_from_legacy(src=dest, dest=dest) == []
     assert paths.migrate_from_legacy(src=None, dest=dest) == []
+
+
+def test_extract_uninstaller_exe(tmp_path):
+    dummy_exe = tmp_path / "unins000.exe"
+    dummy_exe.write_text("bin", encoding="utf-8")
+
+    assert paths._extract_uninstaller_exe("") is None
+    assert paths._extract_uninstaller_exe(f'"{dummy_exe}"') == dummy_exe
+    assert paths._extract_uninstaller_exe(f'"{dummy_exe}" /SILENT') == dummy_exe
+    assert paths._extract_uninstaller_exe(f"{dummy_exe} /SILENT") == dummy_exe
+    assert paths._extract_uninstaller_exe(str(tmp_path / "nonexistent.exe")) is None
+
+
+def test_find_legacy_uninstaller_guard_and_detection(tmp_path, monkeypatch):
+    mock_local = tmp_path / "localappdata"
+    twitch_dir = mock_local / "Programs" / "LuckyTwitch"
+    twitch_dir.mkdir(parents=True)
+    uninst = twitch_dir / "unins000.exe"
+    uninst.write_text("bin", encoding="utf-8")
+
+    monkeypatch.setenv("LOCALAPPDATA", str(mock_local))
+    monkeypatch.setattr(paths.sys, "platform", "win32")
+
+    # If current_exe_dir is the same directory as uninstaller, must ignore it (self-protection)
+    assert paths.find_legacy_uninstaller(current_exe_dir=twitch_dir) is None
+
+    # If current_exe_dir is LuckyDownloader, it finds LuckyTwitch uninstaller
+    downloader_dir = mock_local / "Programs" / "LuckyDownloader"
+    found = paths.find_legacy_uninstaller(current_exe_dir=downloader_dir)
+    assert found == uninst
+
+
+def test_cleanup_legacy_shortcuts(tmp_path, monkeypatch):
+    desktop = tmp_path / "Desktop"
+    desktop.mkdir()
+    shortcut1 = desktop / "LuckyTwitch.lnk"
+    shortcut1.write_text("dummy", encoding="utf-8")
+
+    appdata = tmp_path / "AppData" / "Roaming"
+    programs = appdata / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+    programs.mkdir(parents=True)
+    shortcut2 = programs / "LuckyTwitch.lnk"
+    shortcut2.write_text("dummy", encoding="utf-8")
+
+    twitch_folder = programs / "LuckyTwitch"
+    twitch_folder.mkdir()
+    shortcut3 = twitch_folder / "LuckyTwitch.lnk"
+    shortcut3.write_text("dummy", encoding="utf-8")
+
+    monkeypatch.setattr(paths.Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("APPDATA", str(appdata))
+    monkeypatch.setattr(paths.sys, "platform", "win32")
+
+    assert shortcut1.is_file()
+    assert shortcut2.is_file()
+    assert shortcut3.is_file()
+
+    removed = paths.cleanup_legacy_shortcuts()
+
+    assert not shortcut1.exists()
+    assert not shortcut2.exists()
+    assert not shortcut3.exists()
+    assert not twitch_folder.exists()
+    assert len(removed) >= 3
+
+
+def test_uninstall_legacy_app_launches_subprocess(tmp_path, monkeypatch):
+    dummy_uninst = tmp_path / "unins000.exe"
+    dummy_uninst.write_text("bin", encoding="utf-8")
+
+    launched_cmds = []
+
+    class DummyProc:
+        def wait(self, timeout=None):
+            return 0
+
+    def fake_popen(cmd, **kwargs):
+        launched_cmds.append(cmd)
+        return DummyProc()
+
+    monkeypatch.setattr(paths.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(paths, "cleanup_legacy_shortcuts", lambda: [])
+
+    # Without uninstaller
+    assert paths.uninstall_legacy_app(uninst_path=None) is False
+    assert len(launched_cmds) == 0
+
+    # With uninstaller
+    ok = paths.uninstall_legacy_app(uninst_path=dummy_uninst, wait=True)
+    assert ok is True
+    assert len(launched_cmds) == 1
+    assert launched_cmds[0] == [str(dummy_uninst), "/VERYSILENT", "/NORESTART", "/SUPPRESSMSGBOXES"]
+
+
+def test_ensure_data_dir_runs_uninstaller_when_frozen(tmp_path, monkeypatch):
+    uninstalled = []
+    migrated = []
+    monkeypatch.setattr(paths, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(paths, "FROZEN", True)
+    monkeypatch.setattr(paths, "migrate_from_legacy", lambda: migrated.append(True) or [])
+    monkeypatch.setattr(paths, "uninstall_legacy_app", lambda: uninstalled.append(True) or True)
+
+    paths.ensure_data_dir()
+    assert len(migrated) == 1
+    assert len(uninstalled) == 1

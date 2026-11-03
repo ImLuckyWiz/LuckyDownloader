@@ -204,3 +204,44 @@ def test_run_ytdlp_appends_cookies_flag(monkeypatch, tmp_path: Path):
     assert "--cookies-from-browser" in captured_cmd
     idx = captured_cmd.index("--cookies-from-browser")
     assert captured_cmd[idx + 1] == "chrome"
+
+
+def test_ctx_attach_proc_closes_popen_cancel_race(monkeypatch):
+    import pytest
+    from core.download import run_ytdlp
+    from core.errors import Cancelled
+    from core.runtime import Ctx
+
+    ctx = Ctx()
+    killed = []
+
+    class FakeProc:
+        pid = 99999
+        returncode = -9
+        stdout = iter(["should not be read"])
+
+        def poll(self):
+            return None
+
+        def kill(self):
+            killed.append(self)
+
+        def wait(self):
+            return -9
+
+    def fake_popen(cmd, *args, **kwargs):
+        # Simulate user clicking Cancel while Popen is spawning the process
+        ctx.cancel()
+        return FakeProc()
+
+    monkeypatch.setattr(eng, "find_tool", lambda name: "fake_ytdlp")
+    monkeypatch.setattr("core.download.find_tool", lambda name: "fake_ytdlp")
+    monkeypatch.setattr(eng.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr("core.runtime.kill_process_tree", lambda p: killed.append(p))
+
+    with pytest.raises(Cancelled):
+        run_ytdlp(ctx, ["https://twitch.tv/videos/123"], threads=2)
+
+    assert len(killed) == 1
+    assert ctx.proc is None
+

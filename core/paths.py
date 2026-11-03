@@ -8,7 +8,9 @@ Tests monkeypatch the attributes of THIS module (the other core modules read the
 
 from __future__ import annotations
 
+import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -160,11 +162,226 @@ WATCHLIST_PATH = DATA_DIR / "luckytwitch_watchlist.json"
 MAX_RECENT = 12
 
 
+def _extract_uninstaller_exe(cmd: str) -> Path | None:
+    """Extract the executable path from an Inno Setup UninstallString command."""
+    if not cmd:
+        return None
+    s = cmd.strip()
+    if s.startswith('"'):
+        end = s.find('"', 1)
+        exe = s[1:end] if end != -1 else s.strip('"')
+    else:
+        parts = s.split(maxsplit=1)
+        exe = parts[0] if parts else ""
+    if exe:
+        try:
+            p = Path(exe)
+            if p.is_file():
+                return p
+        except (ValueError, OSError):
+            pass
+    return None
+
+
+def find_legacy_uninstaller(current_exe_dir: Path | None = None) -> Path | None:
+    """Find the uninstaller executable for LuckyTwitch on Windows, if installed."""
+    if sys.platform != "win32":
+        return None
+
+    if current_exe_dir is None:
+        try:
+            current_exe_dir = Path(sys.executable).resolve().parent
+        except (ValueError, OSError):
+            current_exe_dir = None
+
+    # 1. Check registry (HKCU and HKLM)
+    try:
+        import winreg
+
+        subkeys = [
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{6E2B6B0C-3F0D-4C57-9B6A-1A7C2E0D4F11}_is1",
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{9C4A8D2E-7B1F-4E63-8A5D-3F2E1C9B7D44}_is1",
+        ]
+        for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+            # Known GUIDs
+            for subkey in subkeys:
+                try:
+                    with winreg.OpenKey(root, subkey) as k:
+                        disp_name = ""
+                        try:
+                            disp_name, _ = winreg.QueryValueEx(k, "DisplayName")
+                        except OSError:
+                            pass
+                        loc = ""
+                        try:
+                            loc, _ = winreg.QueryValueEx(k, "InstallLocation")
+                        except OSError:
+                            pass
+                        if "luckydownloader" in str(disp_name).lower() or "luckydownloader" in str(loc).lower():
+                            continue
+                        for val_name in ("QuietUninstallString", "UninstallString"):
+                            try:
+                                cmd, _ = winreg.QueryValueEx(k, val_name)
+                                p = _extract_uninstaller_exe(str(cmd))
+                                if p and (current_exe_dir is None or p.resolve().parent != current_exe_dir):
+                                    return p
+                            except OSError:
+                                pass
+                except OSError:
+                    pass
+
+            # Enumerate subkeys for LuckyTwitch
+            try:
+                with winreg.OpenKey(root, r"Software\Microsoft\Windows\CurrentVersion\Uninstall") as uninst_key:
+                    num_subkeys = winreg.QueryInfoKey(uninst_key)[0]
+                    for i in range(num_subkeys):
+                        try:
+                            child_name = winreg.EnumKey(uninst_key, i)
+                            with winreg.OpenKey(uninst_key, child_name) as ck:
+                                disp_name = ""
+                                try:
+                                    disp_name, _ = winreg.QueryValueEx(ck, "DisplayName")
+                                except OSError:
+                                    pass
+                                loc = ""
+                                try:
+                                    loc, _ = winreg.QueryValueEx(ck, "InstallLocation")
+                                except OSError:
+                                    pass
+                                d_str = str(disp_name).lower()
+                                l_str = str(loc).lower()
+                                if "luckydownloader" in d_str or "luckydownloader" in l_str:
+                                    continue
+                                if "luckytwitch" in d_str or "luckytwitch" in l_str:
+                                    for val_name in ("QuietUninstallString", "UninstallString"):
+                                        try:
+                                            cmd, _ = winreg.QueryValueEx(ck, val_name)
+                                            p = _extract_uninstaller_exe(str(cmd))
+                                            if p and (current_exe_dir is None or p.resolve().parent != current_exe_dir):
+                                                return p
+                                        except OSError:
+                                            pass
+                        except OSError:
+                            pass
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+    # 2. Check standard install folders
+    localappdata = os.environ.get("LOCALAPPDATA")
+    if localappdata:
+        for cand_dir in (
+            Path(localappdata) / "Programs" / "LuckyTwitch",
+            Path(localappdata) / "Programs" / "LuckyTwitch-Beta",
+        ):
+            uninst = cand_dir / "unins000.exe"
+            if uninst.is_file():
+                if current_exe_dir is None or uninst.resolve().parent != current_exe_dir:
+                    return uninst
+
+    return None
+
+
+def cleanup_legacy_shortcuts() -> list[str]:
+    """Remove leftover LuckyTwitch desktop and Start Menu shortcuts, returning list of removed paths."""
+    removed: list[str] = []
+    if sys.platform == "win32":
+        candidates = []
+        user_desktop = Path.home() / "Desktop"
+        candidates.extend([
+            user_desktop / "LuckyTwitch.lnk",
+            user_desktop / "LuckyTwitch (Beta).lnk",
+        ])
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            programs = Path(appdata) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+            candidates.extend([
+                programs / "LuckyTwitch.lnk",
+                programs / "LuckyTwitch (Beta).lnk",
+                programs / "LuckyTwitch" / "LuckyTwitch.lnk",
+                programs / "LuckyTwitch" / "Uninstall LuckyTwitch.lnk",
+            ])
+            folder = programs / "LuckyTwitch"
+            if folder.is_dir():
+                try:
+                    for f in folder.iterdir():
+                        f.unlink(missing_ok=True)
+                    folder.rmdir()
+                    removed.append(str(folder))
+                except OSError:
+                    pass
+        for p in candidates:
+            try:
+                if p.is_file():
+                    p.unlink(missing_ok=True)
+                    removed.append(str(p))
+            except OSError:
+                pass
+    elif sys.platform == "darwin":
+        for cand in (
+            Path("/Applications/LuckyTwitch.app"),
+            Path.home() / "Applications" / "LuckyTwitch.app",
+        ):
+            if cand.exists():
+                try:
+                    shutil.rmtree(cand, ignore_errors=True)
+                    removed.append(str(cand))
+                except OSError:
+                    pass
+    elif sys.platform.startswith("linux"):
+        desktop = Path.home() / ".local" / "share" / "applications" / "luckytwitch.desktop"
+        if desktop.is_file():
+            try:
+                desktop.unlink(missing_ok=True)
+                removed.append(str(desktop))
+            except OSError:
+                pass
+    return removed
+
+
+def uninstall_legacy_app(uninst_path: Path | None = None, wait: bool = False) -> bool:
+    """Trigger silent uninstallation of legacy LuckyTwitch if detected, and remove legacy shortcuts.
+
+    Returns True if an uninstaller was triggered, False otherwise.
+    """
+    if uninst_path is None:
+        uninst_path = find_legacy_uninstaller()
+
+    triggered = False
+    if uninst_path and uninst_path.is_file():
+        cmd = [str(uninst_path), "/VERYSILENT", "/NORESTART", "/SUPPRESSMSGBOXES"]
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = (
+                getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+                | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+            )
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                creationflags=creationflags,
+                close_fds=(sys.platform != "win32"),
+            )
+            triggered = True
+            if wait:
+                try:
+                    proc.wait(timeout=30)
+                except (subprocess.TimeoutExpired, OSError):
+                    pass
+        except OSError:
+            pass
+
+    cleanup_legacy_shortcuts()
+    return triggered
+
+
 def ensure_data_dir() -> None:
-    """Create the data folder and perform legacy data migration if running frozen."""
+    """Create the data folder, perform legacy data migration, and auto-uninstall legacy app if running frozen."""
     try:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
     except OSError:
         pass
     if FROZEN:
         migrate_from_legacy()
+        uninstall_legacy_app()

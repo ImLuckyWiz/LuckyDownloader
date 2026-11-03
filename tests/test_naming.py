@@ -48,10 +48,22 @@ def make_opts(**kw):
         ("Ñandú – año", "Ñandú año"),
         ("keep (these) [brackets] - and-dashes", "keep (these) [brackets] - and-dashes"),
         ("???", ""),
+        ("CON", "_CON"),
+        ("aux", "_aux"),
+        ("NUL.mp4", "_NUL.mp4"),
+        ("com1", "_com1"),
+        ("lpt2.txt", "_lpt2.txt"),
     ],
 )
 def test_safe_name(raw, expected):
     assert safe_name(raw) == expected
+
+
+def test_safe_name_caps_length():
+    long_name = "a" * 200
+    res = safe_name(long_name)
+    assert len(res) == 150
+    assert res == "a" * 150
 
 
 # --------------------------------------------------------------------------- unique_path
@@ -95,7 +107,7 @@ def test_part_stem_unknown_token_survives_as_plain_text():
     assert part_stem(make_src(), make_opts(name_template="{foo} x"), Part(1, 0, 1), 1) == "foo x"
 
 
-@pytest.mark.parametrize("template", ["{n", "{0}"])
+@pytest.mark.parametrize("template", ["{n", "{0}", "{title.foo}", "{n[0]}"])
 def test_part_stem_broken_template_falls_back(template):
     assert part_stem(make_src(), make_opts(name_template=template), Part(1, 0, 1), 1) == "123"
     assert part_stem(make_src(), make_opts(name_template=template), Part(1, 0, 1), 2) == "123 - part1"

@@ -306,9 +306,9 @@ def test_run_job_workdir_naming_by_quality(monkeypatch, tmp_path):
     run_with("best", [])
 
     assert len(workdirs) == 3
-    assert workdirs[0] == ".luckytwitch_1_720p60"
-    assert workdirs[1] == ".luckytwitch_1_480p"
-    assert workdirs[2] == ".luckytwitch_1"
+    assert workdirs[0].startswith(".luckytwitch_1_720p60_")
+    assert workdirs[1].startswith(".luckytwitch_1_480p_")
+    assert workdirs[2].startswith(".luckytwitch_1_")
 
 
 def test_run_job_generic_source_cuts(monkeypatch, tmp_path):

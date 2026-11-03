@@ -5,12 +5,14 @@ Splitting, finalizing, path naming, and high-level job runner.
 from __future__ import annotations
 
 import csv
+import inspect
 import json
 import math
 import os
 import re
 import shutil
 import sys
+import uuid
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -39,7 +41,7 @@ from core.download import (
     mp4_movie_timescale,
     run_ffmpeg,
 )
-from core.errors import Cancelled, EngineError
+from core.errors import ArchiveSkippedError, Cancelled, EngineError
 from core.i18n import t
 from core.job import Job, JobOptions
 from core.providers import Capability
@@ -82,11 +84,22 @@ def clean_title(title: str) -> str:
     return cleaned or title.strip()
 
 
-def safe_name(text: str) -> str:
+_WIN_RESERVED_RE = re.compile(
+    r"^(CON|PRN|AUX|NUL|COM[1-9\xb9\xb2\xb3]|LPT[1-9\xb9\xb2\xb3])(\..*)?$",
+    re.IGNORECASE,
+)
+
+
+def safe_name(text: str, max_len: int = 150) -> str:
     """Strip emojis / illegal characters so the name is safe everywhere."""
-    text = re.sub(r"[\U00010000-\U0010ffff]", " ", text)
+    text = re.sub(r"[\U00010000-\U0010ffff]", " ", text or "")
     text = re.sub(r"[^\w\s\-\.\(\)\[\]]", "", text, flags=re.UNICODE)
-    return re.sub(r"\s+", " ", text).strip(" .")
+    s = re.sub(r"\s+", " ", text).strip(" .")
+    if max_len > 0 and len(s) > max_len:
+        s = s[:max_len].rstrip(" .")
+    if _WIN_RESERVED_RE.match(s):
+        s = f"_{s}"
+    return s
 
 
 def dominant_game(segments: list[GameSegment] | None, start: float, end: float) -> str:
@@ -147,7 +160,7 @@ def format_generic_stem(src: SourceInfo, template: str | None = None, clean: boo
     )
     try:
         raw = tpl.format_map(data)
-    except (ValueError, IndexError):
+    except (KeyError, ValueError, AttributeError, TypeError, IndexError):
         raw = f"{data['uploader']} - {data['date']} - {data['title']} [{data['id']}]"
 
     cleaned = re.sub(r"\s+-\s+-\s+", " - ", raw)
@@ -207,7 +220,7 @@ def part_stem(src: SourceInfo, opts: JobOptions, part: Part, total: int, clip: d
         template = opts.clip_name_template
     try:
         name = template.format_map(data)
-    except (ValueError, IndexError):
+    except (KeyError, ValueError, AttributeError, TypeError, IndexError):
         name = data["clip_title"] if clip else (f"{data['id']}" if total == 1 else f"{data['id']} - part{part.index}")
     name = safe_name(name)
     if clip:
@@ -273,7 +286,7 @@ def stream_dir(src: SourceInfo, opts: JobOptions) -> Path:
     )
     try:
         stream = opts.folder_template.format_map(data)
-    except (ValueError, IndexError):
+    except (KeyError, ValueError, AttributeError, TypeError, IndexError):
         stream = f"{data['date']} - {data['id']}"
     stream = safe_name(stream)[:100].strip(" .") or str(data["id"])
     streamer = safe_name(src.uploader)[:60].strip(" .") or "vod"
@@ -577,10 +590,12 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
     out_dir = Path(opts.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     final_dir = stream_dir(src, opts)
-    workdir = out_dir / (
-        f".luckytwitch_{src.twitch_vod_id or src.id}"
-        + (f"_{fmt.format_id}" if fmt else "")
-    )
+    id_slug = re.sub(r"[^A-Za-z0-9_-]", "_", str(src.twitch_vod_id or src.id or "unknown"))[:64] or "unknown"
+    fmt_slug = f"_{re.sub(r'[^A-Za-z0-9_-]', '_', fmt.format_id)[:40]}" if fmt else ""
+    job_nonce = uuid.uuid4().hex[:8]
+    workdir = out_dir / f".luckytwitch_{id_slug}{fmt_slug}_{job_nonce}"
+    if not workdir.resolve().is_relative_to(out_dir.resolve()):
+        raise EngineError(t("Unsafe work directory path"))
     tags = {
         "title": src.title,
         "artist": src.uploader,
@@ -646,10 +661,27 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
     rate_kw = {"rate_limit": rate_limit} if rate_limit else {}
     cookies_browser = getattr(opts, "cookies_browser", None)
     cookies_kw = {"cookies_browser": cookies_browser} if cookies_browser else {}
+    download_archive = str(getattr(opts, "download_archive", "") or "").strip()
+
+    def _supports_kw(fn, key: str) -> bool:
+        try:
+            params = inspect.signature(fn).parameters.values()
+            return any(p.kind == inspect.Parameter.VAR_KEYWORD or p.name == key for p in params)
+        except (ValueError, TypeError):
+            return True
+
+    full_archive_kw = {"download_archive": download_archive} if (download_archive and _supports_kw(_dl_full, "download_archive")) else {}
+    sec_archive_kw = {"download_archive": download_archive} if (download_archive and _supports_kw(_dl_sec, "download_archive")) else {}
 
     if plan.strategy == "full":
         ctx.stage(0.0, 0.85, "Downloading VOD")
-        full = _dl_full(ctx, src.url, workdir, opts.threads, **fmt_kw, **rate_kw, **cookies_kw)
+        try:
+            full = _dl_full(ctx, src.url, workdir, opts.threads, **fmt_kw, **rate_kw, **cookies_kw, **full_archive_kw)
+        except ArchiveSkippedError as e:
+            ctx.log(str(e))
+            shutil.rmtree(workdir, ignore_errors=True)
+            ctx.stage(1.0, 1.0, "Done")
+            return results
         ctx.stage(0.85, 1.0, "Cutting")
         if opts.exact:
             for i, p in enumerate(plan.parts):
@@ -677,7 +709,12 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
             ctx.check_cancel()
             lo, hi = i / total_parts, (i + 1) / total_parts
             ctx.stage(lo, lo + (hi - lo) * 0.9, f"Downloading part {p.index}/{total_parts}")
-            aligned = _dl_align(ctx, src.url, p, workdir, **dl_kw)
+            use_aligned = (
+                getattr(src, "site", "twitch") == "twitch"
+                and getattr(src, "twitch_vod_id", None)
+                and src.has_capability(Capability.TIMELINE)
+            )
+            aligned = _dl_align(ctx, src.url, p, workdir, **dl_kw) if use_aligned else None
             if aligned:
                 f, real_start, real_end = aligned
                 early = p.start - real_start
@@ -691,7 +728,11 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
                     f = _cut(ctx, f, p, opts.container, workdir, offset=max(0.0, p.start - real_start))
                     real_start, real_end = p.start, p.end
             else:
-                f = _dl_sec(ctx, src.url, p, workdir, opts.threads, opts.exact, **fmt_kw, **rate_kw, **cookies_kw)
+                try:
+                    f = _dl_sec(ctx, src.url, p, workdir, opts.threads, opts.exact, **fmt_kw, **rate_kw, **cookies_kw, **sec_archive_kw)
+                except ArchiveSkippedError as e:
+                    ctx.log(str(e))
+                    continue
                 real_start, real_end = p.start, p.end
             ctx.stage(lo + (hi - lo) * 0.9, hi, f"Finishing part {p.index}/{total_parts}")
             finish(p, f, real_start, real_end)
@@ -701,7 +742,7 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
     try:
         from core import history
         vod_id = src.twitch_vod_id or src.id
-        if vod_id:
+        if vod_id and results:
             history.record_download({
                 "vod_id": vod_id,
                 "title": src.title,

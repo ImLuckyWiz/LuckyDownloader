@@ -162,3 +162,77 @@ def test_parse_playlist_info_youtube_thumbnail_fallback():
     pl = parse_playlist_info(data, "https://www.youtube.com/playlist?list=PL123")
     assert pl.entries[0].thumbnail == "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
     assert pl.thumbnail == "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+
+
+def test_run_ytdlp_forwards_download_archive(monkeypatch):
+    import luckytwitch_engine as eng
+    from core.download import run_ytdlp
+
+    recorded = []
+    monkeypatch.setattr(eng, "find_tool", lambda n: "yt-dlp")
+
+    class FakeProc:
+        def __init__(self, cmd, **kw):
+            self.cmd = cmd
+            self.stdout = iter([])
+            self.returncode = 0
+
+        def wait(self):
+            return 0
+
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(eng.subprocess, "Popen", lambda cmd, **kw: (recorded.append(cmd), FakeProc(cmd))[1])
+    ctx = eng.Ctx()
+    run_ytdlp(ctx, ["https://youtube.com/watch?v=123"], threads=4, download_archive="/tmp/archive.txt")
+
+    assert len(recorded) == 1
+    cmd = recorded[0]
+    assert "--download-archive" in cmd
+    idx = cmd.index("--download-archive")
+    assert cmd[idx + 1] == "/tmp/archive.txt"
+
+
+def test_run_job_forwards_download_archive_and_handles_archive_skip(monkeypatch, tmp_path):
+    import luckytwitch_engine as eng
+
+    pl = PlaylistInfo(
+        id="PLtest",
+        title="My Playlist",
+        url="https://www.youtube.com/playlist?list=PLtest",
+        uploader="ChannelName",
+        site="youtube",
+        provider=GenericProvider("youtube"),
+        entries=[
+            PlaylistItem(id="vid1", title="Video One", url="https://youtube.com/watch?v=vid1", duration=100.0, index=1),
+        ],
+    )
+    base_opts = JobOptions(
+        cut_text="",
+        out_dir=str(tmp_path / "downloads"),
+        container="mp4",
+        quality="best",
+    )
+    jobs = expand_playlist_jobs(pl, pl.entries, base_opts, skip_existing=True)
+    assert len(jobs) == 1
+    job = jobs[0]
+    expected_archive = str(Path(tmp_path / "downloads") / ".lucky_download_archive.txt")
+    assert job.opts.download_archive == expected_archive
+
+    monkeypatch.setattr(eng, "find_tool", lambda n: "fake_tool")
+    recorded_kw = {}
+
+    def fake_ytdlp_skip(ctx, args, threads, **kw):
+        recorded_kw.update(kw)
+        # Simulate yt-dlp skipping an archived video: exits 0 without writing any file
+
+    monkeypatch.setattr(eng, "run_ytdlp", fake_ytdlp_skip)
+    logs = []
+    ctx = eng.Ctx(log=logs.append)
+    results = eng.run_job(job, ctx)
+
+    assert recorded_kw.get("download_archive") == expected_archive
+    assert results == []
+    assert any("archive" in m.lower() for m in logs)
+

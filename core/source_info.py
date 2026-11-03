@@ -12,7 +12,7 @@ import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import requests
 
@@ -555,10 +555,11 @@ def parse_generic_source_info(info: dict, url: str) -> SourceInfo:
     prov, _ = detect_source(url)
     extractor = str(info.get("extractor_key") or info.get("extractor") or "").lower()
     site = prov.name if prov and prov.name != "generic" else (extractor or "generic")
+    clean_id = re.sub(r"[\\/]+", "_", str(info.get("id", "") or "")).strip()
 
     return SourceInfo(
         url=url,
-        id=str(info.get("id", "")),
+        id=clean_id,
         title=title,
         uploader=uploader,
         duration=duration,

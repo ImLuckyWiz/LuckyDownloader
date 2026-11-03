@@ -69,7 +69,7 @@ def _chapter_title(clip: dict, tpl: str) -> str:
     )
     try:
         return tpl.format_map(data)
-    except (ValueError, IndexError):
+    except (KeyError, ValueError, AttributeError, TypeError, IndexError):
         return data["title"]
 
 

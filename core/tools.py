@@ -30,10 +30,10 @@ from core.runtime import (
     find_tool,
 )
 
-if sys.version_info >= (3, 11):
-    from typing import TYPE_CHECKING
-    if TYPE_CHECKING:
-        from core.runtime import Ctx
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.runtime import Ctx
 
 YTDLP_RELEASES = "https://github.com/yt-dlp/yt-dlp/releases"
 FFMPEG_BUILDS = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest"

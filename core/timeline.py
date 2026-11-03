@@ -1,8 +1,4 @@
-"""Pure geometry, snapping and undo-history helpers for the Timeline (Phase 7, ``core/timeline.py``).
-
-Copied from ``ui/timeline.py`` with no UI toolkit imports so both ``qt_ui/timeline.py`` and UI-free unit tests can use
-them directly while ``ui/timeline.py`` stays untouched until cutover.
-"""
+"""Pure geometry, snapping and undo-history helpers for the timeline widget."""
 
 from __future__ import annotations
 

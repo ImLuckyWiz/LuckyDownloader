@@ -193,3 +193,16 @@ def test_insert_at_an_existing_boundary_gives_valid_text():
     twice = insert_cut_point(once, 3597, DUR)
     assert twice == once  # no duplicate boundary: asking for the same cut again changes nothing
     parse_cut_points(twice, DUR)  # and the text is still valid
+
+
+def test_cut_points_with_zero_or_unknown_duration():
+    parts = parse_cut_points("0:00 - 1:00", duration=0.0)
+    assert len(parts) == 1
+    assert (parts[0].start, parts[0].end) == (0.0, 60.0)
+
+    parts_none = parse_cut_points("0:00 - 1:00", duration=None)
+    assert len(parts_none) == 1
+    assert (parts_none[0].start, parts_none[0].end) == (0.0, 60.0)
+
+    with pytest.raises(PlanError, match="«end» needs the VOD length"):
+        parse_cut_points("0:00 - end", duration=0.0)

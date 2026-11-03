@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-02 12:19-0300\n"
+"POT-Creation-Date: 2026-11-03 00:22-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -101,6 +101,10 @@ msgid ""
 "whole VOD and split it."
 msgstr ""
 
+#: core/download.py
+msgid "Skipped (already recorded in download archive)."
+msgstr ""
+
 #: core/download.py core/finalize.py
 msgid "ffmpeg was not found. Install it and add it to PATH."
 msgstr ""
@@ -171,6 +175,10 @@ msgstr ""
 
 #: core/finalize.py
 msgid "Quality: this video offers no choice, using the best one."
+msgstr ""
+
+#: core/finalize.py
+msgid "Unsafe work directory path"
 msgstr ""
 
 #: core/finalize.py
