@@ -17,6 +17,10 @@ Usage = namedtuple("Usage", ["total", "used", "free"])
 def test_run_job_preflight_disk_check_aborts_early(monkeypatch, tmp_path):
     # Only 50 MB free space
     monkeypatch.setattr("shutil.disk_usage", lambda path: Usage(total=10**11, used=10**11 - 50 * 1024 * 1024, free=50 * 1024 * 1024))
+    monkeypatch.setattr("core.finalize.find_tool", lambda name: "ffmpeg")
+    import sys
+    if "luckytwitch_engine" in sys.modules:
+        monkeypatch.setattr("luckytwitch_engine.find_tool", lambda name: "ffmpeg")
 
     src = SourceInfo(
         url="https://twitch.tv/videos/12345",
@@ -43,11 +47,13 @@ def test_run_job_preflight_disk_check_multiplier(monkeypatch, tmp_path):
         recorded_required.append(required_bytes)
 
     monkeypatch.setattr("core.finalize.check_disk_space", fake_check)
+    monkeypatch.setattr("core.finalize.find_tool", lambda name: "ffmpeg")
     monkeypatch.setattr("core.finalize._load_chapters", lambda ctx, job: [])
     monkeypatch.setattr("core.finalize._load_muted", lambda ctx, job: [])
     # Also patch luckytwitch_engine if loaded
     import sys
     if "luckytwitch_engine" in sys.modules:
+        monkeypatch.setattr("luckytwitch_engine.find_tool", lambda name: "ffmpeg")
         monkeypatch.setattr("luckytwitch_engine._load_chapters", lambda ctx, job: [])
         monkeypatch.setattr("luckytwitch_engine._load_muted", lambda ctx, job: [])
 
