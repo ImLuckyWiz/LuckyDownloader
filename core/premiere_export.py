@@ -12,9 +12,14 @@ from typing import TYPE_CHECKING
 from xml.sax.saxutils import escape
 
 from core.chapters import MUTED_COMMENT, Chapter
+from core.runtime import _NO_WINDOW, _tool_env, find_tool, resolve_dep
 
 if TYPE_CHECKING:
-    from luckytwitch_engine import SourceInfo
+    from core.source_info import SourceInfo
+
+_ORIG_FIND_TOOL = find_tool
+_ORIG_TOOL_ENV = _tool_env
+_ORIG_NO_WINDOW = _NO_WINDOW
 
 
 def _timebase(fps: float) -> tuple[int, bool]:
@@ -29,14 +34,13 @@ def _timebase(fps: float) -> tuple[int, bool]:
 
 def probe_video(path: Path) -> tuple[float, int, int] | None:
     """(fps, width, height) of the first video stream, or None if ffprobe is missing / fails."""
-    import luckytwitch_engine
-    find_tool = getattr(luckytwitch_engine, "find_tool", None)
-    tool_env = getattr(luckytwitch_engine, "_tool_env", lambda: None)
-    no_window = getattr(luckytwitch_engine, "_NO_WINDOW", 0)
+    _find = resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
+    _env = resolve_dep("_tool_env", _ORIG_TOOL_ENV, _tool_env)
+    _nw = resolve_dep("_NO_WINDOW", _ORIG_NO_WINDOW, _NO_WINDOW)
 
-    if not find_tool:
+    if not _find:
         return None
-    ffprobe = find_tool("ffprobe")
+    ffprobe = _find("ffprobe")
     if not ffprobe:
         return None
     try:
@@ -44,7 +48,7 @@ def probe_video(path: Path) -> tuple[float, int, int] | None:
             [ffprobe, "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=r_frame_rate,width,height", "-of", "json", str(path)],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
-            stdin=subprocess.DEVNULL, env=tool_env(), creationflags=no_window, timeout=60,
+            stdin=subprocess.DEVNULL, env=_env(), creationflags=_nw, timeout=60,
         ).stdout
         st = json.loads(out)["streams"][0]
         num, _, den = str(st["r_frame_rate"]).partition("/")

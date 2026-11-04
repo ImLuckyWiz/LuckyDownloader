@@ -88,6 +88,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     paths.ensure_data_dir()
+    from core.diagnostics import setup_file_logging
+    setup_file_logging()
     from core.ui_state import load_ui_state
     from core.i18n import LANG_AUTO, resolve_language, set_language
     from qt_ui import i18n_qt

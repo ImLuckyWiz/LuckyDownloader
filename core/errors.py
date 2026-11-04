@@ -20,3 +20,7 @@ class Cancelled(EngineError):
 class ArchiveSkippedError(EngineError):
     """The video was skipped because it is already recorded in the download archive."""
 
+
+class DiskSpaceError(EngineError, RuntimeError):
+    """Insufficient free disk space for download."""
+

@@ -21,11 +21,14 @@ import requests
 from core.errors import ArchiveSkippedError, Cancelled, EngineError
 from core.i18n import t, tn
 from core.planning import Part
-from core.runtime import Ctx, _NO_WINDOW, _tool_env, find_tool
+from core.runtime import Ctx, _NO_WINDOW, _tool_env, find_tool, resolve_dep
 from core.source_info import YTDLP_MISSING
 from core.timeutil import fmt_hms
 
 from typing import Any, TYPE_CHECKING
+
+_ORIG_FIND_TOOL = find_tool
+_ORIG_SUBPROCESS = subprocess
 
 if TYPE_CHECKING:
     from core.job import JobOptions
@@ -153,11 +156,9 @@ def mp4_movie_timescale(path: Path) -> int | None:
     return None
 
 
-def run_ffmpeg(ctx: Ctx, args: list[str], total: float | None = None) -> str:
+def run_ffmpeg(ctx: Ctx, args: list[str], total: float | None = None, *, deps: Any = None) -> str:
     """Run ffmpeg, report progress when `total` (seconds of output) is known."""
-    eng = sys.modules.get("luckytwitch_engine")
-    import core.tools
-    _find = find_tool if find_tool is not getattr(core.tools, "find_tool", None) else (getattr(eng, "find_tool", find_tool) if eng else find_tool)
+    _find = getattr(deps, "find_tool", None) or resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
     ffmpeg = _find("ffmpeg")
     if not ffmpeg:
         raise EngineError(t("ffmpeg was not found. Install it and add it to PATH."))
@@ -196,6 +197,9 @@ def run_ffmpeg(ctx: Ctx, args: list[str], total: float | None = None) -> str:
     if proc.returncode != 0:
         raise EngineError("ffmpeg failed:\n" + "\n".join(errors[-8:]))
     return "\n".join(errors)
+
+
+_ORIG_RUN_FFMPEG = run_ffmpeg
 
 
 # --------------------------------------------------------------------------- #
@@ -314,16 +318,16 @@ def run_ytdlp(
     rate_limit: str | None = None,
     cookies_browser: str | None = None,
     download_archive: str | None = None,
+    *,
+    deps: Any = None,
 ) -> None:
     """
     Run the yt-dlp binary, forwarding progress to ctx. Cancel kills the whole process tree.
     total_secs: length of what is being downloaded (sections) so ffmpeg's stats become a percentage.
     watch_dir: folder where the download lands, used as a fallback progress source.
     """
-    eng = sys.modules.get("luckytwitch_engine")
-    import core.tools
-    _find = find_tool if find_tool is not getattr(core.tools, "find_tool", None) else (getattr(eng, "find_tool", find_tool) if eng else find_tool)
-    _subp = getattr(eng, "subprocess", subprocess) if eng else subprocess
+    _find = getattr(deps, "find_tool", None) or resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
+    _subp = getattr(deps, "subprocess", None) or resolve_dep("subprocess", _ORIG_SUBPROCESS, subprocess)
     ytdlp = _find("yt-dlp")
     if not ytdlp:
         raise EngineError(YTDLP_MISSING)
@@ -410,6 +414,9 @@ def run_ytdlp(
         raise EngineError("Download failed:\n" + "\n".join(tail[-8:]))
 
 
+_ORIG_RUN_YTDLP = run_ytdlp
+
+
 AUDIO_FORMATS = ("m4a", "mp3")
 MEDIA_EXTS = {".mp4", ".mkv", ".ts", ".webm", ".mov", ".m4v", ".m4a", ".mp3"}
 AUDIO_SKIPPED = (  # settings that need a video track -> what the log calls them
@@ -453,8 +460,8 @@ def download_full(
         kw["cookies_browser"] = str(cookies_browser).strip().lower()
     if download_archive and str(download_archive).strip():
         kw["download_archive"] = str(download_archive).strip()
-    eng = sys.modules.get("luckytwitch_engine")
-    _ytdlp = getattr(eng, "run_ytdlp", run_ytdlp) if eng else run_ytdlp
+    deps = kwargs.get("deps")
+    _ytdlp = getattr(deps, "run_ytdlp", None) or resolve_dep("run_ytdlp", _ORIG_RUN_YTDLP, run_ytdlp)
     _ytdlp(ctx, ["-o", _out_template(workdir, "full"), url], threads, **kw)
     media = _find_media(workdir)
     if not media:
@@ -494,8 +501,8 @@ def download_section(
         kw["cookies_browser"] = str(cookies_browser).strip().lower()
     if download_archive and str(download_archive).strip():
         kw["download_archive"] = str(download_archive).strip()
-    eng = sys.modules.get("luckytwitch_engine")
-    _ytdlp = getattr(eng, "run_ytdlp", run_ytdlp) if eng else run_ytdlp
+    deps = kwargs.get("deps")
+    _ytdlp = getattr(deps, "run_ytdlp", None) or resolve_dep("run_ytdlp", _ORIG_RUN_YTDLP, run_ytdlp)
     _ytdlp(ctx, args + [url], threads, total_secs=part.duration, watch_dir=pdir, **kw)
     media = _find_media(pdir)
     if not media and download_archive and str(download_archive).strip():
@@ -659,12 +666,10 @@ def write_local_playlist(segments: list[Segment], dest: Path) -> None:
     dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def get_playlist_url(ctx: Ctx, url: str, format_id: str | None = None) -> str:
+def get_playlist_url(ctx: Ctx, url: str, format_id: str | None = None, *, deps: Any = None) -> str:
     """The media playlist (.m3u8) yt-dlp would download, chosen with the same quality flags."""
-    eng = sys.modules.get("luckytwitch_engine")
-    import core.tools
-    _find = find_tool if find_tool is not getattr(core.tools, "find_tool", None) else (getattr(eng, "find_tool", find_tool) if eng else find_tool)
-    _subp = getattr(eng, "subprocess", subprocess) if eng else subprocess
+    _find = getattr(deps, "find_tool", None) or resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
+    _subp = getattr(deps, "subprocess", None) or resolve_dep("subprocess", _ORIG_SUBPROCESS, subprocess)
     ytdlp = _find("yt-dlp")
     if not ytdlp:
         raise EngineError(YTDLP_MISSING)
@@ -687,8 +692,11 @@ def get_playlist_url(ctx: Ctx, url: str, format_id: str | None = None) -> str:
     return urls[0]
 
 
+_ORIG_GET_PLAYLIST_URL = get_playlist_url
+
+
 def download_section_aligned(
-    ctx: Ctx, url: str, part: Part, workdir: Path, format_id: str | None = None, audio_only: bool = False
+    ctx: Ctx, url: str, part: Part, workdir: Path, format_id: str | None = None, audio_only: bool = False, *, deps: Any = None
 ) -> tuple[Path, float, float] | None:
     """
     Download [part.start, part.end] as whole HLS segments with a single ffmpeg stream copy and NO -ss.
@@ -698,9 +706,8 @@ def download_section_aligned(
     """
     try:
         kw = {"format_id": format_id} if format_id is not None else {}
-        eng = sys.modules.get("luckytwitch_engine")
-        _get_pl = getattr(eng, "get_playlist_url", get_playlist_url) if eng else get_playlist_url
-        _run_ff = getattr(eng, "run_ffmpeg", run_ffmpeg) if eng else run_ffmpeg
+        _get_pl = getattr(deps, "get_playlist_url", None) or resolve_dep("get_playlist_url", _ORIG_GET_PLAYLIST_URL, get_playlist_url)
+        _run_ff = getattr(deps, "run_ffmpeg", None) or resolve_dep("run_ffmpeg", _ORIG_RUN_FFMPEG, run_ffmpeg)
 
         playlist_url = _get_pl(ctx, url, **kw)
         resp = requests.get(playlist_url, headers={"User-Agent": HLS_USER_AGENT}, timeout=30)

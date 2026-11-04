@@ -20,7 +20,14 @@ import requests
 from core.errors import EngineError
 from core.i18n import t
 from core.muted import fetch_muted_ranges
+from core.runtime import USER_AGENT, _NO_WINDOW, _tool_env, find_tool, resolve_dep, user_data_dir
 from core.timeline import Range
+
+_ORIG_FIND_TOOL = find_tool
+_ORIG_TOOL_ENV = _tool_env
+_ORIG_NO_WINDOW = _NO_WINDOW
+_ORIG_USER_DATA_DIR = user_data_dir
+_ORIG_USER_AGENT = USER_AGENT
 
 
 @dataclass
@@ -201,10 +208,9 @@ def _run_ytdlp_json(
     json_error_msg: str | None = None,
 ) -> dict[str, Any]:
     """Execute yt-dlp --dump-single-json with fallback and error mapping."""
-    import luckytwitch_engine
-    _find = find_tool_fn if find_tool_fn is not None else getattr(luckytwitch_engine, "find_tool", None)
-    _env = tool_env_fn if tool_env_fn is not None else getattr(luckytwitch_engine, "_tool_env", lambda: None)
-    _nw = no_window_flag if no_window_flag is not None else getattr(luckytwitch_engine, "_NO_WINDOW", 0)
+    _find = find_tool_fn if find_tool_fn is not None else resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
+    _env = tool_env_fn if tool_env_fn is not None else resolve_dep("_tool_env", _ORIG_TOOL_ENV, _tool_env)
+    _nw = no_window_flag if no_window_flag is not None else resolve_dep("_NO_WINDOW", _ORIG_NO_WINDOW, _NO_WINDOW)
 
     ytdlp = _find("yt-dlp") if _find else None
     if not ytdlp:
@@ -295,14 +301,7 @@ def get_source_info(text: str, cookies_browser: str | None = None) -> SourceInfo
     if "\n" in url or "\r" in url:
         raise EngineError(t("Paste a single VOD URL or ID (not multi-line text)."))
 
-    import luckytwitch_engine
-    eng_run = getattr(luckytwitch_engine, "_run_ytdlp_json", None)
-    if _run_ytdlp_json is not _ORIG_SOURCE_INFO_RUN_YTDLP_JSON:
-        run_fn = _run_ytdlp_json
-    elif eng_run is not None and eng_run is not _ORIG_SOURCE_INFO_RUN_YTDLP_JSON:
-        run_fn = eng_run
-    else:
-        run_fn = _run_ytdlp_json
+    run_fn = resolve_dep("_run_ytdlp_json", _ORIG_SOURCE_INFO_RUN_YTDLP_JSON, _run_ytdlp_json)
 
     is_vod = bool(twitch_vod_id(url))
     if run_fn is _ORIG_SOURCE_INFO_RUN_YTDLP_JSON:
@@ -813,11 +812,9 @@ def fetch_storyboard_sheet(url: str, user_data_dir_fn=None, user_agent: str = ""
     if not url:
         return None
     if user_data_dir_fn is None:
-        import luckytwitch_engine
-        user_data_dir_fn = luckytwitch_engine.user_data_dir
+        user_data_dir_fn = resolve_dep("user_data_dir", _ORIG_USER_DATA_DIR, user_data_dir)
     if not user_agent:
-        import luckytwitch_engine
-        user_agent = getattr(luckytwitch_engine, "USER_AGENT", "")
+        user_agent = resolve_dep("USER_AGENT", _ORIG_USER_AGENT, USER_AGENT) or ""
 
     path = user_data_dir_fn() / "cache" / "storyboards" / (hashlib.sha1(url.encode("utf-8")).hexdigest() + ".jpg")
     try:

@@ -1,3 +1,15 @@
+## v2.15.0
+
+LuckyDownloader **v2.15.0** adds automatic download queue recovery across restarts and updates, pre-flight disk-space checks, one-click diagnostics export, resumable work directories, and modularized core and UI architecture:
+
+- **Automatic Download Queue Persistence & Crash Recovery:** Unfinished and in-progress download jobs are now saved automatically to disk whenever the queue changes and restored seamlessly on startup after an application restart, update, or unexpected shutdown.
+- **Pre-Flight Disk-Space Verification:** Before starting any download, LuckyDownloader now checks available free space in the destination folder (accounting for temporary concat/remux space on multi-part jobs) and alerts you immediately if disk space is insufficient.
+- **One-Click Diagnostics Bundle & Rotating Log File:** Added automatic rotating file logging (`logs/luckydownloader.log`) and a new **Export Diagnostics…** button in the **About LuckyDownloader** dialog that packages system details, tool versions (`yt-dlp` and `ffmpeg`), application logs, and redacted settings into a single `.zip` archive for easy troubleshooting.
+- **Resumable Job Work Directories & Temporary File Cleanup:** Download jobs now use deterministic temporary work directories based on their source, format, and cut ranges so retrying an interrupted job resumes partial `.part` files cleanly without colliding with different cuts of the same video. Stale temporary folders older than 48 hours are cleaned up automatically on startup or on demand via the new **Clean temporary files** button in **Options**.
+- **Core Pipeline & UI Modularization:** Decoupled core download and finalization pipeline dependencies from legacy engine globals and split the main window, Plan tab, and Timeline views into focused controller and component modules.
+
+---
+
 ## v2.14.6
 
 LuckyDownloader **v2.14.6** improves multi-platform provider detection, Twitch clip format selection, playlist safety, Spanish localization completeness, and `LuckyDownloader` branding consistency:

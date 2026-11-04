@@ -8,6 +8,8 @@ luckytwitch_watchlist.json
 luckytwitch_update.json
 recent_searches.json
 luckydownloader_queue.json
+queue_state.json
+logs/
 .rnd
 links/
 running.beat

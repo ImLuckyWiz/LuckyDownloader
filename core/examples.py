@@ -7,16 +7,11 @@ the loaded VOD (a ``SourceInfo``) or None: then a sample VOD is used.
 
 from __future__ import annotations
 
-from luckytwitch_engine import (
-    GameSegment,
-    JobOptions,
-    Part,
-    SourceInfo,
-    VideoFormat,
-    _SafeDict,
-    part_stem,
-    stream_dir,
-)
+from core.chapters import _SafeDict
+from core.finalize import part_stem, stream_dir
+from core.job import JobOptions
+from core.planning import Part
+from core.source_info import GameSegment, SourceInfo, VideoFormat
 
 SAMPLE_SOURCE = dict(
     url="https://www.twitch.tv/videos/123",

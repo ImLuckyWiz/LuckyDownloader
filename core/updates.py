@@ -20,7 +20,10 @@ from pathlib import Path
 import requests
 
 from core import paths
-from luckytwitch_engine import USER_AGENT
+from core.runtime import USER_AGENT, resolve_dep
+from core.tools import _download_file
+
+_ORIG_DOWNLOAD_FILE = _download_file
 
 VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?$")
 GITHUB_RELEASE_API = "https://api.github.com/repos/ImLuckyWiz/LuckyDownloader/releases/latest"
@@ -324,8 +327,8 @@ def download_installer(ctx, info: UpdateInfo, dest: Path) -> Path:
     """
     if not is_safe_asset_url(info.asset_url):
         raise ValueError(f"Asset URL is not on the GitHub releases allow-list: {info.asset_url}")
-    from luckytwitch_engine import _download_file
-    _download_file(ctx, info.asset_url, dest)
+    dl_fn = resolve_dep("_download_file", _ORIG_DOWNLOAD_FILE, _download_file)
+    dl_fn(ctx, info.asset_url, dest)
     return dest
 
 

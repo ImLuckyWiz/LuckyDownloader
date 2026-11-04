@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from core import paths
-from luckytwitch_engine import APP_DIR
+from core.runtime import APP_DIR
 
 DEFAULTS = {
     "out_dir": str((Path.home() / "Videos" / "LuckyDownloader") if paths.FROZEN else (APP_DIR / "downloads")),

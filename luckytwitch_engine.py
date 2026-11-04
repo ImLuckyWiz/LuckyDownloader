@@ -97,13 +97,17 @@ from core.download import (
     select_segments,
     write_local_playlist,
 )
-from core.errors import ArchiveSkippedError, Cancelled, EngineError, PlanError
+from core.errors import ArchiveSkippedError, Cancelled, DiskSpaceError, EngineError, PlanError
 from core.finalize import (
     _load_chapters,
     _load_muted,
     _write_sidecar,
     GENERIC_NAME_TEMPLATE,
+    PipelineDeps,
+    check_disk_space,
     clean_title,
+    cleanup_stale_workdirs,
+    compute_job_workdir,
     format_generic_stem,
     cut_exact,
     date_components,
@@ -198,6 +202,8 @@ from core.runtime import (
     _tool_env,
     find_tool,
     kill_process_tree,
+    register_override_provider,
+    resolve_dep,
     user_data_dir,
 )
 from core.source_info import (
@@ -286,3 +292,14 @@ from core.vod_search import (
     fetch_videos,
     search_channels,
 )
+import sys as _sys
+
+
+def _facade_override_provider(name: str, default):
+    mod = _sys.modules.get(__name__)
+    if mod is not None and hasattr(mod, name):
+        return getattr(mod, name)
+    return default
+
+
+register_override_provider(_facade_override_provider)

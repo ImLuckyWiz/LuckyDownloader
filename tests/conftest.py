@@ -33,7 +33,8 @@ def _data_folder_in_tmp(request, tmp_path, monkeypatch):
                        ("RECENT_SEARCHES_PATH", "recent_searches.json"),
                        ("CONFIG_PATH", "config.json"), ("LINKS_DIR", "links"), ("BEAT_PATH", "running.beat"),
                        ("UI_STATE_PATH", "luckytwitch_ui.json"), ("UPDATE_STATE_PATH", "luckytwitch_update.json"),
-                       ("HISTORY_PATH", "luckytwitch_history.json"), ("WATCHLIST_PATH", "luckytwitch_watchlist.json")):
+                       ("HISTORY_PATH", "luckytwitch_history.json"), ("WATCHLIST_PATH", "luckytwitch_watchlist.json"),
+                       ("QUEUE_STATE_PATH", "queue_state.json"), ("QUEUE_STATE_FILE", "queue_state.json")):
         monkeypatch.setattr(paths, name, data_dir / leaf)
     try:
         import core.history

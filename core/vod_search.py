@@ -11,8 +11,12 @@ from pathlib import Path
 
 import requests
 
+from core.runtime import USER_AGENT, resolve_dep, user_data_dir
 from core.timeutil import parse_twitch_duration
 from core.twitch_api import TwitchClient
+
+_ORIG_USER_DATA_DIR = user_data_dir
+_ORIG_USER_AGENT = USER_AGENT
 
 VIDEO_TYPES = ("archive", "highlight", "upload")  # past broadcasts, highlights, uploads
 
@@ -83,11 +87,9 @@ def fetch_thumbnail(url: str, user_data_dir_fn=None, user_agent: str = "") -> Pa
     if not url:
         return None
     if user_data_dir_fn is None:
-        import luckytwitch_engine
-        user_data_dir_fn = luckytwitch_engine.user_data_dir
+        user_data_dir_fn = resolve_dep("user_data_dir", _ORIG_USER_DATA_DIR, user_data_dir)
     if not user_agent:
-        import luckytwitch_engine
-        user_agent = getattr(luckytwitch_engine, "USER_AGENT", "")
+        user_agent = resolve_dep("USER_AGENT", _ORIG_USER_AGENT, USER_AGENT) or ""
 
     path = user_data_dir_fn() / "cache" / "thumbs" / (hashlib.sha1(url.encode("utf-8")).hexdigest() + ".jpg")
     try:

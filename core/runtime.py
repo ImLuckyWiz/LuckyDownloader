@@ -12,9 +12,28 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from core.errors import Cancelled
+
+_override_provider: Callable[[str, Any], Any] | None = None
+
+
+def register_override_provider(provider: Callable[[str, Any], Any] | None) -> None:
+    """Register an optional override provider hook (e.g. from facade modules for test monkeypatching)."""
+    global _override_provider
+    _override_provider = provider
+
+
+def resolve_dep(name: str, default: Any, local_current: Any = None) -> Any:
+    """Resolve a dependency by name, preferring local module patches first, then any registered provider."""
+    if local_current is not None and local_current is not default:
+        return local_current
+    if _override_provider is not None:
+        val = _override_provider(name, default)
+        if val is not None:
+            return val
+    return local_current if local_current is not None else default
 
 APP_DIR = (
     Path(sys.executable).parent

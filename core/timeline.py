@@ -10,7 +10,7 @@ from core.planning import parse_cut_points
 from core.timeutil import fmt_hms
 
 if TYPE_CHECKING:
-    from luckytwitch_engine import GameSegment
+    from core.source_info import GameSegment
 
 # --- range and slice editing --- #
 Range = tuple[float, float]

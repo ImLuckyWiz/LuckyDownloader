@@ -88,13 +88,13 @@ This index maps **all 67 findings (`A-01`..`L-05`)** from [`docs/REVIEW_2026_11.
 - [x] **Plan 06 - Step 13 (RELEASE `v2.14.6`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.6`), commit & git tag `v2.14.6` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 07 — [`docs/PLAN_07_ARCHITECTURE_AND_PRODUCT_ROADMAP.md`](./PLAN_07_ARCHITECTURE_AND_PRODUCT_ROADMAP.md) -> Release `v2.15.0`
-- [ ] **Plan 07 - Step 1** (`L-01`): Pre-flight disk-space check before starting jobs — `[Model: Gemini Flash]`
-- [ ] **Plan 07 - Step 2** (`L-03`): Rotating log file and one-click "Export Diagnostics Bundle" — `[Model: Gemini Flash]`
-- [ ] **Plan 07 - Step 3** (`A-08`, `L-04`): Deterministic resumable work directories & stale workdir cleanup — `[Model: Argon / Claude Sonnet]`
-- [ ] **Plan 07 - Step 4** (`L-02`): Automatic queue persistence & crash/update recovery — `[Model: Argon / Claude Sonnet]`
-- [ ] **Plan 07 - Step 5** (`A-09`, `L-05`): Decouple `core/` from `sys.modules.get("luckytwitch_engine")` — `[Model: Argon / Claude Sonnet]`
-- [ ] **Plan 07 - Step 6** (`D-10`): Split Qt UI god-modules (`main_window.py`, `tabs/plan.py`, `timeline.py`) — `[Model: Argon / Claude Sonnet]`
-- [ ] **Plan 07 - Step 7 (RELEASE `v2.15.0`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.15.0`), commit & git tag `v2.15.0` — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 07 - Step 1** (`L-01`): Pre-flight disk-space check before starting jobs — `[Model: Gemini Flash]`
+- [x] **Plan 07 - Step 2** (`L-03`): Rotating log file and one-click "Export Diagnostics Bundle" — `[Model: Gemini Flash]`
+- [x] **Plan 07 - Step 3** (`A-08`, `L-04`): Deterministic resumable work directories & stale workdir cleanup — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 07 - Step 4** (`L-02`): Automatic queue persistence & crash/update recovery — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 07 - Step 5** (`A-09`, `L-05`): Decouple `core/` from `sys.modules.get("luckytwitch_engine")` — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 07 - Step 6** (`D-10`): Split Qt UI god-modules (`main_window.py`, `tabs/plan.py`, `timeline.py`) — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 07 - Step 7 (RELEASE `v2.15.0`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.15.0`), commit & git tag `v2.15.0` — `[Model: Argon / Claude Sonnet]`
 
 ---
 

@@ -362,3 +362,106 @@ class HistoryDialog(QDialog):
         from core import history
         history.clear_history()
         self.refresh()
+
+
+class AboutDialog(QDialog):
+    """About LuckyDownloader dialog with app version, system diagnostics export, and credits."""
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setObjectName("aboutDialog")
+        self.setWindowTitle(t("About LuckyDownloader"))
+        self.setModal(True)
+        self.setMinimumWidth(440)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(20, 20, 20, 18)
+        outer.setSpacing(14)
+
+        # Header with icon and title
+        header = QHBoxLayout()
+        header.setSpacing(14)
+
+        icon_lbl = QLabel(self)
+        from core.resources import resource_path
+        icon_path = resource_path("assets/icon.png")
+        if icon_path.is_file():
+            from PySide6.QtGui import QPixmap
+            icon_lbl.setPixmap(QPixmap(str(icon_path)).scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        else:
+            icon_lbl.setPixmap(pixmap("film", 48, ACCENT))
+        header.addWidget(icon_lbl)
+
+        title_lay = QVBoxLayout()
+        title_lay.setSpacing(2)
+        app_name = QLabel(t("LuckyDownloader"), self)
+        app_name.setStyleSheet("font-size: 18px; font-weight: bold; color: white;")
+        title_lay.addWidget(app_name)
+
+        from core.paths import BUNDLED_VERSION, read_bundled_version
+        ver = BUNDLED_VERSION or read_bundled_version() or "dev"
+        ver_lbl = QLabel(t("Version {ver}").format(ver=ver), self)
+        ver_lbl.setProperty("role", "muted")
+        title_lay.addWidget(ver_lbl)
+
+        header.addLayout(title_lay)
+        header.addStretch(1)
+        outer.addLayout(header)
+
+        # Description
+        desc = QLabel(
+            t("Modern Twitch VOD & clip downloader, cutter, chat archiver, and Premiere Pro exporter."),
+            self,
+        )
+        desc.setWordWrap(True)
+        outer.addWidget(desc)
+
+        # System info summary
+        import platform
+        import sys
+        sys_info_lbl = QLabel(
+            t("Python {py} · {os} {release}").format(
+                py=sys.version.split()[0], os=platform.system(), release=platform.release()
+            ),
+            self,
+        )
+        sys_info_lbl.setProperty("role", "muted")
+        sys_info_lbl.setStyleSheet("font-size: 11px;")
+        outer.addWidget(sys_info_lbl)
+
+        # Actions row
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+
+        self.export_btn = QPushButton(t("Export Diagnostics…"), self)
+        self.export_btn.setProperty("variant", "ghost")
+        self.export_btn.setIcon(icon("file-text", 14))
+        self.export_btn.clicked.connect(self._on_export_diagnostics)
+        btn_row.addWidget(self.export_btn)
+
+        btn_row.addStretch(1)
+
+        self.close_btn = QPushButton(t("Close"), self)
+        self.close_btn.setProperty("variant", "accent")
+        self.close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(self.close_btn)
+
+        outer.addLayout(btn_row)
+
+    def _on_export_diagnostics(self) -> None:
+        from pathlib import Path
+        from core.diagnostics import export_diagnostics_zip
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            t("Export Diagnostics Bundle"),
+            "luckydownloader_diagnostics.zip",
+            "Zip archives (*.zip);;All files (*.*)",
+        )
+        if not path:
+            return
+        try:
+            export_diagnostics_zip(Path(path))
+            info(self, t("Diagnostics Exported"), t("Diagnostics bundle successfully saved to:\n{path}").format(path=path))
+        except Exception as e:
+            error(self, t("Export Failed"), t("Could not export diagnostics bundle: {error}").format(error=e))
+

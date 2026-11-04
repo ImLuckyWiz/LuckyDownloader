@@ -171,6 +171,8 @@ UI_STATE_PATH = DATA_DIR / "luckytwitch_ui.json"
 UPDATE_STATE_PATH = DATA_DIR / "luckytwitch_update.json"
 HISTORY_PATH = DATA_DIR / "luckytwitch_history.json"
 WATCHLIST_PATH = DATA_DIR / "luckytwitch_watchlist.json"
+QUEUE_STATE_PATH = DATA_DIR / "queue_state.json"
+QUEUE_STATE_FILE = QUEUE_STATE_PATH
 MAX_RECENT = 12
 
 

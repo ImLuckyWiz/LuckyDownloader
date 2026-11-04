@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 
 from core import paths
-from luckytwitch_engine import TWITCH_CLIENT_ID, TwitchClient
+from core.twitch_api import TWITCH_CLIENT_ID, TwitchClient
 
 
 def read_config() -> dict:

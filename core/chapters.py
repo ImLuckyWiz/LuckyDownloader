@@ -15,7 +15,7 @@ from core.timeutil import fmt_hms
 from core.twitch_api import clip_end, clip_start
 
 if TYPE_CHECKING:
-    from luckytwitch_engine import GameSegment
+    from core.source_info import GameSegment
 
 
 @dataclass

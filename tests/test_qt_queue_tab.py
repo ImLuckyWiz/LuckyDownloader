@@ -914,3 +914,88 @@ def test_queue_tab_auto_thumbnail_fetch(qtbot, tmp_path):
     tab._on_thumb_ready(it2.iid, str(test_img))
     assert it2.thumb is not None
     assert isinstance(it2.thumb, QPixmap)
+
+
+def test_queue_persistence_round_trip_and_running_recovery(tmp_path):
+    from core.chapters import ClipFilter
+    from core.job import Job, JobOptions
+    from core.source_info import GameSegment, SourceInfo, VideoFormat
+
+    state_file = tmp_path / "queue_state.json"
+    src1 = SourceInfo(
+        url="https://www.twitch.tv/videos/111",
+        id="111",
+        title="Stream One",
+        uploader="alice",
+        duration=3600.0,
+        date="2026-04-11",
+        twitch_vod_id="111",
+        segments=[GameSegment(0.0, 1800.0, "Chess")],
+        formats=[VideoFormat(format_id="1080p60", height=1080, fps=60.0)],
+        site="twitch",
+    )
+    opts1 = JobOptions(cut_text="0:00:00 - 0:10:00", out_dir=str(tmp_path), clip_filter=ClipFilter(min_views=5))
+    job1 = Job(source=src1, opts=opts1, clips=[{"id": "c1", "title": "Nice play"}])
+
+    src2 = SourceInfo(
+        url="https://www.twitch.tv/videos/222",
+        id="222",
+        title="Stream Two",
+        uploader="bob",
+        duration=1200.0,
+        date="2026-04-11",
+        twitch_vod_id="222",
+        site="twitch",
+    )
+    job2 = Job(source=src2, opts=JobOptions(cut_text="0:00:00 - end", out_dir=str(tmp_path)))
+
+    model = QueueModel()
+    it1 = model.add(job1, "alice · Stream One", 1, "only the parts")
+    it2 = model.add(job2, "bob · Stream Two", 1, "full VOD + split")
+    # Simulate it1 was running when app closed/crashed
+    model.set_status(it1.iid, "running")
+    model.save_state(state_file)
+
+    assert state_file.is_file()
+
+    restored_model = QueueModel()
+    restored = restored_model.load_state(state_file, only_unfinished=True)
+    assert len(restored) == 2
+    # Running item is recovered as queued so it can be resumed
+    assert restored_model.items[0].status == "queued"
+    assert restored_model.items[0].shown_status == "queued"
+    assert isinstance(restored_model.items[0].job, Job)
+    assert restored_model.items[0].job.source.url == "https://www.twitch.tv/videos/111"
+    assert restored_model.items[0].job.opts.clip_filter.min_views == 5
+    assert restored_model.items[1].job.source.url == "https://www.twitch.tv/videos/222"
+
+
+def test_main_window_restores_unfinished_queue_on_startup(qtbot, tmp_path, monkeypatch):
+    from core import paths
+    from core.job import Job, JobOptions
+    from core.source_info import SourceInfo
+    from qt_ui.main_window import MainWindow
+
+    state_file = paths.QUEUE_STATE_FILE
+    src = SourceInfo(
+        url="https://www.twitch.tv/videos/999",
+        id="999",
+        title="Saved VOD",
+        uploader="streamer",
+        duration=600.0,
+        date="2026-04-11",
+        twitch_vod_id="999",
+    )
+    job = Job(source=src, opts=JobOptions(cut_text="0:00:00 - end", out_dir=str(tmp_path)))
+
+    seed_model = QueueModel()
+    it = seed_model.add(job, "streamer · Saved VOD", 1, "full VOD + split")
+    seed_model.set_status(it.iid, "running")
+    seed_model.save_state(state_file)
+
+    w = MainWindow(settings={"out_dir": str(tmp_path)}, client=None)
+    qtbot.addWidget(w)
+    assert len(w.tab_queue.items) == 1
+    assert w.tab_queue.items[0].label == "streamer · Saved VOD"
+    assert w.tab_queue.items[0].status == "queued"
+    w.close()

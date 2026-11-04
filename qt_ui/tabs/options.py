@@ -808,10 +808,15 @@ class OptionsTab(QWidget):
         self.update_btn.clicked.connect(self.update_tools_requested)
         self.update_row.add_control(self.update_btn)
 
-        self.tools_folder_row = card.add_row(t("Tools folder"), t("Where yt-dlp, ffmpeg and TwitchDownloaderCLI are kept."), divider=False)
+        self.tools_folder_row = card.add_row(t("Tools folder"), t("Where yt-dlp, ffmpeg and TwitchDownloaderCLI are kept."))
         self.tools_folder_btn = QPushButton(t("Open tools folder"))
         self.tools_folder_btn.clicked.connect(self.open_tools_folder)
         self.tools_folder_row.add_control(self.tools_folder_btn)
+
+        self.clean_temp_row = card.add_row(t("Temporary files"), t("Remove incomplete temporary download directories from the output folder."), divider=False)
+        self.clean_temp_btn = QPushButton(t("Clean temporary files"))
+        self.clean_temp_btn.clicked.connect(self.clean_temp_files)
+        self.clean_temp_row.add_control(self.clean_temp_btn)
 
         app_update_card = self._card(f, N_("LuckyTwitch updates"), N_("Check for new versions of LuckyTwitch Downloader."))
         row = self._add_setting_row(
@@ -884,6 +889,13 @@ class OptionsTab(QWidget):
             open_in_file_manager(TOOLS_DIR)
         except OSError as e:
             dialogs.info(self, t("Tools folder"), f"{TOOLS_DIR}\n\n{e}")
+
+    def clean_temp_files(self) -> int:
+        from core.finalize import cleanup_stale_workdirs
+        out_dir = str(self.binder.get("out_dir") or DEFAULTS.get("out_dir") or APP_DIR)
+        removed = cleanup_stale_workdirs(out_dir, max_age_hours=0.0)
+        self.status_message.emit(t("Cleaned {count} temporary folder(s).").format(count=removed))
+        return removed
 
     def refresh_link_state(self) -> None:
         """Say whether this computer sends luckytwitch:// links to this app (Windows can be set up from here)."""
@@ -1011,6 +1023,11 @@ class OptionsTab(QWidget):
             self.update_btn.setText(t("Update yt-dlp now"))
         if hasattr(self, "tools_folder_btn") and self.tools_folder_btn:
             self.tools_folder_btn.setText(t("Open tools folder"))
+        if hasattr(self, "clean_temp_btn") and self.clean_temp_btn:
+            self.clean_temp_btn.setText(t("Clean temporary files"))
+        if hasattr(self, "clean_temp_row") and self.clean_temp_row:
+            self.clean_temp_row.title_label.setText(t("Temporary files"))
+            self.clean_temp_row.hint_label.setText(t("Remove incomplete temporary download directories from the output folder."))
         if hasattr(self, "check_app_updates_btn") and self.check_app_updates_btn:
             self.check_app_updates_btn.setText(t("Check now"))
         if hasattr(self, "save_preview_card_row") and self.save_preview_card_row:

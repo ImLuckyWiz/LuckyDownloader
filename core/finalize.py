@@ -5,6 +5,7 @@ Splitting, finalizing, path naming, and high-level job runner.
 from __future__ import annotations
 
 import csv
+import hashlib
 import inspect
 import json
 import math
@@ -12,10 +13,11 @@ import os
 import re
 import shutil
 import sys
-import uuid
-from dataclasses import replace
+import time
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Callable
 
 from core.chapters import (
     Chapter,
@@ -41,18 +43,19 @@ from core.download import (
     mp4_movie_timescale,
     run_ffmpeg,
 )
-from core.errors import ArchiveSkippedError, Cancelled, EngineError
+from core.errors import ArchiveSkippedError, Cancelled, DiskSpaceError, EngineError
 from core.i18n import t
 from core.job import Job, JobOptions
 from core.providers import Capability
 from core.muted import muted_from_playlist_url
 from core.planning import Part, Plan, make_plan
 from core.premiere_export import probe_video, write_markers_json, write_premiere_xml
-from core.runtime import Ctx, find_tool
+from core.runtime import Ctx, find_tool, resolve_dep
 from core.source_info import (
     GameSegment,
     QUALITY_BEST,
     SourceInfo,
+    VideoFormat,
     describe_quality,
     resolve_format,
 )
@@ -60,10 +63,98 @@ from core.timeutil import fmt_hms
 from core.tools import ensure_tdcli
 from core.twitch_api import fetch_clips_for_vod
 
+_ORIG_FIND_TOOL = find_tool
+_ORIG_UNIQUE_PATH = unique_path
+_ORIG_RUN_FFMPEG = run_ffmpeg
+_ORIG_DOWNLOAD_FULL = download_full
+_ORIG_DOWNLOAD_SECTION = download_section
+_ORIG_DOWNLOAD_SECTION_ALIGNED = download_section_aligned
+_ORIG_GET_PLAYLIST_URL = get_playlist_url
+_ORIG_MUTED_FROM_PLAYLIST_URL = muted_from_playlist_url
+_ORIG_MAKE_CHAPTERS = make_chapters
+_ORIG_ENSURE_TDCLI = ensure_tdcli
+_ORIG_PROBE_VIDEO = probe_video
+_ORIG_WRITE_PREMIERE_XML = write_premiere_xml
+_ORIG_WRITE_MARKERS_JSON = write_markers_json
+
+
+@dataclass
+class PipelineDeps:
+    """Explicit dependency container for the download and finalization pipeline."""
+    find_tool: Callable[..., str | None] | None = None
+    download_full: Callable[..., Path] | None = None
+    download_section: Callable[..., Path] | None = None
+    download_section_aligned: Callable[..., tuple[Path, float, float] | None] | None = None
+    cut_exact: Callable[..., Path] | None = None
+    split_copy: Callable[..., dict[int, tuple[Path, float, float]]] | None = None
+    finalize_part: Callable[..., Path] | None = None
+    finalize_audio_part: Callable[..., Path] | None = None
+    ensure_tdcli: Callable[..., str] | None = None
+    probe_video: Callable[..., tuple[float, int, int] | None] | None = None
+    write_premiere_xml: Callable[..., Path] | None = None
+    write_markers_json: Callable[..., Path] | None = None
+    load_chapters: Callable[..., list[Chapter]] | None = None
+    load_muted: Callable[..., list[Chapter]] | None = None
+    unique_path: Callable[[Path], Path] | None = None
+    run_ffmpeg: Callable[..., str] | None = None
+    get_playlist_url: Callable[..., str] | None = None
+    muted_from_playlist_url: Callable[..., list | None] | None = None
+    make_chapters: Callable[..., list[Chapter]] | None = None
+
 
 # --------------------------------------------------------------------------- #
 # Splitting / finalizing helpers & naming
 # --------------------------------------------------------------------------- #
+def check_disk_space(out_dir: str | Path, required_bytes: int = 200 * 1024 * 1024) -> None:
+    """Ensure destination directory has enough free space before starting download jobs."""
+    try:
+        usage = shutil.disk_usage(str(out_dir))
+    except OSError:
+        return
+    if usage.free < required_bytes:
+        free_mb = usage.free // (1024 * 1024)
+        need_mb = required_bytes // (1024 * 1024)
+        raise DiskSpaceError(
+            f"Insufficient disk space in {out_dir}: {free_mb} MB free, at least {need_mb} MB required."
+        )
+
+
+def compute_job_workdir(src: SourceInfo, opts: JobOptions, fmt: VideoFormat | None = None, out_dir: Path | None = None) -> Path:
+    """Return a deterministic temporary work directory for a job so interrupted downloads can resume."""
+    base = Path(out_dir) if out_dir is not None else Path(opts.out_dir)
+    id_slug = re.sub(r"[^A-Za-z0-9_-]", "_", str(src.twitch_vod_id or src.id or "unknown"))[:64] or "unknown"
+    fmt_slug = f"_{re.sub(r'[^A-Za-z0-9_-]', '_', fmt.format_id)[:40]}" if fmt else ""
+    key = f"{src.url}|{fmt_slug}|{opts.cut_text}|{opts.strategy}|{opts.quality}|{opts.container}"
+    job_hash = hashlib.sha256(key.encode("utf-8")).hexdigest()[:8]
+    return base / f".luckytwitch_{id_slug}{fmt_slug}_{job_hash}"
+
+
+def cleanup_stale_workdirs(out_dir: str | Path, max_age_hours: float = 48.0) -> int:
+    """Remove stale temporary work directories (.luckytwitch_* or .luckydownloader_work_*) older than max_age_hours."""
+    base = Path(out_dir)
+    if not base.is_dir():
+        return 0
+    cutoff = time.time() - (max_age_hours * 3600.0)
+    removed = 0
+    try:
+        entries = list(base.iterdir())
+    except OSError:
+        return 0
+    for entry in entries:
+        try:
+            if not entry.is_dir() or entry.is_symlink():
+                continue
+            if not (entry.name.startswith(".luckytwitch_") or entry.name.startswith(".luckydownloader_work_")):
+                continue
+            if max_age_hours <= 0 or entry.stat().st_mtime <= cutoff:
+                shutil.rmtree(entry, ignore_errors=True)
+                if not entry.exists():
+                    removed += 1
+        except OSError:
+            continue
+    return removed
+
+
 def clean_title(title: str) -> str:
     """Clean chat bot commands (!gsupps, !links, !clash), promo tags (#ad),
     emojis without word smushing, and dangling trailing delimiters from a stream title.
@@ -302,11 +393,12 @@ def finalize_part(
     tags: dict[str, str],
     total: float,
     copy_instead_of_move: bool = False,
+    *,
+    deps: PipelineDeps | None = None,
 ) -> Path:
     """Put the part in its final place: add chapters / remux / rename."""
-    eng = sys.modules.get("luckytwitch_engine")
-    _uniq = getattr(eng, "unique_path", unique_path) if eng else unique_path
-    _run_ff = getattr(eng, "run_ffmpeg", run_ffmpeg) if eng else run_ffmpeg
+    _uniq = getattr(deps, "unique_path", None) or resolve_dep("unique_path", _ORIG_UNIQUE_PATH, unique_path)
+    _run_ff = getattr(deps, "run_ffmpeg", None) or resolve_dep("run_ffmpeg", _ORIG_RUN_FFMPEG, run_ffmpeg)
 
     dest = _uniq(dest_stem.parent / f"{dest_stem.name}.{container}")
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -342,11 +434,12 @@ def finalize_audio_part(
     tags: dict[str, str],
     total: float,
     copy_instead_of_move: bool = False,
+    *,
+    deps: PipelineDeps | None = None,
 ) -> Path:
     """Put an audio-only part in its final place as .m4a (copy) or .mp3 (convert)."""
-    eng = sys.modules.get("luckytwitch_engine")
-    _uniq = getattr(eng, "unique_path", unique_path) if eng else unique_path
-    _run_ff = getattr(eng, "run_ffmpeg", run_ffmpeg) if eng else run_ffmpeg
+    _uniq = getattr(deps, "unique_path", None) or resolve_dep("unique_path", _ORIG_UNIQUE_PATH, unique_path)
+    _run_ff = getattr(deps, "run_ffmpeg", None) or resolve_dep("run_ffmpeg", _ORIG_RUN_FFMPEG, run_ffmpeg)
 
     dest = _uniq(dest_stem.parent / f"{dest_stem.name}.{container}")
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -389,7 +482,15 @@ def _write_sidecar(dest: Path, chapters: list[Chapter]) -> None:
 
 
 def split_copy(
-    ctx: Ctx, full: Path, parts: list[Part], duration: float, container: str, workdir: Path, audio_only: bool = False
+    ctx: Ctx,
+    full: Path,
+    parts: list[Part],
+    duration: float,
+    container: str,
+    workdir: Path,
+    audio_only: bool = False,
+    *,
+    deps: PipelineDeps | None = None,
 ) -> dict[int, tuple[Path, float, float]]:
     """
     Single ffmpeg pass (stream copy) that cuts the full file at every boundary.
@@ -398,8 +499,7 @@ def split_copy(
     even if the downloaded file's own timestamps start somewhere else.)
     Segments that are not part of any wanted part (gaps) are deleted.
     """
-    eng = sys.modules.get("luckytwitch_engine")
-    _run_ff = getattr(eng, "run_ffmpeg", run_ffmpeg) if eng else run_ffmpeg
+    _run_ff = getattr(deps, "run_ffmpeg", None) or resolve_dep("run_ffmpeg", _ORIG_RUN_FFMPEG, run_ffmpeg)
 
     boundaries = sorted({0.0} | {p.start for p in parts} | {p.end for p in parts if p.end < duration - 0.5})
     inner = boundaries[1:]
@@ -442,13 +542,21 @@ def split_copy(
     return result
 
 
-def cut_exact(ctx: Ctx, full: Path, part: Part, container: str, workdir: Path, offset: float | None = None) -> Path:
+def cut_exact(
+    ctx: Ctx,
+    full: Path,
+    part: Part,
+    container: str,
+    workdir: Path,
+    offset: float | None = None,
+    *,
+    deps: PipelineDeps | None = None,
+) -> Path:
     """
     Frame-exact cut (re-encodes video).
     `offset`: where the part starts inside `full` (default: part.start, i.e. `full` is the whole VOD).
     """
-    eng = sys.modules.get("luckytwitch_engine")
-    _run_ff = getattr(eng, "run_ffmpeg", run_ffmpeg) if eng else run_ffmpeg
+    _run_ff = getattr(deps, "run_ffmpeg", None) or resolve_dep("run_ffmpeg", _ORIG_RUN_FFMPEG, run_ffmpeg)
 
     out = workdir / f"exact_{part.index}.{container}"
     _run_ff(
@@ -469,7 +577,7 @@ def cut_exact(ctx: Ctx, full: Path, part: Part, container: str, workdir: Path, o
 # --------------------------------------------------------------------------- #
 # Running a job
 # --------------------------------------------------------------------------- #
-def _load_chapters(ctx: Ctx, job: Job) -> list[Chapter]:
+def _load_chapters(ctx: Ctx, job: Job, *, deps: PipelineDeps | None = None) -> list[Chapter]:
     if not (job.opts.chapters or job.opts.premiere_xml or job.opts.premiere_plugin):
         return []
     clips = job.clips
@@ -482,14 +590,13 @@ def _load_chapters(ctx: Ctx, job: Job) -> list[Chapter]:
             return []
         ctx.log(t("Fetching clips for chapters…"))
         clips = fetch_clips_for_vod(job.client, job.source.twitch_vod_id)
-    eng = sys.modules.get("luckytwitch_engine")
-    _make_ch = getattr(eng, "make_chapters", make_chapters) if eng else make_chapters
+    _make_ch = getattr(deps, "make_chapters", None) or resolve_dep("make_chapters", _ORIG_MAKE_CHAPTERS, make_chapters)
     chapters = _make_ch(clips, job.opts.clip_filter)
     ctx.log(t("Chapters: {chapters} (from {clips} clips found)").format(chapters=len(chapters), clips=len(clips)))
     return chapters
 
 
-def _load_muted(ctx: Ctx, job: Job) -> list[Chapter]:
+def _load_muted(ctx: Ctx, job: Job, *, deps: PipelineDeps | None = None) -> list[Chapter]:
     """The stretches Twitch silenced, as chapters, when the .markers.json should carry them (else [])."""
     src, opts = job.source, job.opts
     if not (opts.muted_markers and opts.premiere_plugin) or job.single_clip:
@@ -497,9 +604,10 @@ def _load_muted(ctx: Ctx, job: Job) -> list[Chapter]:
     if not src.has_capability(Capability.TIMELINE):
         return []
     ranges = src.muted  # normally read at «Get info»
-    eng = sys.modules.get("luckytwitch_engine")
-    _get_pl = getattr(eng, "get_playlist_url", get_playlist_url) if eng else get_playlist_url
-    _muted_pl = getattr(eng, "muted_from_playlist_url", muted_from_playlist_url) if eng else muted_from_playlist_url
+    _get_pl = getattr(deps, "get_playlist_url", None) or resolve_dep("get_playlist_url", _ORIG_GET_PLAYLIST_URL, get_playlist_url)
+    _muted_pl = getattr(deps, "muted_from_playlist_url", None) or resolve_dep(
+        "muted_from_playlist_url", _ORIG_MUTED_FROM_PLAYLIST_URL, muted_from_playlist_url
+    )
 
     if ranges is None and src.twitch_vod_id:  # it could not be read then (or the VOD came from elsewhere): try once more
         try:
@@ -516,25 +624,39 @@ def _load_muted(ctx: Ctx, job: Job) -> list[Chapter]:
     return muted_chapters(ranges)
 
 
-def run_job(job: Job, ctx: Ctx) -> list[Path]:
+_ORIG_FINALIZE_PART = finalize_part
+_ORIG_FINALIZE_AUDIO_PART = finalize_audio_part
+_ORIG_SPLIT_COPY = split_copy
+_ORIG_CUT_EXACT = cut_exact
+_ORIG_LOAD_CHAPTERS = _load_chapters
+_ORIG_LOAD_MUTED = _load_muted
+
+
+def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Path]:
     src, opts = job.source, job.opts
-    eng = sys.modules.get("luckytwitch_engine")
-    import core.tools
-    _find = find_tool if find_tool is not getattr(core.tools, "find_tool", None) else (getattr(eng, "find_tool", find_tool) if eng else find_tool)
-    _dl_full = getattr(eng, "download_full", download_full) if eng else download_full
-    _dl_sec = getattr(eng, "download_section", download_section) if eng else download_section
-    _dl_align = getattr(eng, "download_section_aligned", download_section_aligned) if eng else download_section_aligned
-    _cut = getattr(eng, "cut_exact", cut_exact) if eng else cut_exact
-    _split = getattr(eng, "split_copy", split_copy) if eng else split_copy
-    _fin_part = getattr(eng, "finalize_part", finalize_part) if eng else finalize_part
-    _fin_audio = getattr(eng, "finalize_audio_part", finalize_audio_part) if eng else finalize_audio_part
-    _ensure_tdcli = getattr(eng, "ensure_tdcli", ensure_tdcli) if eng else ensure_tdcli
-    _probe = getattr(eng, "probe_video", probe_video) if eng else probe_video
-    _write_xml = getattr(eng, "write_premiere_xml", write_premiere_xml) if eng else write_premiere_xml
-    _write_json = getattr(eng, "write_markers_json", write_markers_json) if eng else write_markers_json
-    _load_ch = getattr(eng, "_load_chapters", _load_chapters) if eng else _load_chapters
-    _load_mut = getattr(eng, "_load_muted", _load_muted) if eng else _load_muted
-    _uniq = getattr(eng, "unique_path", unique_path) if eng else unique_path
+    _find = getattr(deps, "find_tool", None) or resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
+    _dl_full = getattr(deps, "download_full", None) or resolve_dep("download_full", _ORIG_DOWNLOAD_FULL, download_full)
+    _dl_sec = getattr(deps, "download_section", None) or resolve_dep("download_section", _ORIG_DOWNLOAD_SECTION, download_section)
+    _dl_align = getattr(deps, "download_section_aligned", None) or resolve_dep(
+        "download_section_aligned", _ORIG_DOWNLOAD_SECTION_ALIGNED, download_section_aligned
+    )
+    _cut = getattr(deps, "cut_exact", None) or resolve_dep("cut_exact", _ORIG_CUT_EXACT, cut_exact)
+    _split = getattr(deps, "split_copy", None) or resolve_dep("split_copy", _ORIG_SPLIT_COPY, split_copy)
+    _fin_part = getattr(deps, "finalize_part", None) or resolve_dep("finalize_part", _ORIG_FINALIZE_PART, finalize_part)
+    _fin_audio = getattr(deps, "finalize_audio_part", None) or resolve_dep(
+        "finalize_audio_part", _ORIG_FINALIZE_AUDIO_PART, finalize_audio_part
+    )
+    _ensure_tdcli = getattr(deps, "ensure_tdcli", None) or resolve_dep("ensure_tdcli", _ORIG_ENSURE_TDCLI, ensure_tdcli)
+    _probe = getattr(deps, "probe_video", None) or resolve_dep("probe_video", _ORIG_PROBE_VIDEO, probe_video)
+    _write_xml = getattr(deps, "write_premiere_xml", None) or resolve_dep(
+        "write_premiere_xml", _ORIG_WRITE_PREMIERE_XML, write_premiere_xml
+    )
+    _write_json = getattr(deps, "write_markers_json", None) or resolve_dep(
+        "write_markers_json", _ORIG_WRITE_MARKERS_JSON, write_markers_json
+    )
+    _load_ch = getattr(deps, "load_chapters", None) or resolve_dep("_load_chapters", _ORIG_LOAD_CHAPTERS, _load_chapters)
+    _load_mut = getattr(deps, "load_muted", None) or resolve_dep("_load_muted", _ORIG_LOAD_MUTED, _load_muted)
+    _uniq = getattr(deps, "unique_path", None) or resolve_dep("unique_path", _ORIG_UNIQUE_PATH, unique_path)
 
     if not _find("ffmpeg"):
         raise EngineError(t("ffmpeg was not found. Install it and add it to PATH."))
@@ -589,11 +711,14 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
 
     out_dir = Path(opts.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    filesize = getattr(fmt, "filesize", 0) or 0
+    if filesize > 0:
+        required_bytes = int(filesize * (2.1 if len(plan.parts) > 1 else 1.1))
+    else:
+        required_bytes = 200 * 1024 * 1024
+    check_disk_space(out_dir, required_bytes)
     final_dir = stream_dir(src, opts)
-    id_slug = re.sub(r"[^A-Za-z0-9_-]", "_", str(src.twitch_vod_id or src.id or "unknown"))[:64] or "unknown"
-    fmt_slug = f"_{re.sub(r'[^A-Za-z0-9_-]', '_', fmt.format_id)[:40]}" if fmt else ""
-    job_nonce = uuid.uuid4().hex[:8]
-    workdir = out_dir / f".luckytwitch_{id_slug}{fmt_slug}_{job_nonce}"
+    workdir = compute_job_workdir(src, opts, fmt=fmt, out_dir=out_dir)
     if not workdir.resolve().is_relative_to(out_dir.resolve()):
         raise EngineError(t("Unsafe work directory path"))
     tags = {

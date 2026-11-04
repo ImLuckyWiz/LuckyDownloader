@@ -8,107 +8,50 @@ from __future__ import annotations
 
 import os
 import sys
-
-import re
-from urllib.parse import urlsplit
 import weakref
 from dataclasses import replace
-from pathlib import Path
 
-from PySide6.QtCore import QEvent, QRect, Qt, QTimer
-from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
+from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtGui import QCloseEvent, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QProgressBar, QPushButton, QVBoxLayout, QWidget,
 )
 
 import weblink
 from core import paths, updates
-from core.providers import Capability, detect_source
 from core.config import make_client
 from core.i18n import LANG_AUTO, N_, t
-from core.options import build_filter, build_options, flag, num
+from core.options import build_filter, build_options, flag
+from core.providers import Capability, detect_source
 from core.settings import DEFAULTS, save_settings
 from core.ui_state import UIState, load_ui_state, save_ui_state
-from luckytwitch_engine import EngineError, Job, clean_title, clip_cut_text, describe_chat_overlay, fmt_hms, make_plan
+from luckytwitch_engine import EngineError, Job, clean_title, fmt_hms, make_plan
 from qt_ui import dialogs, i18n_qt, notify
 from qt_ui.background_jobs import InfoRunner, SavedChatRunner, ToolsRunner, UpdateCheckRunner, UpdateDownloadRunner
 from qt_ui.bridge import Bridge
+from qt_ui.session_persistence import (
+    _CHANNEL_HANDLE_RE,
+    _CHANNEL_URL_RE,
+    _VOD_URL_RE,
+    RESERVED_TWITCH,
+    SessionPersistenceMixin,
+    extract_channel_input,
+    extract_vod_input,
+    is_valid_url,
+)
 from qt_ui.shell import CommandBar, NavRail, PageStack, ShortcutsDialog, VodStrip
 from qt_ui.tabs import BrowseTab, OptionsTab, PlanTab, QueueTab, SearchTab
 from qt_ui.theme import dark_titlebar
 from qt_ui.titlebar import CustomTitleBar
 from qt_ui.twitch_dialog import TwitchDialog
+from qt_ui.update_controller import UpdateControllerMixin
+from qt_ui.watchlist_controller import WatchlistControllerMixin
 
 WINDOW_TITLE = "LuckyDownloader"
 START_SIZE = (1040, 860)
 MIN_SIZE = (950, 560)
 TAB_NAMES = (N_("Browse"), N_("Plan"), N_("Options"), N_("Queue & log"))
 READY_TEXT = "Ready. Paste a VOD URL or ID and press «Get info»."
-
-_VOD_URL_RE = re.compile(r"(?:(?:https?://)?(?:www\.|m\.)?twitch\.tv/(?:videos/\d+|\w+/v/\d+)|luckydownloader://\S+|luckytwitch://\S+)", re.I)
-
-
-def extract_vod_input(text: str) -> str | None:
-    """Return a Twitch VOD URL / luckydownloader:// / luckytwitch:// link / numeric VOD ID from ``text``, or None."""
-    s = (text or "").strip()
-    if not s or "\n" in s or "\r" in s:
-        return None
-    m = _VOD_URL_RE.search(s)
-    if m:
-        url = m.group(0)
-        if url.lower().startswith(("twitch.tv", "www.twitch.tv", "m.twitch.tv")):
-            url = f"https://{url}"
-        return url
-    if s.isdigit() and 7 <= len(s) <= 12:
-        return s
-    return None
-
-
-_CHANNEL_URL_RE = re.compile(r"^(?:https?://)?(?:www\.|m\.)?twitch\.tv/([a-zA-Z0-9_]{3,30})(?:[/?#].*)?$", re.I)
-_CHANNEL_HANDLE_RE = re.compile(r"^@?([a-zA-Z0-9_]{3,30})$")
-RESERVED_TWITCH = {"videos", "video", "directory", "p", "settings", "inventory", "downloads", "subscriptions", "wallet"}
-
-
-def extract_channel_input(text: str) -> str | None:
-    """Return a Twitch channel/streamer name if text looks like a handle or channel URL, else None."""
-    s = (text or "").strip()
-    if not s or "\n" in s or "\r" in s or extract_vod_input(s):
-        return None
-    m_url = _CHANNEL_URL_RE.match(s)
-    if m_url:
-        user = m_url.group(1).lower()
-        if user not in RESERVED_TWITCH:
-            return user
-    m_handle = _CHANNEL_HANDLE_RE.match(s)
-    if m_handle:
-        user = m_handle.group(1).lower()
-        if not user.isdigit():
-            return user
-    return None
-
-
-def is_valid_url(text: str) -> bool:
-    """Return True if text is a valid web URL or VOD ID, else False."""
-    s = (text or "").strip()
-    if not s or "\n" in s or "\r" in s:
-        return False
-    if s.isdigit():
-        return True
-    if extract_vod_input(s):
-        return True
-    if s.lower().startswith(("http://", "https://", "luckydownloader://", "luckytwitch://")):
-        try:
-            parsed = urlsplit(s)
-            return bool(parsed.scheme and parsed.netloc and " " not in s)
-        except Exception:
-            return False
-    if "." in s and "/" in s and " " not in s:
-        try:
-            parsed = urlsplit(f"https://{s}")
-            return bool(parsed.netloc and "." in parsed.netloc)
-        except Exception:
-            return False
-    return False
 
 
 def _weak(method):
@@ -127,11 +70,17 @@ def _tab_text(name: str) -> str:
     return t(name).replace("&", "&&")
 
 
-class MainWindow(QMainWindow):
+class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistControllerMixin, QMainWindow):
     """``client`` is the Twitch client (or None when nobody is signed in): without one the app starts on the Plan
     tab, as the tkinter app does. ``settings`` is the dict from ``core.settings.load_settings()``."""
 
-    def __init__(self, bridge: Bridge | None = None, settings: dict | None = None, client=None, show_welcome: bool | None = None):
+    def __init__(
+        self,
+        bridge: Bridge | None = None,
+        settings: dict | None = None,
+        client=None,
+        show_welcome: bool | None = None,
+    ):
         super().__init__()
         self.bridge = bridge if bridge is not None else Bridge(self)
         self.settings = settings if settings is not None else {}
@@ -142,7 +91,10 @@ class MainWindow(QMainWindow):
         has_saved = ui_path.is_file()
         self._ui_state = load_ui_state(ui_path)
         # the language must be active before any widget is built, so every t() below is already in it
-        i18n_qt.apply_language((getattr(self._ui_state, "language", None) or LANG_AUTO) if has_saved else LANG_AUTO, announce=False)
+        i18n_qt.apply_language(
+            (getattr(self._ui_state, "language", None) or LANG_AUTO) if has_saved else LANG_AUTO,
+            announce=False,
+        )
         self._login_dialog: TwitchDialog | None = None
         self._shortcuts_dialog: ShortcutsDialog | None = None
         self._last_clipboard_offer: str = ""
@@ -364,6 +316,7 @@ class MainWindow(QMainWindow):
         i18n_qt.language_bus().changed.connect(self.refresh_language)
         self._setup_shortcuts()
         self._restore_ui_state()
+        self._restore_queue_state()
         self.start_link_listener()
         self.set_status(t("Ready. Paste a VOD URL or ID and press «Get info»."))
         dark_titlebar(self)
@@ -387,7 +340,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "tab_browse") and hasattr(self.tab_browse, "refresh_language"):
             self.tab_browse.refresh_language()
 
-    # ---------------------------- keyboard & UI state (B8, B9) ---------------------------- #
+    # ---------------------------- keyboard & window events ---------------------------- #
     def _setup_shortcuts(self) -> None:
         self.shortcuts: dict[str, QShortcut] = {}
 
@@ -412,7 +365,6 @@ class MainWindow(QMainWindow):
         if self.tabs.currentWidget() is self.tab_plan:
             self.add_to_queue(start=start)
 
-    
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
         if getattr(self, "frame_controller", None) is not None:
@@ -446,42 +398,6 @@ class MainWindow(QMainWindow):
                 return True, result
         return super().nativeEvent(event_type, message)
 
-    def show_welcome_overlay(self):
-        if getattr(self, "welcome_overlay", None) is not None:
-            self.welcome_overlay.raise_()
-            self.welcome_overlay.show()
-            return self.welcome_overlay
-
-        from core.settings import DEFAULTS
-        out_dir = self.settings.get("out_dir", DEFAULTS["out_dir"])
-        container = self.settings.get("container", DEFAULTS["container"])
-        from qt_ui.welcome.overlay import WelcomeOverlay
-        overlay = WelcomeOverlay(
-            initial_out_dir=out_dir,
-            initial_container=container,
-            is_signed_in=bool(self.client),
-            parent=self,
-        )
-        overlay.setGeometry(0, 0, self.width(), self.height())
-        overlay.finished.connect(self._on_welcome_finished)
-        overlay.signin_requested.connect(self.ask_credentials)
-        self.welcome_overlay = overlay
-        overlay.show()
-        overlay.raise_()
-        if getattr(self, "title_bar", None) is not None:
-            self.title_bar.raise_()
-        return overlay
-
-    def _on_welcome_finished(self, out_dir: str, container: str) -> None:
-        self.settings["out_dir"] = out_dir
-        self.settings["container"] = container
-        from core.settings import save_settings
-        save_settings(self.settings)
-        if hasattr(self, "_ui_state"):
-            self._ui_state.has_completed_onboarding = True
-            self._save_ui_state()
-        self.welcome_overlay = None
-
     def focus_vod_bar(self) -> None:
         self.vod_entry.setFocus()
         self.vod_entry.selectAll()
@@ -493,145 +409,6 @@ class MainWindow(QMainWindow):
         self._shortcuts_dialog = ShortcutsDialog(self)
         self._shortcuts_dialog.open()
         return self._shortcuts_dialog
-
-    def _restore_ui_state(self) -> None:
-        ui_path = getattr(paths, "UI_STATE_PATH", paths.DATA_DIR / "luckytwitch_ui.json")
-        has_saved = ui_path.is_file()
-        state = load_ui_state(ui_path)
-        self._ui_state = state
-        setting = (getattr(state, "language", None) or LANG_AUTO) if has_saved else LANG_AUTO
-        i18n_qt.apply_language(setting, announce=False)
-        self.refresh_language()
-        if hasattr(self, "tab_options") and hasattr(self.tab_options, "select_language_setting"):
-            self.tab_options.select_language_setting(setting)
-        self.rail.set_expanded(state.rail_expanded, animate=False)
-        if has_saved:
-            w = max(state.window_w, MIN_SIZE[0])
-            h = max(state.window_h, MIN_SIZE[1])
-            self.resize(w, h)
-            if state.window_x is not None and state.window_y is not None:
-                from PySide6.QtGui import QGuiApplication
-                screens = QGuiApplication.screens()
-                on_screen = any(
-                    s.availableGeometry().intersects(QRect(state.window_x, state.window_y, w, h))
-                    for s in screens
-                ) if screens else True
-                if on_screen:
-                    self.move(state.window_x, state.window_y)
-            if getattr(state, "window_maximized", False):
-                self.showMaximized()
-                if getattr(self, "title_bar", None) is not None:
-                    self.title_bar.update_maximized_state(True)
-        if self.client is None:
-            if has_saved and state.active_tab in (*TAB_NAMES, "Search") and state.active_tab not in ("Browse", "Search"):
-                self.tabs.setCurrentIndex(TAB_NAMES.index(state.active_tab))
-            else:
-                self.tabs.setCurrentWidget(self.tab_plan)
-
-        import os
-        should_welcome = (
-            self._show_welcome is True
-            or (self._show_welcome is None and not state.has_completed_onboarding and not os.environ.get("PYTEST_CURRENT_TEST"))
-        )
-        if should_welcome:
-            self.show_welcome_overlay()
-
-    def _save_ui_state(self) -> None:
-        idx = self.tabs.currentIndex()
-        active_name = TAB_NAMES[idx] if 0 <= idx < len(TAB_NAMES) else "Plan"
-        has_onboard = self._ui_state.has_completed_onboarding if hasattr(self, "_ui_state") else False
-        is_max = self.isMaximized()
-        geom = self.normalGeometry() if is_max else self.geometry()
-        state = UIState(
-            window_x=geom.x(),
-            window_y=geom.y(),
-            window_w=geom.width(),
-            window_h=geom.height(),
-            window_maximized=is_max,
-            active_tab=active_name,
-            rail_expanded=self.rail.expanded,
-            has_completed_onboarding=has_onboard,
-            custom_titlebar=self.use_custom_titlebar,
-            language=i18n_qt.current_setting(),
-        )
-        save_ui_state(state)
-
-    # ---------------------------- drag & drop / clipboard (B2) ---------------------------- #
-    def dragEnterEvent(self, event) -> None:  # noqa: N802
-        mime = event.mimeData()
-        if mime is not None and (mime.hasUrls() or mime.hasText()):
-            event.acceptProposedAction()
-            return
-        super().dragEnterEvent(event)
-
-    def dropEvent(self, event) -> None:  # noqa: N802
-        mime = event.mimeData()
-        if mime is None:
-            return
-        raw = ""
-        if mime.hasUrls() and mime.urls():
-            raw = mime.urls()[0].toString()
-        elif mime.hasText():
-            raw = mime.text()
-        raw = raw.strip()
-        if not raw:
-            return
-        event.acceptProposedAction()
-        if raw.lower().startswith(("luckydownloader://", "luckytwitch://")):
-            self.open_link(raw)
-            return
-
-        vod = extract_vod_input(raw)
-        channel = extract_channel_input(raw)
-        if vod:
-            self.vod_entry.setText(vod)
-            self.on_get_info()
-        elif channel:
-            self.vod_entry.setText(channel)
-            self.on_get_info()
-        elif is_valid_url(raw):
-            self.vod_entry.setText(raw)
-            self.on_get_info()
-        else:
-            self.set_status(t("Please drop a valid video URL, a VOD ID, or a streamer name."))
-            dialogs.warning(
-                self,
-                t("Invalid input"),
-                t("The dropped text is not a valid video URL, a VOD ID, or a streamer name."),
-            )
-
-    def paste_vod_from_clipboard(self) -> None:
-        clip = QApplication.clipboard()
-        if clip is None:
-            return
-        text = clip.text().strip()
-        if not text:
-            return
-        vod = extract_vod_input(text) or text
-        self.vod_entry.setText(vod)
-        self.vod_entry.setFocus()
-        if extract_vod_input(text):
-            self.on_get_info()
-
-    def check_clipboard_for_vod(self) -> bool:
-        """If the VOD entry is empty and a new Twitch VOD link is on the clipboard, offer a one-click toast."""
-        if self.vod_entry.text().strip() or self.source is not None:
-            return False
-        clip = QApplication.clipboard()
-        if clip is None:
-            return False
-        raw = clip.text().strip()
-        vod = extract_vod_input(raw)
-        if not vod or not vod.lower().startswith("http") or vod == self._last_clipboard_offer:
-            return False
-        self._last_clipboard_offer = vod
-
-        def _load() -> None:
-            self.vod_entry.setText(vod)
-            self.on_get_info()
-
-        notify.info(self, t("Twitch VOD in clipboard"), vod, action=(t("Load VOD"), _load))
-        return True
 
     def event(self, event) -> bool:
         if event.type() == QEvent.Type.WindowActivate:
@@ -654,13 +431,6 @@ class MainWindow(QMainWindow):
         if getattr(self, "welcome_overlay", None) is not None:
             self.welcome_overlay.set_signed_in(value is not None)
         self.update_search_state()
-
-    def get_client(self):
-        return self.client
-
-    def reload_client(self) -> None:
-        """A saved session expired: make the client again from what is saved (the Search tab asks for this)."""
-        self.client = make_client()
 
     def output_dir(self) -> str:
         return self.settings.get("out_dir", "")
@@ -688,11 +458,6 @@ class MainWindow(QMainWindow):
     def show_queue_tab(self) -> None:
         self.tabs.setCurrentWidget(self.tab_queue)
 
-    def update_search_state(self) -> None:
-        tab = getattr(self, "tab_search", None)
-        if tab is not None:
-            tab.update_search_state()
-
     def _sync_queue_badge(self, *_args) -> None:
         if hasattr(self, "rail") and hasattr(self, "tab_queue"):
             self.rail.set_queue_count(len(self.tab_queue.items))
@@ -719,24 +484,6 @@ class MainWindow(QMainWindow):
                 animate_opacity(
                     self.activity_pill, 1.0, 0.0, DURATION_FAST,
                     on_finished=lambda: self.activity_pill.setVisible(False),
-                )
-
-    def _set_update_pill_visible(self, visible: bool) -> None:
-        from qt_ui.motion import DURATION_FAST, Motion, animate_opacity
-
-        if not Motion.enabled() or not self.isVisible():
-            self.update_pill.setVisible(visible)
-            return
-
-        if visible:
-            if not self.update_pill.isVisible():
-                self.update_pill.setVisible(True)
-                animate_opacity(self.update_pill, 0.0, 1.0, DURATION_FAST)
-        else:
-            if self.update_pill.isVisible():
-                animate_opacity(
-                    self.update_pill, 1.0, 0.0, DURATION_FAST,
-                    on_finished=lambda: self.update_pill.setVisible(False),
                 )
 
     def set_progress(self, frac: float, text: str) -> None:
@@ -847,7 +594,9 @@ class MainWindow(QMainWindow):
         if self.source:
             self.source.title = new_title
             extra = f" \u00b7 {len(self.clips)} clips" if self.clips_loaded else ""
-            self.info_label.setText(f"{self.source.uploader} \u00b7 {new_title} \u00b7 {fmt_hms(self.source.duration)} \u00b7 {self.source.date}{extra}")
+            self.info_label.setText(
+                f"{self.source.uploader} \u00b7 {new_title} \u00b7 {fmt_hms(self.source.duration)} \u00b7 {self.source.date}{extra}"
+            )
             self.vod_strip.title_label.setText(new_title or f"VOD {getattr(self.source, 'vod_id', '')}")
             self.tab_options.refresh_name_examples()
 
@@ -888,168 +637,6 @@ class MainWindow(QMainWindow):
     def _on_plan_strategy_changed(self, _value: str) -> None:
         self.tab_options.binder.reload()
         self.tab_options.refresh_changed_markers()
-
-    # ---------------------------- tools (yt-dlp / ffmpeg) ---------------------------- #
-    def start_tools_setup(self, force: bool = False) -> None:
-        """Download missing tools / update yt-dlp in the background (``luckytwitch_qt.main`` calls this at start)."""
-        if self.tools_busy:
-            return
-        self.tools_busy = True
-        self.info_btn.setEnabled(False)
-        self.tab_options.set_tools_running(True)
-        self.set_status(t("Preparing tools (yt-dlp, ffmpeg)…"))
-        update = force or flag(self.settings, "auto_update")
-        self.tools_ctx = self.tools_runner.start(update, force)
-
-    def update_tools_now(self) -> None:
-        if self.tab_queue.runner.is_running():
-            dialogs.info(self, t("Running"), t("Wait for the running job to finish (or cancel it) first."))
-            return
-        self.start_tools_setup(force=True)
-
-    def on_tools_done(self, error: str) -> None:
-        self.tools_busy = False
-        self.tools_ctx = None
-        self.info_btn.setEnabled(True)
-        self.tab_options.set_tools_running(False)
-        self.set_progress(0, "")
-        if error:
-            self.log(f"Tools: {error}")
-            self.set_status(t("Some tools are missing. See the log."))
-            dialogs.warning(self, t("Tools"), error)
-        else:
-            self.set_status(t("Ready. Paste a VOD URL or ID and press «Get info»."))
-            if getattr(self, "_pending_retry_url", None):
-                retry_url = self._pending_retry_url
-                self._pending_retry_url = None
-                self.vod_entry.setText(retry_url)
-                self.on_get_info()
-
-    # ---------------------------- LuckyTwitch updates ---------------------------- #
-    def start_update_check(self, force: bool = False, manual: bool | None = None) -> None:
-        """Start background check for application updates on GitHub."""
-        if manual is not None:
-            force = manual
-
-        if not force:
-            if not self.settings.get("check_app_updates", True):
-                return
-            if not updates.is_valid_app_version(paths.BUNDLED_VERSION):
-                return
-        if self.tab_queue.runner.is_running() or self.tools_busy:
-            if force:
-                notify.info(self, t("Check updates"), t("Cannot check for updates while downloads or tools are busy."))
-            return
-
-        self._checking_updates_manually = force
-        self.update_check_runner.start(force=force)
-
-    def on_update_checked(self, info, error: str) -> None:
-        manual = self._checking_updates_manually
-        self._checking_updates_manually = False
-
-        self.tab_options.refresh_app_update_state()
-
-        if error:
-            self.log(f"Updates: could not check: {error}")
-            if manual:
-                notify.info(self, t("Check updates"), t("Could not check for updates: {error}", error=error))
-            return
-
-        if info:
-            self._update_info = info
-            state = updates.load_state()
-            is_skipped = state.get("skipped_tag") == info.tag
-            if not is_skipped:
-                self.update_pill.setText(t("● Update available · {version}", version=info.tag))
-                self._set_update_pill_visible(True)
-                if state.get("notified_tag") != info.tag:
-                    state["notified_tag"] = info.tag
-                    updates.save_state(state)
-                    cur = paths.BUNDLED_VERSION or "current version"
-                    notify.info(
-                        self, t("Update available"),
-                        t("LuckyDownloader {version} is out (you have {current}).", version=info.tag, current=cur),
-                        action=(t("View update"), lambda: self.open_update_dialog(info)),
-                        duration_ms=12000,
-                    )
-            else:
-                self._set_update_pill_visible(False)
-            if manual:
-                self.open_update_dialog(info)
-        else:
-            self._set_update_pill_visible(False)
-            if manual:
-                cur = paths.BUNDLED_VERSION or "current version"
-                notify.info(self, t("Up to date"), t("LuckyDownloader is up to date ({version}).", version=cur))
-
-    def open_update_dialog(self, info=None) -> None:
-        target = info or self._update_info
-        if not target:
-            from core import updates
-            state = updates.load_state()
-            cached = state.get("cached")
-            target = updates.UpdateInfo.from_dict(cached) if cached else None
-        if not target:
-            return
-        from qt_ui.update_dialog import UpdateDialog
-        dlg = UpdateDialog(target, host=self, parent=self)
-        dlg.exec()
-
-    def on_update_skipped(self, tag: str) -> None:
-        self._set_update_pill_visible(False)
-
-    # ---------------------------- the overlay of a saved chat ---------------------------- #
-    def render_saved_chat(self) -> None:
-        """Options → Chat → «Draw the overlay from a saved chat»: pick a «.chat.json», confirm, draw it (no download)."""
-        if self.tab_queue.runner.is_running() or self.tools_busy or self.saved_chat_busy:
-            dialogs.info(self, t("Busy"), t("Wait for the running job (or the tools setup) to finish first."))
-            return
-        opts = self.build_options()
-        folder = Path(opts.out_dir)
-        path = dialogs.open_file(self, t("Choose a saved chat (.chat.json)"), str(folder) if folder.is_dir() else "",
-                                 t("Chat files (*.json);;All files (*.*)"))
-        if not path:
-            return
-        chat = Path(path)
-        try:
-            summary = describe_chat_overlay(chat, opts)
-        except EngineError as e:
-            dialogs.error(self, t("Chat overlay"), str(e))
-            return
-        if not dialogs.ask_ok_cancel(self, t("Draw the chat overlay?"), summary + "\n\n" + t("It can take a while for a long chat.")):
-            return
-        self.start_saved_chat_render(chat, opts)
-
-    def start_saved_chat_render(self, chat: Path, opts) -> None:
-        self.saved_chat_busy = True
-        self.tab_queue.set_running(True)  # «Start queue» off, «Cancel current» on (the log and the button live there)
-        self.tab_options.set_saved_chat_running(True)
-        self.show_queue_tab()
-        self.set_status(t("Chat overlay…"))
-        self.saved_chat_ctx = self.saved_chat_runner.start(chat, opts)
-
-    def cancel_saved_chat(self) -> bool:
-        """«Cancel current» while an overlay is being drawn. False when there is none."""
-        if self.saved_chat_ctx is None:
-            return False
-        self.saved_chat_ctx.cancel()
-        return True
-
-    def on_saved_chat_done(self, out: str, error: str) -> None:
-        self.saved_chat_busy = False
-        self.saved_chat_ctx = None
-        self.tab_queue.set_running(False)
-        self.tab_options.set_saved_chat_running(False)
-        self.set_progress(0, "")
-        if error:
-            cancelled = error == "Cancelled."
-            self.log("Cancelled." if cancelled else f"Chat overlay: {error}")
-            self.set_status(t("Chat overlay cancelled.") if cancelled else t("Chat overlay failed. See the log."))
-            if not cancelled:
-                dialogs.error(self, t("Chat overlay"), error)
-        else:
-            self.set_status(t("Chat overlay ready: {file}", file=Path(out).name))
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 (Qt name)
         if self.tools_ctx:
@@ -1168,7 +755,9 @@ class MainWindow(QMainWindow):
         if not has_timeline:
             self.tab_plan.update_generic_card(info)
         extra = f" \u00b7 {len(self.clips)} clips" if loaded else ""
-        self.info_label.setText(f"{info.uploader} \u00b7 {info.title} \u00b7 {fmt_hms(info.duration)} \u00b7 {info.date}{extra}")
+        self.info_label.setText(
+            f"{info.uploader} \u00b7 {info.title} \u00b7 {fmt_hms(info.duration)} \u00b7 {info.date}{extra}"
+        )
         self.vod_strip.set_vod(info, self.clips if loaded else [], warn)
         if not self.cut_text() and has_timeline:
             self.tab_plan.set_cut_text("0:00:00 - end")
@@ -1182,31 +771,12 @@ class MainWindow(QMainWindow):
             self.set_status(t("Video loaded. Choose your options and add it to the queue."))
         if self._info_from_link is not None:
             what = f" ({self._info_from_link})" if self._info_from_link else ""
-            self.set_status(t("VOD opened from a link{details}. Check the cut points, then add it to the queue.", details=what))
+            self.set_status(
+                t("VOD opened from a link{details}. Check the cut points, then add it to the queue.", details=what)
+            )
             self._info_from_link = None
         if warn:
             self.log(warn)
-
-    def _handle_playlist_loaded(self, pl: PlaylistInfo) -> None:
-        from qt_ui.playlist_dialog import PlaylistPickerDialog
-        dlg = PlaylistPickerDialog(pl, settings=self.settings, parent=self)
-        if dlg.exec():
-            jobs = dlg.build_jobs()
-            if not jobs:
-                return
-            for job in jobs:
-                label = f"{job.source.uploader or job.source.site} · {job.source.title}"[:70]
-                self.tab_queue.enqueue(job, label, 1, "full video")
-            self._sync_queue_badge()
-            self.set_status(t("Added {count} playlist items to queue.", count=len(jobs)))
-            notify.success(
-                self,
-                t("Playlist queued"),
-                t("Added {count} videos from «{title}».", count=len(jobs), title=pl.title),
-                action=(t("Go to Queue"), self.show_queue_tab),
-            )
-        else:
-            self.set_status(t("Playlist selection cancelled."))
 
     def on_info_error(self, msg: str) -> None:
         self._info_from_link = None
@@ -1312,130 +882,3 @@ class MainWindow(QMainWindow):
             msg = t("Added to queue ({count} item(s)).", count=len(self.tab_queue.items))
             self.set_status(msg)
             notify.success(self, t("Added to queue"), label, action=(t("Go to Queue"), self.show_queue_tab))
-
-    def download_clips(self) -> None:
-        """Queue each selected clip as its own download (just that clip, named after the clip)."""
-        sel = self.tab_plan.selected_clip_rows()
-        if not sel:
-            dialogs.info(self, t("Select a clip"), t("Select a clip in the table first."))
-            return
-        if not self.source:
-            dialogs.info(self, t("No VOD"), t("Press «Get info» first."))
-            return
-        base = self.build_options()
-        before = num(self.settings, "clip_pad_before", float, 3)
-        after = num(self.settings, "clip_pad_after", float, 3)
-        added = 0
-        thumb = self._current_vod_thumb()
-        for row in sel:
-            clip = self.clips[row]
-            title = clip.get("title") or t("Clip")
-            try:
-                cut = clip_cut_text(clip, self.source.duration, before, after)
-                opts = replace(
-                    base, cut_text=cut, strategy="sections", chapters=False, keep_full=False, sidecar=False,
-                    premiere_xml=False, premiere_plugin=False, game_markers=False, muted_markers=False, chat=False,
-                    chat_render=False,
-                )
-                make_plan(opts.cut_text, self.source.duration, opts.strategy, opts.full_threshold)
-            except EngineError as e:
-                dialogs.warning(self, t("Clip"), f"«{title}»: {e}")
-                continue
-            job = Job(self.source, opts, single_clip=clip)
-            label = f"{self.source.uploader} \u00b7 Clip: {title}"[:70]
-            self.tab_queue.enqueue(job, label, 1, "only the clip", thumb=thumb)
-            added += 1
-        if added:
-            self._sync_queue_badge()
-            if self.settings:
-                save_settings(self.settings)
-            self.set_status(t("Added {clips} clip(s) to the queue ({items} item(s)). Open «Queue & log» and press «Start queue».", clips=added, items=len(self.tab_queue.items)))
-            notify.success(
-                self, t("Clips added"), t("Added {n} clip(s) to the queue.", n=added),
-                action=(t("Go to Queue"), self.show_queue_tab),
-            )
-
-    # ---------------------------- luckytwitch:// links ---------------------------- #
-    def start_link_listener(self) -> None:
-        """Poll ``LINKS_DIR`` every 500 ms and touch ``BEAT_PATH`` about every two seconds (first beat right away)."""
-        self.poll_links()
-        self._link_timer.start()
-
-    def poll_links(self) -> None:
-        try:
-            self._link_tick += 1
-            if self._link_tick % 4 == 1:  # about every two seconds
-                weblink.beat(paths.BEAT_PATH)
-            for text in weblink.take_links(paths.LINKS_DIR):
-                self.open_link(text)
-        except Exception as e:  # noqa: BLE001 - never let a bad link stop the loop that watches for the next one
-            self.log(f"Links: {e}")
-
-    def bring_to_front(self) -> None:
-        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
-        self.show()
-        self.raise_()
-        self.activateWindow()
-
-    def _retry_link(self) -> None:
-        if self._link_retry_args is not None:
-            text, waits = self._link_retry_args
-            self._link_retry_args = None
-            self.open_link(text, waits)
-
-    def open_link(self, text: str, waits: int = 0) -> None:
-        """Fill in the Plan tab from a ``luckytwitch://`` link and read the VOD. Never queues or starts anything."""
-        try:
-            req = weblink.parse_link(text)
-        except weblink.LinkError as e:
-            self.bring_to_front()
-            self.log(f"Link not opened: {e}")
-            dialogs.warning(self, t("Link"), str(e))
-            return
-        self.bring_to_front()
-        if self.tools_busy or self._info_busy:
-            if waits >= 180:
-                self.log("Link not opened: the app stayed busy for too long.")
-                dialogs.warning(self, t("Link"), t("The app was busy for too long to open that link. Try it again."))
-                return
-            self.set_status(t("The link will open in a moment…"))
-            self._link_retry_args = (text, waits + 1)
-            self._link_retry_timer.start()
-            return
-        self.tabs.setCurrentWidget(self.tab_plan)
-        # forget the VOD that was loaded: if reading the new one fails, its cut points must not be applied to the old one
-        self.source, self.clips, self.clips_loaded = None, [], False
-        self.command_bar.show_no_vod()
-        self.vod_entry.setText(req.url)
-        self.tab_plan.set_cut_text(req.cuts or "")
-        self.update_preview()
-        self.refresh_clips()
-        self.tab_options.refresh_name_examples()
-        self.log(f"Link: {req.url}" + (f" ({req.label})" if req.label else "") + (f", cut points: {req.cuts}" if req.cuts else ""))
-        self._link_pending = req.label
-        from core.providers.detect import detect_provider
-        if detect_provider(req.url).site != "generic":
-            self.on_get_info()
-
-    def use_vod(self, url: str) -> None:
-        """«Use this VOD» in the Search tab: the link goes into the entry, the Plan tab opens, «Get info» runs."""
-        self.vod_entry.setText(url)
-        self.tabs.setCurrentWidget(self.tab_plan)
-        self.on_get_info()
-
-    def open_history_dialog(self) -> None:
-        from qt_ui.dialogs import HistoryDialog
-        dlg = HistoryDialog(self)
-        dlg.vod_requested.connect(self.use_vod)
-        dlg.exec()
-
-    def load_vod_from_url(self, url: str) -> None:
-        self.use_vod(url)
-
-    def ask_credentials(self) -> None:
-        """The Twitch API dialog (modal; this returns at once, like the tkinter one)."""
-        if self._login_dialog is not None:
-            self._login_dialog.close()
-            self._login_dialog.deleteLater()
-        self._login_dialog = TwitchDialog(self, self)
-        self._login_dialog.open()

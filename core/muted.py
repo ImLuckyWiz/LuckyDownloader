@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 
 import requests
 
+from core.runtime import resolve_dep
 from core.timeline import Range
 
 # User-Agent for HLS playlist requests
@@ -87,13 +88,15 @@ def muted_from_playlist_url(url: str, duration: float | None = None) -> list[Ran
         return None
 
 
+_ORIG_MUTED_FROM_PLAYLIST_URL = muted_from_playlist_url
+
+
 def fetch_muted_ranges(formats, duration: float | None = None) -> list[Range] | None:
     """The muted stretches of a VOD from yt-dlp's format list: [] = none, None = could not be told."""
     url = pick_playlist_url(formats)
     if not url:
         return None
-    import luckytwitch_engine
-    fn = getattr(luckytwitch_engine, "muted_from_playlist_url", muted_from_playlist_url)
+    fn = resolve_dep("muted_from_playlist_url", _ORIG_MUTED_FROM_PLAYLIST_URL, muted_from_playlist_url)
     return fn(url, duration)
 
 

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-04 03:12-0300\n"
+"POT-Creation-Date: 2026-11-04 04:54-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -13,7 +13,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: tools/i18n.py (Babel)\n"
 
-#: core/chapters.py qt_ui/tabs/plan.py
+#: core/chapters.py qt_ui/tabs/plan_storyboard.py
 msgid "That clip has no position in the VOD."
 msgstr ""
 
@@ -626,13 +626,17 @@ msgstr ""
 msgid "Search"
 msgstr ""
 
-#: qt_ui/background_jobs.py qt_ui/main_window.py
+#: qt_ui/background_jobs.py qt_ui/watchlist_controller.py
 msgid "Chat overlay"
 msgstr ""
 
 #: qt_ui/background_jobs.py
 #, python-brace-format
 msgid "Downloading {tag}"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "About LuckyDownloader"
 msgstr ""
 
 #: qt_ui/dialogs.py
@@ -660,11 +664,39 @@ msgid "Copy details"
 msgstr ""
 
 #: qt_ui/dialogs.py
+#, python-brace-format
+msgid "Could not export diagnostics bundle: {error}"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Diagnostics Exported"
+msgstr ""
+
+#: qt_ui/dialogs.py
+#, python-brace-format
+msgid ""
+"Diagnostics bundle successfully saved to:\n"
+"{path}"
+msgstr ""
+
+#: qt_ui/dialogs.py
 msgid "Download History"
 msgstr ""
 
 #: qt_ui/dialogs.py
 msgid "Downloaded"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Export Diagnostics Bundle"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Export Diagnostics…"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Export Failed"
 msgstr ""
 
 #: qt_ui/dialogs.py
@@ -683,12 +715,25 @@ msgstr ""
 msgid "Load"
 msgstr ""
 
+#: qt_ui/dialogs.py qt_ui/welcome/overlay.py
+msgid "LuckyDownloader"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Modern Twitch VOD & clip downloader, cutter, chat archiver, and Premiere Pro exporter."
+msgstr ""
+
 #: qt_ui/dialogs.py
 msgid "No downloads yet"
 msgstr ""
 
 #: qt_ui/dialogs.py qt_ui/queue_model.py
 msgid "Parts"
+msgstr ""
+
+#: qt_ui/dialogs.py
+#, python-brace-format
+msgid "Python {py} · {os} {release}"
 msgstr ""
 
 #: qt_ui/dialogs.py qt_ui/tabs/options.py
@@ -707,8 +752,13 @@ msgstr ""
 msgid "Streamer"
 msgstr ""
 
-#: qt_ui/dialogs.py qt_ui/playlist_dialog.py qt_ui/search_models.py qt_ui/tabs/plan.py
+#: qt_ui/dialogs.py qt_ui/playlist_dialog.py qt_ui/search_models.py qt_ui/tabs/plan_storyboard.py
 msgid "Title"
+msgstr ""
+
+#: qt_ui/dialogs.py
+#, python-brace-format
+msgid "Version {ver}"
 msgstr ""
 
 #: qt_ui/dialogs.py
@@ -745,89 +795,15 @@ msgid "Added to queue ({count} item(s))."
 msgstr ""
 
 #: qt_ui/main_window.py
-#, python-brace-format
-msgid "Added {clips} clip(s) to the queue ({items} item(s)). Open «Queue & log» and press «Start queue»."
-msgstr ""
-
-#: qt_ui/main_window.py
-#, python-brace-format
-msgid "Added {count} playlist items to queue."
-msgstr ""
-
-#: qt_ui/main_window.py
-#, python-brace-format
-msgid "Added {count} videos from «{title}»."
-msgstr ""
-
-#: qt_ui/main_window.py
-#, python-brace-format
-msgid "Added {n} clip(s) to the queue."
-msgstr ""
-
-#: qt_ui/main_window.py
 msgid "All queued downloads have finished."
 msgstr ""
 
-#: qt_ui/main_window.py
+#: qt_ui/main_window.py qt_ui/session_persistence.py
 msgid "Browse"
 msgstr ""
 
-#: qt_ui/main_window.py qt_ui/update_dialog.py
-msgid "Busy"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Cannot check for updates while downloads or tools are busy."
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Chat files (*.json);;All files (*.*)"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Chat overlay cancelled."
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Chat overlay failed. See the log."
-msgstr ""
-
-#: qt_ui/main_window.py
-#, python-brace-format
-msgid "Chat overlay ready: {file}"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Chat overlay…"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Check updates"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Choose a saved chat (.chat.json)"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Clip"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Clips added"
-msgstr ""
-
-#: qt_ui/main_window.py
-#, python-brace-format
-msgid "Could not check for updates: {error}"
-msgstr ""
-
-#: qt_ui/main_window.py qt_ui/tabs/plan.py
+#: qt_ui/main_window.py qt_ui/tabs/plan.py qt_ui/tabs/plan_crop_controls.py
 msgid "Cut points"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Draw the chat overlay?"
 msgstr ""
 
 #: qt_ui/main_window.py qt_ui/twitch_dialog.py
@@ -846,16 +822,12 @@ msgstr ""
 msgid "Get info"
 msgstr ""
 
-#: qt_ui/main_window.py
+#: qt_ui/main_window.py qt_ui/session_persistence.py qt_ui/watchlist_controller.py
 msgid "Go to Queue"
 msgstr ""
 
-#: qt_ui/main_window.py
+#: qt_ui/main_window.py qt_ui/session_persistence.py
 msgid "Invalid input"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "It can take a while for a long chat."
 msgstr ""
 
 #: qt_ui/main_window.py
@@ -868,25 +840,7 @@ msgstr ""
 msgid "Job {n}/{total}: "
 msgstr ""
 
-#: qt_ui/main_window.py
-msgid "Link"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Load VOD"
-msgstr ""
-
-#: qt_ui/main_window.py
-#, python-brace-format
-msgid "LuckyDownloader is up to date ({version})."
-msgstr ""
-
-#: qt_ui/main_window.py
-#, python-brace-format
-msgid "LuckyDownloader {version} is out (you have {current})."
-msgstr ""
-
-#: qt_ui/main_window.py qt_ui/tabs/plan.py
+#: qt_ui/main_window.py qt_ui/tabs/plan_storyboard.py qt_ui/watchlist_controller.py
 msgid "No VOD"
 msgstr ""
 
@@ -898,43 +852,23 @@ msgstr ""
 msgid "Open folder"
 msgstr ""
 
-#: qt_ui/main_window.py
+#: qt_ui/main_window.py qt_ui/session_persistence.py
 msgid "Options"
 msgstr ""
 
-#: qt_ui/main_window.py qt_ui/tabs/plan.py
+#: qt_ui/main_window.py qt_ui/tabs/plan_crop_controls.py
 msgid "Paste a VOD and press «Get info» first."
 msgstr ""
 
-#: qt_ui/main_window.py
+#: qt_ui/main_window.py qt_ui/session_persistence.py
 msgid "Plan"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Playlist queued"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Playlist selection cancelled."
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Please drop a valid video URL, a VOD ID, or a streamer name."
 msgstr ""
 
 #: qt_ui/main_window.py
 msgid "Please enter a valid video URL, a VOD ID, or a streamer name."
 msgstr ""
 
-#: qt_ui/main_window.py
-msgid "Preparing tools (yt-dlp, ffmpeg)…"
-msgstr ""
-
-#: qt_ui/main_window.py qt_ui/tabs/plan.py
-msgid "Press «Get info» first."
-msgstr ""
-
-#: qt_ui/main_window.py
+#: qt_ui/main_window.py qt_ui/session_persistence.py
 msgid "Queue & log"
 msgstr ""
 
@@ -954,56 +888,16 @@ msgstr ""
 msgid "Reading VOD info…"
 msgstr ""
 
-#: qt_ui/main_window.py
+#: qt_ui/main_window.py qt_ui/update_controller.py
 msgid "Ready. Paste a VOD URL or ID and press «Get info»."
 msgstr ""
 
-#: qt_ui/main_window.py qt_ui/tabs/queue.py
+#: qt_ui/main_window.py qt_ui/tabs/queue.py qt_ui/update_controller.py
 msgid "Running"
-msgstr ""
-
-#: qt_ui/main_window.py qt_ui/tabs/plan.py
-msgid "Select a clip"
-msgstr ""
-
-#: qt_ui/main_window.py qt_ui/tabs/plan.py
-msgid "Select a clip in the table first."
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Some tools are missing. See the log."
 msgstr ""
 
 #: qt_ui/main_window.py
 msgid "Still preparing yt-dlp / ffmpeg, one moment…"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "The app was busy for too long to open that link. Try it again."
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "The dropped text is not a valid video URL, a VOD ID, or a streamer name."
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "The link will open in a moment…"
-msgstr ""
-
-#: qt_ui/main_window.py qt_ui/tabs/options.py
-msgid "Tools"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Twitch VOD in clipboard"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Up to date"
-msgstr ""
-
-#: qt_ui/main_window.py qt_ui/update_dialog.py
-msgid "Update available"
 msgstr ""
 
 #: qt_ui/main_window.py
@@ -1020,24 +914,7 @@ msgid "Video loaded. Choose your options and add it to the queue."
 msgstr ""
 
 #: qt_ui/main_window.py
-msgid "View update"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Wait for the running job (or the tools setup) to finish first."
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "Wait for the running job to finish (or cancel it) first."
-msgstr ""
-
-#: qt_ui/main_window.py
 msgid "Would you like to update yt-dlp now and try again?"
-msgstr ""
-
-#: qt_ui/main_window.py
-#, python-brace-format
-msgid "● Update available · {version}"
 msgstr ""
 
 #: qt_ui/playlist_dialog.py
@@ -1057,11 +934,12 @@ msgstr ""
 msgid "Apply"
 msgstr ""
 
-#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan_playlist_dialog.py
 msgid "Audio only"
 msgstr ""
 
-#: qt_ui/playlist_dialog.py qt_ui/tabs/options.py qt_ui/tabs/plan.py qt_ui/welcome/setup_card.py
+#: qt_ui/playlist_dialog.py qt_ui/tabs/options.py qt_ui/tabs/plan_playlist_dialog.py
+#: qt_ui/welcome/setup_card.py
 msgid "Browse…"
 msgstr ""
 
@@ -1073,15 +951,15 @@ msgstr ""
 msgid "Download options"
 msgstr ""
 
-#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan_storyboard.py
 msgid "Duration"
 msgstr ""
 
-#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan_playlist_dialog.py
 msgid "Folder:"
 msgstr ""
 
-#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan_playlist_dialog.py
 msgid "Format:"
 msgstr ""
 
@@ -1094,7 +972,8 @@ msgstr ""
 msgid "Playlist items — {title}"
 msgstr ""
 
-#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py qt_ui/tabs/plan_crop_controls.py
+#: qt_ui/tabs/plan_playlist_dialog.py
 msgid "Quality:"
 msgstr ""
 
@@ -1102,11 +981,11 @@ msgstr ""
 msgid "Range:"
 msgstr ""
 
-#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Select all"
 msgstr ""
 
-#: qt_ui/playlist_dialog.py qt_ui/tabs/plan.py
+#: qt_ui/playlist_dialog.py qt_ui/tabs/plan_playlist_dialog.py
 msgid "Select download folder"
 msgstr ""
 
@@ -1160,7 +1039,7 @@ msgstr ""
 msgid "Strategy"
 msgstr ""
 
-#: qt_ui/queue_model.py qt_ui/tabs/plan.py
+#: qt_ui/queue_model.py qt_ui/tabs/plan_playlist_dialog.py
 msgid "Video"
 msgstr ""
 
@@ -1198,7 +1077,7 @@ msgstr ""
 msgid "Length"
 msgstr ""
 
-#: qt_ui/search_models.py qt_ui/tabs/plan.py
+#: qt_ui/search_models.py qt_ui/tabs/plan_storyboard.py
 msgid "Views"
 msgstr ""
 
@@ -1213,6 +1092,43 @@ msgstr[1] ""
 msgid "✓ Downloaded"
 msgstr ""
 
+#: qt_ui/session_persistence.py
+msgid "Link"
+msgstr ""
+
+#: qt_ui/session_persistence.py
+msgid "Load VOD"
+msgstr ""
+
+#: qt_ui/session_persistence.py
+msgid "Please drop a valid video URL, a VOD ID, or a streamer name."
+msgstr ""
+
+#: qt_ui/session_persistence.py
+msgid "Queue restored"
+msgstr ""
+
+#: qt_ui/session_persistence.py
+#, python-brace-format
+msgid "Restored {count} unfinished download(s) from the previous session."
+msgstr ""
+
+#: qt_ui/session_persistence.py
+msgid "The app was busy for too long to open that link. Try it again."
+msgstr ""
+
+#: qt_ui/session_persistence.py
+msgid "The dropped text is not a valid video URL, a VOD ID, or a streamer name."
+msgstr ""
+
+#: qt_ui/session_persistence.py
+msgid "The link will open in a moment…"
+msgstr ""
+
+#: qt_ui/session_persistence.py
+msgid "Twitch VOD in clipboard"
+msgstr ""
+
 #: qt_ui/shell.py
 msgid "Add current VOD to queue and start (on Plan)"
 msgstr ""
@@ -1221,7 +1137,7 @@ msgstr ""
 msgid "Add current VOD to queue without starting (on Plan)"
 msgstr ""
 
-#: qt_ui/shell.py qt_ui/tabs/plan.py
+#: qt_ui/shell.py qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Clear"
 msgstr ""
 
@@ -1478,6 +1394,15 @@ msgstr ""
 
 #: qt_ui/tabs/options.py
 msgid "Choose chat file…"
+msgstr ""
+
+#: qt_ui/tabs/options.py
+msgid "Clean temporary files"
+msgstr ""
+
+#: qt_ui/tabs/options.py
+#, python-brace-format
+msgid "Cleaned {count} temporary folder(s)."
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -1835,7 +1760,12 @@ msgstr ""
 msgid "Redraws on every frame instead of 5 times a second. Slower."
 msgstr ""
 
-#: qt_ui/tabs/options.py qt_ui/tabs/plan.py qt_ui/widgets.py
+#: qt_ui/tabs/options.py
+msgid "Remove incomplete temporary download directories from the output folder."
+msgstr ""
+
+#: qt_ui/tabs/options.py qt_ui/tabs/plan.py qt_ui/tabs/plan_crop_controls.py
+#: qt_ui/tabs/plan_playlist_dialog.py qt_ui/widgets.py
 msgid "Reset"
 msgstr ""
 
@@ -1941,11 +1871,19 @@ msgid "Tail"
 msgstr ""
 
 #: qt_ui/tabs/options.py
+msgid "Temporary files"
+msgstr ""
+
+#: qt_ui/tabs/options.py
 msgid "Text size"
 msgstr ""
 
 #: qt_ui/tabs/options.py
 msgid "These links currently open another copy of LuckyTwitch. Press the button to use this one."
+msgstr ""
+
+#: qt_ui/tabs/options.py qt_ui/update_controller.py
+msgid "Tools"
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -2111,43 +2049,14 @@ msgid "{ver} · checked: {last}"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "   ·  {time} muted"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "  ({n} can't be placed: no offset)"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "  [chapters are OFF]"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid " · about {size}"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid " · {time} muted"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
 msgid "1. Paste a link or search a streamer   ·   2. Mark where to cut   ·   3. Add to queue"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-#, python-format
-msgid "100% of VOD"
 msgstr ""
 
 #: qt_ui/tabs/plan.py
 msgid "Add && start"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Add clips as chapters"
 msgstr ""
 
@@ -2155,150 +2064,52 @@ msgstr ""
 msgid "Add to queue"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid "At"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Auto"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_crop_controls.py
 #, python-brace-format
 msgid "Best available ({quality})"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid ""
-"Boundaries in order, e.g.  0:00:00 - 0:30:00 - 1:30:00 - end   (end = end of the VOD).   To skip "
-"a section use «;» or a new line:  0:00:00 - 0:30:00 ; 2:00:00 - end"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Can't split here"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Chapter"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Clips → chapters"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid "Cookies"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "Cookies ({browser})"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Creator"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Download only selected clip"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "Download {n} clip"
-msgid_plural "Download {n} clips"
-msgstr[0] ""
-msgstr[1] ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Each clip that passes the filter becomes a chapter."
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid "Fix the cut points to add this VOD"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Fix the cut points to add this video"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Full VOD + split"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Full video + split"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Invert"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Lead-in (s)"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid "Leave cut points blank to download the full video, or enter cut points above to trim."
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Min duration (s)"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Min views"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid ""
 "Needs the Twitch API sign-in (the «Twitch API…» button). Chapters are written into the video "
 "files; the Premiere Pro outputs (Options → Premiere Pro) have their own switches."
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid "No clips loaded (sign in with the Twitch API… button, optional)."
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "No offset"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "Only the parts"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Optional: put the VOD's clips in the files as chapters."
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_playlist_dialog.py
 msgid ""
 "Optional: write cut points to trim or split (e.g. 1:00 - 5:00 ; 12:00 - end). Leave blank for "
 "full video."
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "Part {n}:  {start} → {end}   ({duration})"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "Part {n}:  {start} → {end}   ({duration}){silenced}"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "Quality: {quality} · Audio only: saved as .m4a or .mp3 (Options). Video-only extras are skipped."
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "Quality: {quality}{size}"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_crop_controls.py
 msgid "Reset to original Twitch title"
 msgstr ""
 
@@ -2306,139 +2117,278 @@ msgstr ""
 msgid "Search streamers"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid "Select one clip"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Selection:"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "Send cookies from {browser} for this download"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "Skip Part {n}"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Split at selected clip"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid "Splitting works with a single clip: select just one."
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_crop_controls.py
 msgid "Strategy:"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_crop_controls.py
 msgid "Stream title…"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
-msgid "This VOD has no clips."
 msgstr ""
 
 #: qt_ui/tabs/plan.py
 msgid "Timeline"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_crop_controls.py qt_ui/tabs/plan_playlist_dialog.py
 msgid "Title:"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
 msgid "Top N (0 = all)"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid "Untitled clip"
+#: qt_ui/tabs/plan_crop_controls.py
+#, python-brace-format
+msgid "   ·  {time} muted"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid "Video details"
+#: qt_ui/tabs/plan_crop_controls.py
+#, python-brace-format
+msgid " · about {size}"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-msgid "Video title…"
+#: qt_ui/tabs/plan_crop_controls.py
+#, python-brace-format
+msgid " · {time} muted"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
+#, python-format
+msgid "100% of VOD"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+msgid "Auto"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+msgid ""
+"Boundaries in order, e.g.  0:00:00 - 0:30:00 - 1:30:00 - end   (end = end of the VOD).   To skip "
+"a section use «;» or a new line:  0:00:00 - 0:30:00 ; 2:00:00 - end"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+msgid "Fix the cut points to add this VOD"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+msgid "Fix the cut points to add this video"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+msgid "Full VOD + split"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+msgid "Full video + split"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+msgid "Leave cut points blank to download the full video, or enter cut points above to trim."
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+msgid "Only the parts"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+#, python-brace-format
+msgid "Part {n}:  {start} → {end}   ({duration})"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+#, python-brace-format
+msgid "Part {n}:  {start} → {end}   ({duration}){silenced}"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+#, python-brace-format
+msgid "Quality: {quality} · Audio only: saved as .m4a or .mp3 (Options). Video-only extras are skipped."
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+#, python-brace-format
+msgid "Quality: {quality}{size}"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
+#, python-brace-format
+msgid "Skip Part {n}"
+msgstr ""
+
+#: qt_ui/tabs/plan_crop_controls.py
 msgid "Write the cut points above (press «Get info» first so «end» works)."
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "by {creator}"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 msgid "download only these parts"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 msgid "download the full VOD once, then split it"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 msgid "download the full video once, then split it"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 #, python-brace-format
 msgid "{count} · {duration} in total"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "{included} of {total} clips pass the filter → {chapters} chapters"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 #, python-brace-format
 msgid "{n} part"
 msgid_plural "{n} parts"
 msgstr[0] ""
 msgstr[1] ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 #, python-brace-format, python-format
 msgid "{pct}% of VOD"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 #, python-brace-format, python-format
 msgid "{summary} · {mode} ({pct}% of VOD covered)"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 #, python-brace-format, python-format
 msgid "{summary} · {mode} ({pct}% of video covered)"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
-#, python-brace-format
-msgid "{views} views"
-msgstr ""
-
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 #, python-brace-format
 msgid "· {time} muted"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 #, python-brace-format, python-format
 msgid "→ {how}   (parts cover {pct}% of the VOD)"
 msgstr ""
 
-#: qt_ui/tabs/plan.py
+#: qt_ui/tabs/plan_crop_controls.py
 #, python-brace-format, python-format
 msgid "→ {how}   (parts cover {pct}% of the video)"
+msgstr ""
+
+#: qt_ui/tabs/plan_playlist_dialog.py
+msgid "Cookies"
+msgstr ""
+
+#: qt_ui/tabs/plan_playlist_dialog.py
+#, python-brace-format
+msgid "Cookies ({browser})"
+msgstr ""
+
+#: qt_ui/tabs/plan_playlist_dialog.py
+#, python-brace-format
+msgid "Send cookies from {browser} for this download"
+msgstr ""
+
+#: qt_ui/tabs/plan_playlist_dialog.py
+msgid "Video details"
+msgstr ""
+
+#: qt_ui/tabs/plan_playlist_dialog.py
+msgid "Video title…"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+#, python-brace-format
+msgid "  ({n} can't be placed: no offset)"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "  [chapters are OFF]"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "At"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "Can't split here"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "Chapter"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "Creator"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "Download only selected clip"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+#, python-brace-format
+msgid "Download {n} clip"
+msgid_plural "Download {n} clips"
+msgstr[0] ""
+msgstr[1] ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "No clips loaded (sign in with the Twitch API… button, optional)."
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "No offset"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py qt_ui/watchlist_controller.py
+msgid "Press «Get info» first."
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py qt_ui/watchlist_controller.py
+msgid "Select a clip"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py qt_ui/watchlist_controller.py
+msgid "Select a clip in the table first."
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "Select one clip"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "Splitting works with a single clip: select just one."
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "This VOD has no clips."
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+msgid "Untitled clip"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+#, python-brace-format
+msgid "by {creator}"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+#, python-brace-format
+msgid "{included} of {total} clips pass the filter → {chapters} chapters"
+msgstr ""
+
+#: qt_ui/tabs/plan_storyboard.py
+#, python-brace-format
+msgid "{views} views"
 msgstr ""
 
 #: qt_ui/tabs/queue.py
@@ -2911,21 +2861,11 @@ msgid "● = live now"
 msgstr ""
 
 #: qt_ui/timeline.py
-#, python-brace-format
-msgid "+{n} more"
-msgstr ""
-
-#: qt_ui/timeline.py
 msgid "At least one part has to stay."
 msgstr ""
 
 #: qt_ui/timeline.py
 msgid "Click a cut line (or hold the mouse next to it), then press Delete to remove it."
-msgstr ""
-
-#: qt_ui/timeline.py
-#, python-brace-format
-msgid "Clip at {time}"
 msgstr ""
 
 #: qt_ui/timeline.py
@@ -2971,12 +2911,8 @@ msgstr ""
 msgid "Only a cut line between two parts can be removed (click the part to skip it instead)."
 msgstr ""
 
-#: qt_ui/timeline.py
+#: qt_ui/timeline.py qt_ui/timeline_painters.py
 msgid "Overview of the whole VOD: drag the highlighted window to move along it"
-msgstr ""
-
-#: qt_ui/timeline.py
-msgid "Press «Get info» to see the VOD here."
 msgstr ""
 
 #: qt_ui/timeline.py
@@ -3007,7 +2943,7 @@ msgstr ""
 msgid "That section is skipped: click it in the parts row to keep it again."
 msgstr ""
 
-#: qt_ui/timeline.py
+#: qt_ui/timeline.py qt_ui/timeline_painters.py qt_ui/timeline_preview.py
 msgid "The cut points text has an error: fix it to edit here."
 msgstr ""
 
@@ -3045,62 +2981,6 @@ msgstr ""
 
 #: qt_ui/timeline.py
 #, python-brace-format
-msgid "at {time}"
-msgstr ""
-
-#: qt_ui/timeline.py
-msgid "click to cut here (or press S)"
-msgstr ""
-
-#: qt_ui/timeline.py
-msgid "click to keep this section"
-msgstr ""
-
-#: qt_ui/timeline.py
-msgid "click to skip this part"
-msgstr ""
-
-#: qt_ui/timeline.py
-msgid "clip flag"
-msgstr ""
-
-#: qt_ui/timeline.py
-msgid "double-click: make this game its own part (Shift: only this game)"
-msgstr ""
-
-#: qt_ui/timeline.py
-msgid "drag to move"
-msgstr ""
-
-#: qt_ui/timeline.py
-msgid "drag to move along the VOD"
-msgstr ""
-
-#: qt_ui/timeline.py
-msgid "drag to move, right-click to remove"
-msgstr ""
-
-#: qt_ui/timeline.py
-#, python-brace-format
-msgid "muted by Twitch ({start} → {end})"
-msgstr ""
-
-#: qt_ui/timeline.py
-#, python-brace-format
-msgid ""
-"{game}: {duration} in total\n"
-"Click: make it its own part · Shift+click: keep only this game"
-msgstr ""
-
-#: qt_ui/timeline.py
-#, python-brace-format
-msgid "{n} clip between {start} and {end}"
-msgid_plural "{n} clips between {start} and {end}"
-msgstr[0] ""
-msgstr[1] ""
-
-#: qt_ui/timeline.py
-#, python-brace-format
 msgid "{n} stretch"
 msgid_plural "{n} stretches"
 msgstr[0] ""
@@ -3111,7 +2991,77 @@ msgstr[1] ""
 msgid "{stretches} · {duration} silenced by Twitch"
 msgstr ""
 
-#: qt_ui/timeline.py
+#: qt_ui/timeline_painters.py
+msgid "Press «Get info» to see the VOD here."
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+#, python-brace-format
+msgid "+{n} more"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+#, python-brace-format
+msgid "Clip at {time}"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+#, python-brace-format
+msgid "at {time}"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+msgid "click to cut here (or press S)"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+msgid "click to keep this section"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+msgid "click to skip this part"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+msgid "clip flag"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+msgid "double-click: make this game its own part (Shift: only this game)"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+msgid "drag to move"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+msgid "drag to move along the VOD"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+msgid "drag to move, right-click to remove"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+#, python-brace-format
+msgid "muted by Twitch ({start} → {end})"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+#, python-brace-format
+msgid ""
+"{game}: {duration} in total\n"
+"Click: make it its own part · Shift+click: keep only this game"
+msgstr ""
+
+#: qt_ui/timeline_preview.py
+#, python-brace-format
+msgid "{n} clip between {start} and {end}"
+msgid_plural "{n} clips between {start} and {end}"
+msgstr[0] ""
+msgstr[1] ""
+
+#: qt_ui/timeline_preview.py
 #, python-brace-format
 msgid "… and {n} more (zoom in to see them)"
 msgstr ""
@@ -3225,8 +3175,64 @@ msgstr ""
 msgid "✔ Signed in with Twitch. Clips are available."
 msgstr ""
 
+#: qt_ui/update_controller.py
+msgid "Cannot check for updates while downloads or tools are busy."
+msgstr ""
+
+#: qt_ui/update_controller.py
+msgid "Check updates"
+msgstr ""
+
+#: qt_ui/update_controller.py
+#, python-brace-format
+msgid "Could not check for updates: {error}"
+msgstr ""
+
+#: qt_ui/update_controller.py
+#, python-brace-format
+msgid "LuckyDownloader is up to date ({version})."
+msgstr ""
+
+#: qt_ui/update_controller.py
+#, python-brace-format
+msgid "LuckyDownloader {version} is out (you have {current})."
+msgstr ""
+
+#: qt_ui/update_controller.py
+msgid "Preparing tools (yt-dlp, ffmpeg)…"
+msgstr ""
+
+#: qt_ui/update_controller.py
+msgid "Some tools are missing. See the log."
+msgstr ""
+
+#: qt_ui/update_controller.py
+msgid "Up to date"
+msgstr ""
+
+#: qt_ui/update_controller.py qt_ui/update_dialog.py
+msgid "Update available"
+msgstr ""
+
+#: qt_ui/update_controller.py
+msgid "View update"
+msgstr ""
+
+#: qt_ui/update_controller.py
+msgid "Wait for the running job to finish (or cancel it) first."
+msgstr ""
+
+#: qt_ui/update_controller.py
+#, python-brace-format
+msgid "● Update available · {version}"
+msgstr ""
+
 #: qt_ui/update_dialog.py
 msgid "(Read the full notes on GitHub)"
+msgstr ""
+
+#: qt_ui/update_dialog.py qt_ui/watchlist_controller.py
+msgid "Busy"
 msgstr ""
 
 #: qt_ui/update_dialog.py
@@ -3312,12 +3318,81 @@ msgstr ""
 msgid "dev build"
 msgstr ""
 
-#: qt_ui/welcome/overlay.py
-msgid "Fast Twitch VODs, precision clip cutting, and animated chat overlays."
+#: qt_ui/watchlist_controller.py
+#, python-brace-format
+msgid "Added {clips} clip(s) to the queue ({items} item(s)). Open «Queue & log» and press «Start queue»."
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+#, python-brace-format
+msgid "Added {count} playlist items to queue."
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+#, python-brace-format
+msgid "Added {count} videos from «{title}»."
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+#, python-brace-format
+msgid "Added {n} clip(s) to the queue."
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Chat files (*.json);;All files (*.*)"
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Chat overlay cancelled."
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Chat overlay failed. See the log."
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+#, python-brace-format
+msgid "Chat overlay ready: {file}"
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Chat overlay…"
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Choose a saved chat (.chat.json)"
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Clip"
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Clips added"
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Draw the chat overlay?"
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "It can take a while for a long chat."
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Playlist queued"
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Playlist selection cancelled."
+msgstr ""
+
+#: qt_ui/watchlist_controller.py
+msgid "Wait for the running job (or the tools setup) to finish first."
 msgstr ""
 
 #: qt_ui/welcome/overlay.py
-msgid "LuckyDownloader"
+msgid "Fast Twitch VODs, precision clip cutting, and animated chat overlays."
 msgstr ""
 
 #: qt_ui/welcome/overlay.py
@@ -3422,7 +3497,8 @@ msgid "cancelled"
 msgstr ""
 
 #. indirect: reached through a variable or a helper (tab names, option titles, add_row...)
-#: core/status.py qt_ui/queue_model.py qt_ui/queue_runner.py qt_ui/tabs/queue.py
+#: core/status.py qt_ui/queue_model.py qt_ui/queue_runner.py qt_ui/session_persistence.py
+#: qt_ui/tabs/queue.py
 msgid "queued"
 msgstr ""
 

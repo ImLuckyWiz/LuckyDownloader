@@ -17,8 +17,11 @@ from typing import Callable
 from core.errors import Cancelled, EngineError
 from core.i18n import t
 from core.premiere_export import probe_video
-from core.runtime import Ctx, _NO_WINDOW, _tool_env, find_tool
+from core.runtime import Ctx, _NO_WINDOW, _tool_env, find_tool, resolve_dep
 from core.timeutil import fmt_hms
+
+_ORIG_FIND_TOOL = find_tool
+_ORIG_PROBE_VIDEO = probe_video
 
 if sys.version_info >= (3, 11):
     from typing import TYPE_CHECKING
@@ -38,6 +41,9 @@ def unique_path(path: Path) -> Path:
         if not cand.exists():
             return cand
         n += 1
+
+
+_ORIG_UNIQUE_PATH = unique_path
 
 
 # --------------------------------------------------------------------------- #
@@ -147,14 +153,16 @@ def download_chat(ctx: Ctx, tdcli: str, vod_id: str, start: float, end: float, d
                   embed: bool, cache_dir: Path) -> Path:
     """Run TwitchDownloaderCLI for one stretch of a VOD. Never leaves a half-written file behind."""
     ctx.check_cancel()
-    eng = sys.modules.get("luckytwitch_engine")
-    _uniq = getattr(eng, "unique_path", unique_path) if eng else unique_path
+    _uniq = resolve_dep("unique_path", _ORIG_UNIQUE_PATH, unique_path)
     dest = _uniq(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     cache_dir.mkdir(parents=True, exist_ok=True)
     _run_tdcli(ctx, chat_command(tdcli, vod_id, start, end, dest, embed, cache_dir), dest, "Chat download",
                parse_tdcli_status)
     return dest
+
+
+_ORIG_DOWNLOAD_CHAT = download_chat
 
 
 # --------------------------------------------------------------------------- #
@@ -250,9 +258,8 @@ def render_chat(ctx: Ctx, tdcli: str, chat_json: Path, dest: Path, *, mode: str,
                 height: int, font_size: int, fps: int, smooth: bool, cache_dir: Path, lead: float = 0.0) -> Path:
     """Render one chat file as an overlay video. Never leaves a half-written file behind."""
     ctx.check_cancel()
-    eng = sys.modules.get("luckytwitch_engine")
-    _uniq = getattr(eng, "unique_path", unique_path) if eng else unique_path
-    _find = getattr(eng, "find_tool", find_tool) if eng else find_tool
+    _uniq = resolve_dep("unique_path", _ORIG_UNIQUE_PATH, unique_path)
+    _find = resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
     dest = _uniq(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -262,6 +269,9 @@ def render_chat(ctx: Ctx, tdcli: str, chat_json: Path, dest: Path, *, mode: str,
     for w in _run_tdcli(ctx, cmd, dest, "Chat render", parse_render_status, log_steps=True)[:3]:
         ctx.log("Warning: chat overlay: " + w[len("[WARNING]"):].lstrip(" -").strip())
     return dest
+
+
+_ORIG_RENDER_CHAT = render_chat
 
 
 def chat_overlay_settings(opts: JobOptions, probe: tuple[float, int, int] | None) -> tuple[str, str, int, int, int]:
@@ -373,9 +383,8 @@ def render_existing_chat(ctx: Ctx, tdcli: str, chat_json: Path, opts: JobOptions
     downloaded and neither the chat nor the video is touched. Size and frame rate follow «name.mp4» (or .mkv…)
     next to the chat when it exists; the fraction of the part's start comes from «name.markers.json» when it exists.
     """
-    eng = sys.modules.get("luckytwitch_engine")
-    _probe = getattr(eng, "probe_video", probe_video) if eng else probe_video
-    _render = getattr(eng, "render_chat", render_chat) if eng else render_chat
+    _probe = resolve_dep("probe_video", _ORIG_PROBE_VIDEO, probe_video)
+    _render = resolve_dep("render_chat", _ORIG_RENDER_CHAT, render_chat)
 
     info = read_chat_info(chat_json)
     video = find_part_video(chat_json)
@@ -392,8 +401,7 @@ def render_existing_chat(ctx: Ctx, tdcli: str, chat_json: Path, opts: JobOptions
 
 def describe_chat_overlay(chat_json: Path, opts: JobOptions) -> str:
     """What drawing the overlay of this chat file will do, in plain words (to confirm before the long render)."""
-    eng = sys.modules.get("luckytwitch_engine")
-    _probe = getattr(eng, "probe_video", probe_video) if eng else probe_video
+    _probe = resolve_dep("probe_video", _ORIG_PROBE_VIDEO, probe_video)
 
     info = read_chat_info(chat_json)
     video = find_part_video(chat_json)
@@ -433,10 +441,9 @@ def chat_files_for_part(ctx: Ctx, tool: str, src: SourceInfo, opts: JobOptions, 
     chat_json: Path | None = None  # the file the overlay is drawn from
     temp_json = False
     chat_failed = False
-    eng = sys.modules.get("luckytwitch_engine")
-    _dl_chat = getattr(eng, "download_chat", download_chat) if eng else download_chat
-    _render_chat = getattr(eng, "render_chat", render_chat) if eng else render_chat
-    _probe = getattr(eng, "probe_video", probe_video) if eng else probe_video
+    _dl_chat = resolve_dep("download_chat", _ORIG_DOWNLOAD_CHAT, download_chat)
+    _render_chat = resolve_dep("render_chat", _ORIG_RENDER_CHAT, render_chat)
+    _probe = resolve_dep("probe_video", _ORIG_PROBE_VIDEO, probe_video)
 
     try:
         if opts.chat:

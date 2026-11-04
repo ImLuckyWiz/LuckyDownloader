@@ -10,9 +10,9 @@ booleans. Numbers are read tolerantly, like ``App.num``: text that is not a numb
 
 from __future__ import annotations
 
-from luckytwitch_engine import (
-    CHAT_FORMATS, CHAT_RENDER_LOOKS, CHAT_RENDER_MODES, ClipFilter, JobOptions,
-)
+from core.chapters import ClipFilter
+from core.chat import CHAT_FORMATS, CHAT_RENDER_LOOKS, CHAT_RENDER_MODES
+from core.job import JobOptions
 
 from core.settings import DEFAULTS
 

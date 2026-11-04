@@ -9,13 +9,19 @@ retry of waiting/failed/cancelled jobs (F4).
 
 from __future__ import annotations
 
+import json
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor
 
+from core import paths
+from core.files import atomic_write_json
 from core.i18n import N_, t, tn
+from core.job import Job, deserialize_job, serialize_job
 from core.status import FINISHED, STATUS_COLOURS, queue_summary, status_label, status_word
 
 COLUMNS = (  # key, heading, width, alignment, stretches
@@ -50,6 +56,47 @@ class QueueItem:
     progress: float = 0.0
     progress_text: str = ""
     thumb: object = None  # QPixmap or None (populated from job storyboard / thumbnail if available)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize this QueueItem for persistent queue recovery."""
+        # Any item that was running when the app closed/crashed is stored as queued so it can resume cleanly.
+        persisted_status = "queued" if self.status == "running" else self.status
+        persisted_shown = "queued" if self.status == "running" else self.shown_status
+        return {
+            "iid": self.iid,
+            "n": int(self.n),
+            "label": self.label,
+            "parts": int(self.parts),
+            "strategy": self.strategy,
+            "status": persisted_status,
+            "shown_status": persisted_shown,
+            "files": list(self.files),
+            "job": serialize_job(self.job) if isinstance(self.job, Job) else None,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any], client: Any = None) -> QueueItem:
+        raw_status = str(data.get("status", "queued"))
+        raw_shown = str(data.get("shown_status", raw_status))
+        if raw_status == "running":
+            raw_status = "queued"
+            raw_shown = "queued"
+        job_data = data.get("job")
+        job_obj = deserialize_job(job_data, client=client) if isinstance(job_data, dict) else None
+        return cls(
+            job=job_obj,
+            iid=str(data.get("iid", "I001")),
+            n=int(data.get("n", 1)),
+            label=str(data.get("label", "")),
+            parts=int(data.get("parts", 1)),
+            strategy=str(data.get("strategy", "full")),
+            status=raw_status,
+            shown_status=raw_shown,
+            files=[str(f) for f in (data.get("files") or [])],
+            progress=1.0 if raw_status == "done" else 0.0,
+            progress_text="",
+            thumb=None,
+        )
 
 
 class QueueModel(QAbstractTableModel):
@@ -106,6 +153,7 @@ class QueueModel(QAbstractTableModel):
             self.beginInsertRows(QModelIndex(), row, row)
             self.items.append(item)
             self.endInsertRows()
+            self.save_state()
             return item
 
     def find(self, iid: str) -> QueueItem | None:
@@ -139,6 +187,7 @@ class QueueModel(QAbstractTableModel):
             elif item.status in ("queued", "failed", "cancelled"):
                 item.progress = 0.0
                 item.progress_text = ""
+            self.save_state()
         self.dataChanged.emit(self.index(row, 0), self.index(row, len(COLUMNS) - 1))
         return True
 
@@ -189,6 +238,7 @@ class QueueModel(QAbstractTableModel):
             moved = self.items.pop(source_row)
             self.items.insert(target_row, moved)
             self.endMoveRows()
+            self.save_state()
             return True
 
     def move_item(self, iid: str, delta: int) -> bool:
@@ -226,6 +276,7 @@ class QueueModel(QAbstractTableModel):
                 self.items.append(moved)
                 self.endMoveRows()
                 row = last
+            self.save_state()
         self.dataChanged.emit(self.index(row, 0), self.index(row, len(COLUMNS) - 1))
         return item
 
@@ -236,6 +287,7 @@ class QueueModel(QAbstractTableModel):
                 self.beginRemoveRows(QModelIndex(), row, row)
                 del self.items[row]
                 self.endRemoveRows()
+                self.save_state()
 
     def clear_finished(self) -> None:
         with self._lock:
@@ -254,13 +306,67 @@ class QueueModel(QAbstractTableModel):
                 for idx, item in enumerate(self.items, start=1):
                     item.n = idx
                 self.endResetModel()
+                self.save_state()
                 return removed
             else:
                 removed = [i.iid for i in self.items]
                 self.beginResetModel()
                 self.items.clear()
                 self.endResetModel()
+                self.save_state()
                 return removed
+
+    def save_state(self, path: Path | None = None) -> None:
+        """Persist real Job items to disk so unfinished downloads survive app restarts or updates."""
+        target = path or getattr(paths, "QUEUE_STATE_FILE", paths.DATA_DIR / "queue_state.json")
+        with self._lock:
+            serializable = [it.to_dict() for it in self.items if isinstance(it.job, Job)]
+            counter = self._counter
+        try:
+            atomic_write_json(target, {"version": 1, "counter": counter, "items": serializable})
+        except Exception:  # noqa: BLE001
+            pass
+
+    def load_state(self, path: Path | None = None, client: Any = None, only_unfinished: bool = False) -> list[QueueItem]:
+        """Restore saved QueueItems from disk into the model. Running items are recovered as 'queued'."""
+        target = path or getattr(paths, "QUEUE_STATE_FILE", paths.DATA_DIR / "queue_state.json")
+        if not target.is_file():
+            return []
+        try:
+            raw = json.loads(target.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            return []
+        if not isinstance(raw, dict):
+            return []
+        items_raw = raw.get("items")
+        if not isinstance(items_raw, list):
+            return []
+        restored: list[QueueItem] = []
+        for entry in items_raw:
+            if not isinstance(entry, dict) or not isinstance(entry.get("job"), dict):
+                continue
+            try:
+                item = QueueItem.from_dict(entry, client=client)
+            except Exception:  # noqa: BLE001
+                continue
+            if only_unfinished and item.status == "done":
+                continue
+            restored.append(item)
+        if not restored:
+            return []
+        with self._lock:
+            self.beginResetModel()
+            self.items = list(restored)
+            max_num = max(
+                (int(it.iid[1:]) for it in restored if it.iid.startswith("I") and it.iid[1:].isdigit()),
+                default=0,
+            )
+            self._counter = max(int(raw.get("counter", 0)), max_num, len(restored))
+            for idx, item in enumerate(self.items, start=1):
+                item.n = idx
+            self.endResetModel()
+            self.save_state(target)
+        return restored
 
     def summary(self) -> str:
         with self._lock:
