@@ -120,71 +120,48 @@ class YouTubeProvider(GenericProvider):
 
     def _run_ytdlp_json(self, target: str, max_items: int | None = None) -> dict[str, Any]:
         """Execute yt-dlp with flat playlist extraction and return parsed JSON."""
-        ytdlp = find_tool("yt-dlp")
-        if not ytdlp:
-            from core.source_info import YTDLP_MISSING
-            raise EngineError(YTDLP_MISSING)
-
-        cmd = [
-            ytdlp,
-            "--dump-single-json",
-            "--no-warnings",
-            "--flat-playlist",
-            "--skip-download",
-            "--remote-components", "ejs:github",
-            "--extractor-args", "youtube:player_client=web_safari,web",
-        ]
-        if max_items:
-            cmd.extend(["--playlist-end", str(max_items)])
-
-        from core.settings import load_settings
-        from core.cookie_scope import resolve_cookies_for_request
-        st = load_settings()
-        cb = st.get("cookies_from_browser")
-        scope = st.get("cookies_scope", "known_only")
-        resolved_cb = resolve_cookies_for_request("https://www.youtube.com", cb, scope_mode=scope)
-        if resolved_cb:
-            cmd += ["--cookies-from-browser", resolved_cb]
-
-        cmd.append(target)
-        try:
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                stdin=subprocess.DEVNULL,
-                env=_tool_env(),
-                creationflags=_NO_WINDOW,
-                timeout=60,
-            )
-        except subprocess.TimeoutExpired as e:
-            raise EngineError(t("yt-dlp took too long to read that URL.")) from e
-        except OSError as e:
-            raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
-
-        if proc.returncode != 0 and "--remote-components" in proc.stderr:
-            cmd_fallback = [c for i, c in enumerate(cmd) if c != "--remote-components" and (i == 0 or cmd[i-1] != "--remote-components")]
+        if _run_ytdlp_json is not _ORIG_YOUTUBE_RUN_YTDLP_JSON:
             try:
-                proc = subprocess.run(
-                    cmd_fallback,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    stdin=subprocess.DEVNULL,
-                    env=_tool_env(),
-                    creationflags=_NO_WINDOW,
-                    timeout=60,
-                )
-            except Exception:
-                pass
+                return _run_ytdlp_json(target, max_items=max_items)
+            except TypeError:
+                return _run_ytdlp_json(target)
+        return _run_ytdlp_json(target, max_items=max_items, timeout=60, is_youtube=True)
 
-        if proc.returncode != 0:
-            raise EngineError(map_generic_error(proc.stderr))
 
+def _run_ytdlp_json(
+    target: str,
+    max_items: int | None = None,
+    *,
+    timeout: int = 60,
+    is_youtube: bool = True,
+) -> dict[str, Any]:
+    """Delegate yt-dlp JSON extraction to core.source_info._run_ytdlp_json."""
+    import core.source_info as _si
+    if _si._run_ytdlp_json is _si._ORIG_SOURCE_INFO_RUN_YTDLP_JSON:
+        return _si._run_ytdlp_json(
+            target,
+            flat_playlist=True,
+            max_items=max_items,
+            timeout=timeout,
+            is_youtube=is_youtube,
+            find_tool_fn=find_tool,
+            tool_env_fn=_tool_env,
+            no_window_flag=_NO_WINDOW,
+            json_error_msg=t("Could not parse yt-dlp output."),
+        )
+    try:
+        return _si._run_ytdlp_json(
+            target,
+            flat_playlist=True,
+            max_items=max_items,
+            timeout=timeout,
+            is_youtube=is_youtube,
+        )
+    except TypeError:
         try:
-            return json.loads(proc.stdout)
-        except Exception as e:
-            raise EngineError(t("Could not parse yt-dlp output.")) from e
+            return _si._run_ytdlp_json(target, max_items=max_items)
+        except TypeError:
+            return _si._run_ytdlp_json(target)
+
+
+_ORIG_YOUTUBE_RUN_YTDLP_JSON = _run_ytdlp_json

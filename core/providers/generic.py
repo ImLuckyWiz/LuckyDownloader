@@ -49,6 +49,45 @@ def map_generic_error(err_text: str) -> str:
     return t("yt-dlp could not read that URL.")
 
 
+def _run_ytdlp_json(
+    target: str,
+    *,
+    cookies_browser: str | None = None,
+    flat_playlist: bool = True,
+    max_items: int | None = None,
+    timeout: int = 180,
+    is_youtube: bool = False,
+) -> dict[str, Any]:
+    """Delegate yt-dlp JSON extraction to core.source_info._run_ytdlp_json."""
+    import core.source_info as _si
+    if _si._run_ytdlp_json is _si._ORIG_SOURCE_INFO_RUN_YTDLP_JSON:
+        return _si._run_ytdlp_json(
+            target,
+            cookies_browser=cookies_browser,
+            flat_playlist=flat_playlist,
+            max_items=max_items,
+            timeout=timeout,
+            is_youtube=is_youtube,
+            find_tool_fn=find_tool,
+            tool_env_fn=_tool_env,
+            no_window_flag=_NO_WINDOW,
+        )
+    try:
+        return _si._run_ytdlp_json(
+            target,
+            cookies_browser=cookies_browser,
+            flat_playlist=flat_playlist,
+            max_items=max_items,
+            timeout=timeout,
+            is_youtube=is_youtube,
+        )
+    except TypeError:
+        return _si._run_ytdlp_json(target)
+
+
+_ORIG_GENERIC_RUN_YTDLP_JSON = _run_ytdlp_json
+
+
 class GenericProvider(Provider):
     """Provider for any site supported by yt-dlp."""
 
@@ -64,77 +103,19 @@ class GenericProvider(Provider):
         return Capability.RESOLVE | Capability.PLAYLIST
 
     def get_source_info(self, text: str) -> SourceInfo:
-        from core.source_info import YTDLP_MISSING
-
         url = text.strip()
         if not url:
             raise EngineError(t("Paste a video URL."))
         if "\n" in url or "\r" in url:
             raise EngineError(t("Paste a single URL (not multi-line text)."))
 
-        ytdlp = find_tool("yt-dlp")
-        if not ytdlp:
-            raise EngineError(YTDLP_MISSING)
-
-        cmd = [
-            ytdlp,
-            "--dump-single-json",
-            "--no-warnings",
-            "--flat-playlist",
-            "--skip-download",
-            "--remote-components", "ejs:github",
-            "--extractor-args", "youtube:player_client=web_safari,web",
-        ]
-        from core.settings import load_settings
-        from core.cookie_scope import resolve_cookies_for_request
-        st = load_settings()
-        cb = load_settings().get("cookies_from_browser")
-        scope = st.get("cookies_scope", "known_only")
-        resolved_cb = resolve_cookies_for_request(url, cb, scope_mode=scope)
-        if resolved_cb:
-            cmd += ["--cookies-from-browser", resolved_cb]
-        cmd.append(url)
-        try:
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                stdin=subprocess.DEVNULL,
-                env=_tool_env(),
-                creationflags=_NO_WINDOW,
-                timeout=180,
-            )
-        except subprocess.TimeoutExpired as e:
-            raise EngineError(t("yt-dlp took too long to read that URL.")) from e
-        except OSError as e:
-            raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
-
-        if proc.returncode != 0 and "--remote-components" in proc.stderr:
-            cmd_fallback = [c for i, c in enumerate(cmd) if c != "--remote-components" and (i == 0 or cmd[i-1] != "--remote-components")]
+        if _run_ytdlp_json is _ORIG_GENERIC_RUN_YTDLP_JSON:
+            info = _run_ytdlp_json(url, flat_playlist=True, timeout=180)
+        else:
             try:
-                proc = subprocess.run(
-                    cmd_fallback,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    stdin=subprocess.DEVNULL,
-                    env=_tool_env(),
-                    creationflags=_NO_WINDOW,
-                    timeout=180,
-                )
-            except Exception:
-                pass
-
-        if proc.returncode != 0:
-            raise EngineError(map_generic_error(proc.stderr))
-
-        try:
-            info = json.loads(proc.stdout)
-        except json.JSONDecodeError as e:
-            raise EngineError(t("yt-dlp returned unreadable data for that URL.")) from e
+                info = _run_ytdlp_json(url, flat_playlist=True, timeout=180)
+            except TypeError:
+                info = _run_ytdlp_json(url)
 
         from core.source_info import is_playlist_dict
         if is_playlist_dict(info):

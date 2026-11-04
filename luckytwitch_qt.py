@@ -1,4 +1,5 @@
-"""LuckyTwitch Downloader, PySide6 version (default entry point from v2.0.0; packaged by build_windows.bat and
+"""LuckyTwitch Downloader, PySide6 version (legacy compatibility facade for luckydownloader_qt.py).
+Kept for backward-compatible test monkeypatching. (default entry point from v2.0.0; packaged by build_windows.bat and
 build_mac.sh).
 
     python luckytwitch_qt.py
@@ -105,6 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     if link and weblink.hand_off(link, paths.LINKS_DIR, paths.BEAT_PATH):
         return 0  # the window that is already open took it
     app = LuckyApplication(argv)
+    app.setApplicationName("LuckyDownloader")
     i18n_qt.apply_language(_lang_setting, announce=False)  # also installs Qt's own translations (needs the app object)
     apply_theme(app)
     set_app_icon(app)

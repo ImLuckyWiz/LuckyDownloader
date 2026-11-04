@@ -142,6 +142,18 @@ def test_build_generic_download_args_with_archive():
     assert args[idx + 1] == "/path/to/archive.txt"
 
 
+def test_parse_playlist_info_youtubetab_extractor_normalized():
+    raw = {
+        "_type": "playlist",
+        "extractor_key": "YoutubeTab",
+        "id": "test_tab",
+        "title": "Channel Videos",
+        "entries": [{"id": "v1", "title": "Video 1"}],
+    }
+    pl = parse_playlist_info(raw, "https://www.youtube.com/@handle/videos")
+    assert pl.site == "youtube"
+
+
 def test_parse_playlist_info_youtube_thumbnail_fallback():
     # When yt-dlp flat playlist does not return thumbnail or thumbnails for an entry
     data = {
@@ -235,4 +247,52 @@ def test_run_job_forwards_download_archive_and_handles_archive_skip(monkeypatch,
     assert recorded_kw.get("download_archive") == expected_archive
     assert results == []
     assert any("archive" in m.lower() for m in logs)
+
+
+def test_playlist_entry_url_validation_and_double_dash(monkeypatch):
+    from core.source_info import parse_playlist_info, _run_ytdlp_json
+    from core.playlist import expand_playlist_jobs
+    from core.job import JobOptions
+
+    # 1. Invalid entry URLs skipped unless YouTube 11-char ID
+    raw = {
+        "_type": "playlist",
+        "extractor_key": "Generic",
+        "id": "pl_123",
+        "title": "Mixed Playlist",
+        "entries": [
+            {"id": "valid1", "url": "https://example.com/v1", "title": "Valid 1"},
+            {"id": "invalid1", "url": "ftp://bad.com/v", "title": "Invalid 1"},
+            {"id": "not_a_url", "url": "relative/path", "title": "Invalid 2"},
+            {"id": "dQw4w9WgXcQ", "url": "", "title": "YouTube ID 11 chars"},
+        ],
+    }
+    # For YouTube playlist, 11-char ID is converted to watch URL
+    pl_yt = parse_playlist_info(raw, "https://www.youtube.com/playlist?list=pl_123")
+    entry_urls = [e.url for e in pl_yt.entries]
+    assert "https://example.com/v1" in entry_urls
+    assert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" in entry_urls
+    assert len(pl_yt.entries) == 2
+
+    # 2. expand_playlist_jobs skips items with invalid URLs
+    bad_item = PlaylistItem(id="bad", title="Bad", url="javascript:void(0)", index=99)
+    opts = JobOptions(cut_text="", out_dir=".")
+    jobs = expand_playlist_jobs(pl_yt, [*pl_yt.entries, bad_item], opts)
+    assert len(jobs) == 2
+    assert all(j.source.url.startswith("https://") for j in jobs)
+
+    # 3. Double-dash before target URL in _run_ytdlp_json
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        import subprocess
+        return subprocess.CompletedProcess(cmd, 0, stdout="{}", stderr="")
+
+    monkeypatch.setattr("core.source_info.subprocess.run", fake_run)
+    monkeypatch.setattr("luckytwitch_engine.find_tool", lambda n: "mock-ytdlp")
+
+    _run_ytdlp_json("https://example.com/watch?v=123")
+    assert calls[-1][-2] == "--"
+    assert calls[-1][-1] == "https://example.com/watch?v=123"
+
 

@@ -178,10 +178,31 @@ def test_parse_playlist_rejected(payload):
         ("audio", False, "ba/b"),
         ("audio only", False, "ba/b"),
         ("audio_only", False, "ba/b"),
+        ("source", False, "bv*+ba/b"),
+        ("SOURCE", False, "bv*+ba/b"),
     ],
 )
 def test_build_generic_format_string(quality, audio_only, expected):
     assert build_generic_format_string(quality=quality, audio_only=audio_only) == expected
+
+
+def test_build_generic_format_string_with_source_info():
+    from core.source_info import SourceInfo
+    from types import SimpleNamespace
+    src = SourceInfo(
+        url="https://clips.twitch.tv/abc",
+        id="abc",
+        title="clip",
+        uploader="streamer",
+        duration=30.0,
+        date="2026-01-01",
+        formats=[SimpleNamespace(id="custom", format_id="custom", video_only=True)],
+    )
+    assert build_generic_format_string("source", src) == "bv*+ba/b"
+    assert build_generic_format_string("best", src) == "bv*+ba/b"
+    assert build_generic_format_string("", src) == "bv*+ba/b"
+    assert build_generic_format_string("custom", src) == "custom+bestaudio/custom/best"
+
 
 
 # --------------------------------------------------------------------------- #

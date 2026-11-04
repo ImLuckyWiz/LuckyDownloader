@@ -208,6 +208,16 @@ def test_detect_source_invalid_text(text):
 # --------------------------------------------------------------------------- #
 # SourceInfo capability integration
 # --------------------------------------------------------------------------- #
+def test_youtube_channel_provider_detection():
+    from core.providers import YOUTUBE_PROVIDER
+    from core.providers.detect import detect_provider
+    assert detect_provider("https://www.youtube.com/@somecreator/videos") is YOUTUBE_PROVIDER
+    assert detect_provider("https://youtube.com/channel/UC1234567890") is YOUTUBE_PROVIDER
+    assert detect_provider("https://www.youtube.com/c/CustomChannel/videos") is YOUTUBE_PROVIDER
+    assert detect_provider("https://www.youtube.com/watch?v=dQw4w9WgXcQ").name == "youtube"
+    assert detect_provider("https://www.youtube.com/watch?v=dQw4w9WgXcQ") is not YOUTUBE_PROVIDER
+
+
 def test_source_info_has_capability():
     twitch_src = SourceInfo(
         url="https://www.twitch.tv/videos/123",
@@ -233,3 +243,128 @@ def test_source_info_has_capability():
     assert yt_src.has_capability(Capability.RESOLVE)
     assert not yt_src.has_capability(Capability.TIMELINE)
     assert not yt_src.has_capability(Capability.CHAT)
+
+
+def test_run_ytdlp_json_consolidation_and_monkeypatch_hooks(monkeypatch):
+    """Verify generic, youtube, and source_info all route through _run_ytdlp_json and honor monkeypatch hooks."""
+    import core.source_info as si
+    import core.providers.generic as gen
+    import core.providers.youtube as yt
+    from core.providers.generic import GenericProvider
+    from core.providers.youtube import YouTubeProvider
+
+    calls = []
+
+    def fake_si_run(url, **kwargs):
+        calls.append(("si", url, kwargs))
+        if str(url).startswith("ytsearch"):
+            return {"_type": "playlist", "entries": [{"id": "v1", "title": "Vid 1", "duration": 60}]}
+        return {
+            "id": "v1",
+            "title": "Video 1",
+            "uploader": "Channel",
+            "duration": 60,
+            "extractor_key": "Youtube",
+            "webpage_url": "https://www.youtube.com/watch?v=v1",
+            "formats": [{"format_id": "18", "vcodec": "avc1", "acodec": "mp4a", "height": 360}],
+        }
+
+    monkeypatch.setattr(si, "_run_ytdlp_json", fake_si_run)
+
+    # 1. GenericProvider.get_source_info delegates to core.source_info._run_ytdlp_json
+    gp = GenericProvider()
+    src = gp.get_source_info("https://www.youtube.com/watch?v=v1")
+    assert src.id == "v1"
+    assert calls[-1][0] == "si"
+
+    # 2. YouTubeProvider._run_ytdlp_json delegates to core.source_info._run_ytdlp_json
+    yp = YouTubeProvider()
+    videos = yp.search_videos("cats", limit=5)
+    assert len(videos) == 1
+    assert videos[0]["id"] == "v1"
+    assert calls[-1][0] == "si"
+    assert calls[-1][2].get("flat_playlist") is True
+
+    # 3. Direct monkeypatch on core.providers.generic._run_ytdlp_json is respected
+    monkeypatch.setattr(
+        gen,
+        "_run_ytdlp_json",
+        lambda u: {"id": "gen_patched", "title": "Patched", "duration": 10, "extractor_key": "Generic"},
+    )
+    src2 = gp.get_source_info("https://example.com/v")
+    assert src2.id == "gen_patched"
+
+    # 4. Direct monkeypatch on core.providers.youtube._run_ytdlp_json is respected
+    monkeypatch.setattr(
+        yt,
+        "_run_ytdlp_json",
+        lambda target, max_items=None: {"entries": [{"id": "yt_patched", "title": "YT Patched"}]},
+    )
+    vids2 = yp.search_videos("dogs", limit=3)
+    assert vids2[0]["id"] == "yt_patched"
+
+
+def test_youtube_extractor_args_scoped(monkeypatch):
+    """Test that YouTube extractor-args and remote-components are only added for YouTube URLs."""
+    import core.download as dl
+    import core.source_info as si
+
+    executed_cmds = []
+
+    def fake_subprocess_run(cmd, **kwargs):
+        executed_cmds.append(cmd)
+        import subprocess
+        proc = subprocess.CompletedProcess(cmd, 0, stdout='{"id": "test", "formats": []}', stderr="")
+        return proc
+
+    monkeypatch.setattr("luckytwitch_engine.find_tool", lambda name: "mock-ytdlp")
+    monkeypatch.setattr("core.source_info.subprocess.run", fake_subprocess_run)
+
+    # 1. Non-YouTube URL in _run_ytdlp_json
+    si._run_ytdlp_json("https://www.twitch.tv/videos/12345")
+    cmd1 = executed_cmds[-1]
+    assert "--remote-components" not in cmd1
+    assert "--extractor-args" not in cmd1
+
+    # 2. YouTube URL in _run_ytdlp_json
+    si._run_ytdlp_json("https://www.youtube.com/watch?v=12345")
+    cmd2 = executed_cmds[-1]
+    assert "--remote-components" in cmd2
+    assert "--extractor-args" in cmd2
+
+    # 3. is_youtube=True flag
+    si._run_ytdlp_json("https://custom.site/video", is_youtube=True)
+    cmd3 = executed_cmds[-1]
+    assert "--remote-components" in cmd3
+    assert "--extractor-args" in cmd3
+
+    # 4. In core.download.run_ytdlp
+    popen_cmds = []
+
+    class MockPopen:
+        def __init__(self, cmd, *args, **kwargs):
+            popen_cmds.append(cmd)
+            import io
+            self.stdout = io.StringIO("")
+            self.poll = lambda: 0
+            self.wait = lambda: 0
+            self.returncode = 0
+
+        def communicate(self, *args, **kwargs):
+            return ("", "")
+
+    monkeypatch.setattr("core.download.find_tool", lambda name: "mock-ytdlp")
+    monkeypatch.setattr("core.download.subprocess.Popen", MockPopen)
+
+    class DummyCtx:
+        def check_cancel(self): pass
+        def report(self, *args): pass
+        def log_progress(self, *args): pass
+        def attach_proc(self, *args): pass
+
+    dl.run_ytdlp(DummyCtx(), ["https://vimeo.com/12345"], threads=1)
+    assert "--remote-components" not in popen_cmds[-1]
+
+    dl.run_ytdlp(DummyCtx(), ["https://youtu.be/12345"], threads=1)
+    assert "--remote-components" in popen_cmds[-1]
+

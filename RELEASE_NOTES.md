@@ -1,3 +1,16 @@
+## v2.14.6
+
+LuckyDownloader **v2.14.6** improves multi-platform provider detection, Twitch clip format selection, playlist safety, Spanish localization completeness, and `LuckyDownloader` branding consistency:
+
+- **YouTube Channel & Tab URL Detection:** Added direct provider detection for YouTube channel URLs (`/@handle`, `/channel/...`, and `/c/...`) and normalized `YoutubeTab` extractor metadata so channel video tabs and playlists resolve with full YouTube capabilities.
+- **Twitch Clip Format Selection & Full-Clip Planning:** Fixed quality format selection for Twitch clips so synthetic resolution labels (`1080p`, `source`, `best`) translate into valid `yt-dlp` format selectors and download cleanly in full without requiring manual cut points.
+- **Scoped `yt-dlp` Arguments & Unified Extraction:** Consolidated JSON metadata extraction across all providers, scoped YouTube-specific `--extractor-args` and `--remote-components` flags strictly to YouTube URLs, and added `--` argument terminators before target URLs in all `yt-dlp` invocations.
+- **Playlist Entry URL Validation:** Validated playlist entry URLs during parsing and job expansion so only verified `http`/`https` links (or valid 11-character YouTube video IDs) are queued.
+- **Spanish Localization Completeness:** Updated the translation extractor to capture `_t(...)` helper calls, localized all remaining chat overlay descriptions and video finalization progress stages into Spanish, and recompiled and synchronized the bundled `.mo` translation catalogs.
+- **`LuckyDownloader` Branding & Repository Hygiene:** Updated the default packaged download directory to `Videos/LuckyDownloader`, aligned the Qt application name and documentation index with `LuckyDownloader`, added the root MIT `LICENSE` file, and updated `.gitignore` for runtime queue and search state files.
+
+---
+
 ## v2.14.5
 
 LuckyDownloader **v2.14.5** improves Windows installer upgrade behavior, hardens the Linux AppImage launcher and release pipeline, and expands automated cross-platform test coverage:

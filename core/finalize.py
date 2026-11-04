@@ -674,7 +674,7 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
     sec_archive_kw = {"download_archive": download_archive} if (download_archive and _supports_kw(_dl_sec, "download_archive")) else {}
 
     if plan.strategy == "full":
-        ctx.stage(0.0, 0.85, "Downloading VOD")
+        ctx.stage(0.0, 0.85, t("Downloading VOD"))
         try:
             full = _dl_full(ctx, src.url, workdir, opts.threads, **fmt_kw, **rate_kw, **cookies_kw, **full_archive_kw)
         except ArchiveSkippedError as e:
@@ -682,10 +682,10 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
             shutil.rmtree(workdir, ignore_errors=True)
             ctx.stage(1.0, 1.0, "Done")
             return results
-        ctx.stage(0.85, 1.0, "Cutting")
+        ctx.stage(0.85, 1.0, t("Cutting"))
         if opts.exact:
             for i, p in enumerate(plan.parts):
-                ctx.stage(0.85 + 0.15 * i / total_parts, 0.85 + 0.15 * (i + 1) / total_parts, f"Re-encoding part {p.index}/{total_parts}")
+                ctx.stage(0.85 + 0.15 * i / total_parts, 0.85 + 0.15 * (i + 1) / total_parts, t("Re-encoding part {part}/{total}").format(part=p.index, total=total_parts))
                 cut = _cut(ctx, full, p, opts.container, workdir)
                 finish(p, cut, p.start, p.end)
         else:
@@ -695,7 +695,7 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
             only_full = len(plan.parts) == 1 and segs[plan.parts[0].index][0] == full
             for i, p in enumerate(plan.parts):
                 f, s, e = segs[p.index]
-                ctx.stage(0.85 + 0.15 * i / total_parts, 0.85 + 0.15 * (i + 1) / total_parts, f"Finishing part {p.index}/{total_parts}")
+                ctx.stage(0.85 + 0.15 * i / total_parts, 0.85 + 0.15 * (i + 1) / total_parts, t("Finishing part {part}/{total}").format(part=p.index, total=total_parts))
                 finish(p, f, s, e, copy=only_full and opts.keep_full)
         if opts.keep_full and full.exists():
             final_dir.mkdir(parents=True, exist_ok=True)
@@ -708,7 +708,7 @@ def run_job(job: Job, ctx: Ctx) -> list[Path]:
         for i, p in enumerate(plan.parts):
             ctx.check_cancel()
             lo, hi = i / total_parts, (i + 1) / total_parts
-            ctx.stage(lo, lo + (hi - lo) * 0.9, f"Downloading part {p.index}/{total_parts}")
+            ctx.stage(lo, lo + (hi - lo) * 0.9, t("Downloading part {part}/{total}").format(part=p.index, total=total_parts))
             use_aligned = (
                 getattr(src, "site", "twitch") == "twitch"
                 and getattr(src, "twitch_vod_id", None)

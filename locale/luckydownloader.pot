@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-03 07:05-0300\n"
+"POT-Creation-Date: 2026-11-04 03:12-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -28,12 +28,27 @@ msgstr ""
 
 #: core/chat.py
 #, python-brace-format
+msgid "Chat for part {part}/{total}"
+msgstr ""
+
+#: core/chat.py
+#, python-brace-format
+msgid "Chat for the overlay of part {part}/{total}"
+msgstr ""
+
+#: core/chat.py
+#, python-brace-format
 msgid "Chat overlay for part {part} failed (the video is fine): {error}"
 msgstr ""
 
 #: core/chat.py
 #, python-brace-format
 msgid "Chat overlay for part {part} skipped: the chat could not be downloaded."
+msgstr ""
+
+#: core/chat.py
+#, python-brace-format
+msgid "Chat overlay for part {part}/{total}"
 msgstr ""
 
 #: core/chat.py
@@ -49,11 +64,73 @@ msgid ""
 msgstr ""
 
 #: core/chat.py
+#, python-brace-format
+msgid "Covers {start} to {end} of the VOD · {messages} messages"
+msgstr ""
+
+#: core/chat.py
+msgid "Emotes and badges are fetched from the internet while it draws."
+msgstr ""
+
+#: core/chat.py
+msgid "Emotes and badges are inside the file."
+msgstr ""
+
+#: core/chat.py
+#, python-brace-format
+msgid "File: {name}"
+msgstr ""
+
+#: core/chat.py
+#, python-brace-format
+msgid "Lined up to the fraction of a second with {base}.markers.json."
+msgstr ""
+
+#: core/chat.py
+msgid "No video next to it, so the size and frame rate come from Options."
+msgstr ""
+
+#: core/chat.py
+#, python-brace-format
+msgid "No {base}.markers.json: lined up to the whole second (up to 1 s ahead of the video)."
+msgstr ""
+
+#: core/chat.py
+#, python-brace-format
+msgid "Overlay: {width}x{height}, {fps} fps, {label}"
+msgstr ""
+
+#: core/chat.py
 msgid "This chat file has no messages, so there is nothing to draw."
 msgstr ""
 
 #: core/chat.py
 msgid "This is not a chat file saved by TwitchDownloader (a «.chat.json»)."
+msgstr ""
+
+#: core/chat.py
+#, python-brace-format
+msgid "Video next to it: {name}"
+msgstr ""
+
+#: core/chat.py
+msgid "black background, H.264"
+msgstr ""
+
+#: core/chat.py
+msgid "starts at the first second of the chat"
+msgstr ""
+
+#: core/chat.py
+msgid "starts together with the part"
+msgstr ""
+
+#: core/chat.py
+msgid "transparent, Animation"
+msgstr ""
+
+#: core/chat.py
+msgid "transparent, ProRes 4444"
 msgstr ""
 
 #: core/chat.py
@@ -71,12 +148,17 @@ msgstr ""
 msgid "✔ {name}  ({width}x{height}, {fps} fps, {label}; starts together with the part)"
 msgstr ""
 
+#: core/chat.py
+#, python-brace-format
+msgid "✔ {name}  ({width}x{height}, {fps} fps, {label}; {start_msg})"
+msgstr ""
+
 #: core/download.py
 #, python-brace-format
 msgid "Could not get the playlist address: {error}"
 msgstr ""
 
-#: core/download.py core/providers/generic.py core/providers/youtube.py core/source_info.py
+#: core/download.py core/source_info.py
 #, python-brace-format
 msgid ""
 "Could not run yt-dlp:\n"
@@ -156,7 +238,25 @@ msgid "Cut point {point} is past the end of the downloaded video."
 msgstr ""
 
 #: core/finalize.py
+msgid "Cutting"
+msgstr ""
+
+#: core/finalize.py
+msgid "Downloading VOD"
+msgstr ""
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Downloading part {part}/{total}"
+msgstr ""
+
+#: core/finalize.py
 msgid "Fetching clips for chapters…"
+msgstr ""
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Finishing part {part}/{total}"
 msgstr ""
 
 #: core/finalize.py
@@ -175,6 +275,11 @@ msgstr ""
 
 #: core/finalize.py
 msgid "Quality: this video offers no choice, using the best one."
+msgstr ""
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Re-encoding part {part}/{total}"
 msgstr ""
 
 #: core/finalize.py
@@ -288,14 +393,6 @@ msgid ""
 "{error}"
 msgstr ""
 
-#: core/providers/generic.py core/source_info.py
-msgid "yt-dlp returned unreadable data for that URL."
-msgstr ""
-
-#: core/providers/generic.py core/providers/youtube.py core/source_info.py
-msgid "yt-dlp took too long to read that URL."
-msgstr ""
-
 #: core/providers/youtube.py
 msgid "Could not parse yt-dlp output."
 msgstr ""
@@ -314,6 +411,14 @@ msgstr ""
 
 #: core/source_info.py
 msgid "yt-dlp did not report the video length for that URL."
+msgstr ""
+
+#: core/source_info.py
+msgid "yt-dlp returned unreadable data for that URL."
+msgstr ""
+
+#: core/source_info.py
+msgid "yt-dlp took too long to read that URL."
 msgstr ""
 
 #: core/status.py qt_ui/queue_model.py

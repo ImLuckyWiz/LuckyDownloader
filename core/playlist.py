@@ -88,6 +88,8 @@ def expand_playlist_jobs(
 
     jobs: list[Job] = []
     for item in items:
+        if not item.url.startswith(("http://", "https://")):
+            continue
         src = SourceInfo(
             url=item.url,
             id=item.id,

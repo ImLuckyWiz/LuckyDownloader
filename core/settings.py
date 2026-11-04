@@ -14,7 +14,7 @@ from core import paths
 from luckytwitch_engine import APP_DIR
 
 DEFAULTS = {
-    "out_dir": str((Path.home() / "Downloads" / "LuckyTwitch") if paths.FROZEN else (APP_DIR / "downloads")),
+    "out_dir": str((Path.home() / "Videos" / "LuckyDownloader") if paths.FROZEN else (APP_DIR / "downloads")),
     "container": "mp4",
     "strategy": "Auto",
     "threshold": "60",

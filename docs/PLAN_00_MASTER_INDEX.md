@@ -73,19 +73,19 @@ This index maps **all 67 findings (`A-01`..`L-05`)** from [`docs/REVIEW_2026_11.
 - [x] **Plan 05 - Step 10 (RELEASE `v2.14.5`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.5`), commit & git tag `v2.14.5` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 06 — [`docs/PLAN_06_PROVIDERS_I18N_AND_REBRAND_HYGIENE.md`](./PLAN_06_PROVIDERS_I18N_AND_REBRAND_HYGIENE.md) -> Release `v2.14.6`
-- [ ] **Plan 06 - Step 1** (`B-01`): Normalize `YoutubeTab` extractor names and channel URLs — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 2** (`B-02`): Fix Twitch clip synthetic format IDs vs `build_generic_format_string` — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 3** (`B-03`): Deduplicate `_run_ytdlp_json` across `source_info.py`, `generic.py`, and `youtube.py` — `[Model: Argon / Claude Sonnet]`
-- [ ] **Plan 06 - Step 4** (`B-04`): Scope YouTube `--extractor-args` and `--remote-components` to YouTube URLs — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 5** (`B-05`): Validate playlist entry URLs and add `--` separator before target URLs — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 6** (`H-01`): Fix `tools/i18n.py` regex to extract `_t("...")` calls — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 7** (`G-05`): Wrap untranslated user-facing strings in `t(...)` — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 8** (`H-02`, `H-03`): Recompile `.mo` files and sync `luckytwitch.mo` — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 9** (`K-01`): Update default `out_dir` and Windows `AppUserModelID` to `LuckyDownloader` — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 10** (`K-02`): Flip `luckydownloader_*` vs `luckytwitch_*` facade direction — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 11** (`K-03`): Update `.gitignore` and clean up duplicate legacy icon assets — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 12** (`K-04`): Update stale `LuckyTwitch` branding in `LICENSE`, `README.es.md`, and `docs/README.md` — `[Model: Gemini Flash]`
-- [ ] **Plan 06 - Step 13 (RELEASE `v2.14.6`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.6`), commit & git tag `v2.14.6` — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 06 - Step 1** (`B-01`): Normalize `YoutubeTab` extractor names and channel URLs — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 2** (`B-02`): Fix Twitch clip synthetic format IDs vs `build_generic_format_string` — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 3** (`B-03`): Deduplicate `_run_ytdlp_json` across `source_info.py`, `generic.py`, and `youtube.py` — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 06 - Step 4** (`B-04`): Scope YouTube `--extractor-args` and `--remote-components` to YouTube URLs — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 5** (`B-05`): Validate playlist entry URLs and add `--` separator before target URLs — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 6** (`H-01`): Fix `tools/i18n.py` regex to extract `_t("...")` calls — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 7** (`G-05`): Wrap untranslated user-facing strings in `t(...)` — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 8** (`H-02`, `H-03`): Recompile `.mo` files and sync `luckytwitch.mo` — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 9** (`K-01`): Update default `out_dir` and Windows `AppUserModelID` to `LuckyDownloader` — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 10** (`K-02`): Flip `luckydownloader_*` vs `luckytwitch_*` facade direction — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 11** (`K-03`): Update `.gitignore` and clean up duplicate legacy icon assets — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 12** (`K-04`): Update stale `LuckyTwitch` branding in `LICENSE`, `README.es.md`, and `docs/README.md` — `[Model: Gemini Flash]`
+- [x] **Plan 06 - Step 13 (RELEASE `v2.14.6`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.6`), commit & git tag `v2.14.6` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 07 — [`docs/PLAN_07_ARCHITECTURE_AND_PRODUCT_ROADMAP.md`](./PLAN_07_ARCHITECTURE_AND_PRODUCT_ROADMAP.md) -> Release `v2.15.0`
 - [ ] **Plan 07 - Step 1** (`L-01`): Pre-flight disk-space check before starting jobs — `[Model: Gemini Flash]`

@@ -10,6 +10,7 @@ import math
 import os
 import re
 import subprocess
+from urllib.parse import urlparse
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -114,6 +115,9 @@ class SourceInfo:
     provider: Any | None = None
 
     def has_capability(self, cap: Any) -> bool:
+        from core.providers.base import Capability
+        if cap == Capability.TIMELINE and getattr(self, "site", "") == "twitch" and getattr(self, "twitch_vod_id", None) is None:
+            return False
         if self.provider is not None:
             return self.provider.has_capability(cap)
         from core.providers.detect import detect_source
@@ -148,6 +152,9 @@ class PlaylistInfo:
     twitch_vod_id: str | None = None
 
     def has_capability(self, cap: Any) -> bool:
+        from core.providers.base import Capability
+        if cap == Capability.TIMELINE and getattr(self, "site", "") == "twitch" and getattr(self, "twitch_vod_id", None) is None:
+            return False
         if self.provider is not None:
             return self.provider.has_capability(cap)
         from core.providers.base import Capability
@@ -169,39 +176,67 @@ def twitch_vod_id(url: str) -> str | None:
 YTDLP_MISSING = "yt-dlp is not installed yet (it is downloaded automatically on first run). Check your connection and restart."
 
 
-def get_source_info(text: str, cookies_browser: str | None = None) -> SourceInfo:
-    import luckytwitch_engine
-    find_tool = getattr(luckytwitch_engine, "find_tool", None)
-    tool_env = getattr(luckytwitch_engine, "_tool_env", lambda: None)
-    no_window = getattr(luckytwitch_engine, "_NO_WINDOW", 0)
+def _is_youtube_url(url: str) -> bool:
+    """Check if the given URL points to a YouTube host."""
+    try:
+        host = urlparse(url).hostname or ""
+        host = host.lower()
+        return host in {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"}
+    except Exception:
+        return False
 
-    url = normalize_url(text)
-    if not url:
-        raise EngineError(t("Paste a VOD URL or ID."))
-    if "\n" in url or "\r" in url:
-        raise EngineError(t("Paste a single VOD URL or ID (not multi-line text)."))
-    ytdlp = find_tool("yt-dlp") if find_tool else None
+
+def _run_ytdlp_json(
+    target: str,
+    *,
+    cookies_browser: str | None = None,
+    cookies_url: str | None = None,
+    flat_playlist: bool = True,
+    max_items: int | None = None,
+    timeout: int = 180,
+    is_youtube: bool = False,
+    find_tool_fn: Callable[[str], str | None] | None = None,
+    tool_env_fn: Callable[[], dict[str, str] | None] | None = None,
+    no_window_flag: int | None = None,
+    json_error_msg: str | None = None,
+) -> dict[str, Any]:
+    """Execute yt-dlp --dump-single-json with fallback and error mapping."""
+    import luckytwitch_engine
+    _find = find_tool_fn if find_tool_fn is not None else getattr(luckytwitch_engine, "find_tool", None)
+    _env = tool_env_fn if tool_env_fn is not None else getattr(luckytwitch_engine, "_tool_env", lambda: None)
+    _nw = no_window_flag if no_window_flag is not None else getattr(luckytwitch_engine, "_NO_WINDOW", 0)
+
+    ytdlp = _find("yt-dlp") if _find else None
     if not ytdlp:
         raise EngineError(YTDLP_MISSING)
+
     cmd = [
         ytdlp,
         "--dump-single-json",
         "--no-warnings",
         "--skip-download",
-        "--remote-components", "ejs:github",
-        "--extractor-args", "youtube:player_client=web_safari,web",
     ]
+    if is_youtube or _is_youtube_url(target):
+        cmd += [
+            "--remote-components", "ejs:github",
+            "--extractor-args", "youtube:player_client=web_safari,web",
+        ]
+    if max_items:
+        cmd.extend(["--playlist-end", str(max_items)])
+
     from core.settings import load_settings
     from core.cookie_scope import resolve_cookies_for_request
     st = load_settings()
     cb = cookies_browser if cookies_browser is not None else st.get("cookies_from_browser")
     scope = st.get("cookies_scope", "known_only")
-    resolved_cb = resolve_cookies_for_request(url, cb, scope_mode=scope)
+    effective_cookies_url = cookies_url or ("https://www.youtube.com" if is_youtube else target)
+    resolved_cb = resolve_cookies_for_request(effective_cookies_url, cb, scope_mode=scope)
     if resolved_cb:
         cmd += ["--cookies-from-browser", resolved_cb]
-    if not twitch_vod_id(url):
+    if flat_playlist:
         cmd.append("--flat-playlist")
-    cmd.append(url)
+    cmd.extend(["--", target])
+
     try:
         proc = subprocess.run(
             cmd,
@@ -210,16 +245,20 @@ def get_source_info(text: str, cookies_browser: str | None = None) -> SourceInfo
             encoding="utf-8",
             errors="replace",
             stdin=subprocess.DEVNULL,
-            env=tool_env(),
-            creationflags=no_window,
-            timeout=180,
+            env=_env(),
+            creationflags=_nw,
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired as e:
         raise EngineError(t("yt-dlp took too long to read that URL.")) from e
     except OSError as e:
         raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
+
     if proc.returncode != 0 and "--remote-components" in proc.stderr:
-        cmd_fallback = [c for i, c in enumerate(cmd) if c != "--remote-components" and (i == 0 or cmd[i-1] != "--remote-components")]
+        cmd_fallback = [
+            c for i, c in enumerate(cmd)
+            if c != "--remote-components" and (i == 0 or cmd[i - 1] != "--remote-components")
+        ]
         try:
             proc = subprocess.run(
                 cmd_fallback,
@@ -228,20 +267,63 @@ def get_source_info(text: str, cookies_browser: str | None = None) -> SourceInfo
                 encoding="utf-8",
                 errors="replace",
                 stdin=subprocess.DEVNULL,
-                env=tool_env(),
-                creationflags=no_window,
-                timeout=180,
+                env=_env(),
+                creationflags=_nw,
+                timeout=timeout,
             )
-        except Exception:
-            pass
+        except subprocess.TimeoutExpired as e:
+            raise EngineError(t("yt-dlp took too long to read that URL.")) from e
+        except OSError as e:
+            raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
+
     if proc.returncode != 0:
         from core.providers.generic import map_generic_error
         raise EngineError(map_generic_error(proc.stderr))
     try:
-        info = json.loads(proc.stdout)
+        return json.loads(proc.stdout)
     except json.JSONDecodeError as e:
-        raise EngineError(t("yt-dlp returned unreadable data for that URL.")) from e
-    if twitch_vod_id(url):
+        raise EngineError(json_error_msg or t("yt-dlp returned unreadable data for that URL.")) from e
+
+
+_ORIG_SOURCE_INFO_RUN_YTDLP_JSON = _run_ytdlp_json
+
+
+def get_source_info(text: str, cookies_browser: str | None = None) -> SourceInfo:
+    url = normalize_url(text)
+    if not url:
+        raise EngineError(t("Paste a VOD URL or ID."))
+    if "\n" in url or "\r" in url:
+        raise EngineError(t("Paste a single VOD URL or ID (not multi-line text)."))
+
+    import luckytwitch_engine
+    eng_run = getattr(luckytwitch_engine, "_run_ytdlp_json", None)
+    if _run_ytdlp_json is not _ORIG_SOURCE_INFO_RUN_YTDLP_JSON:
+        run_fn = _run_ytdlp_json
+    elif eng_run is not None and eng_run is not _ORIG_SOURCE_INFO_RUN_YTDLP_JSON:
+        run_fn = eng_run
+    else:
+        run_fn = _run_ytdlp_json
+
+    is_vod = bool(twitch_vod_id(url))
+    if run_fn is _ORIG_SOURCE_INFO_RUN_YTDLP_JSON:
+        info = run_fn(
+            url,
+            cookies_browser=cookies_browser,
+            flat_playlist=not is_vod,
+            timeout=180,
+        )
+    else:
+        try:
+            info = run_fn(
+                url,
+                cookies_browser=cookies_browser,
+                flat_playlist=not is_vod,
+                timeout=180,
+            )
+        except TypeError:
+            info = run_fn(url)
+
+    if is_vod:
         src = parse_source_info(info, url)
         src.muted = fetch_muted_ranges(info.get("formats"), src.duration)
     elif is_playlist_dict(info):
@@ -482,8 +564,14 @@ def parse_playlist_info(info: dict, url: str) -> PlaylistInfo:
 
     from core.providers.detect import detect_source
     prov, _ = detect_source(url)
-    extractor = str(info.get("extractor_key") or info.get("extractor") or "").lower()
-    site = prov.name if prov and prov.name != "generic" else (extractor or "generic")
+    raw_ext = (info.get("extractor") or info.get("extractor_key") or "generic").lower()
+    site = raw_ext.split(":")[0]
+    if site.startswith("youtube"):
+        site = "youtube"
+    elif site.startswith("twitch"):
+        site = "twitch"
+    elif prov and prov.name != "generic":
+        site = prov.name
 
     raw_entries = info.get("entries") or []
     items: list[PlaylistItem] = []
@@ -493,14 +581,13 @@ def parse_playlist_info(info: dict, url: str) -> PlaylistInfo:
         eid = str(e.get("id") or "")
         etitle = str(e.get("title") or f"Item {idx}").strip()
         eurl = str(e.get("url") or e.get("webpage_url") or "")
-        if not eurl and eid:
-            if "youtube" in site or "youtu" in url:
+        if not eurl.startswith(("http://", "https://")):
+            if (site == "youtube" or "youtu" in url) and re.match(r"^[A-Za-z0-9_-]{11}$", eid):
                 eurl = f"https://www.youtube.com/watch?v={eid}"
-            else:
-                eurl = eid
-        elif eurl and not eurl.startswith("http"):
-            if "youtube" in site or "youtu" in url:
+            elif (site == "youtube" or "youtu" in url) and eurl and re.match(r"^[A-Za-z0-9_-]{11}$", eurl):
                 eurl = f"https://www.youtube.com/watch?v={eurl}"
+            else:
+                continue
 
         edur = float(e.get("duration") or 0.0)
         euploader = str(e.get("uploader") or e.get("channel") or uploader).strip()
@@ -553,8 +640,14 @@ def parse_generic_source_info(info: dict, url: str) -> SourceInfo:
 
     from core.providers.detect import detect_source
     prov, _ = detect_source(url)
-    extractor = str(info.get("extractor_key") or info.get("extractor") or "").lower()
-    site = prov.name if prov and prov.name != "generic" else (extractor or "generic")
+    raw_ext = (info.get("extractor") or info.get("extractor_key") or "generic").lower()
+    site = raw_ext.split(":")[0]
+    if site.startswith("youtube"):
+        site = "youtube"
+    elif site.startswith("twitch"):
+        site = "twitch"
+    elif prov and prov.name != "generic":
+        site = prov.name
     clean_id = re.sub(r"[\\/]+", "_", str(info.get("id", "") or "")).strip()
 
     return SourceInfo(
@@ -575,17 +668,32 @@ def parse_generic_source_info(info: dict, url: str) -> SourceInfo:
     )
 
 
-def build_generic_format_string(quality: str = QUALITY_BEST, audio_only: bool = False) -> str:
+def build_generic_format_string(
+    quality: str = QUALITY_BEST,
+    audio_only: bool | Any = False,
+    src: Any = None,
+) -> str:
     """Turn quality choice into yt-dlp format selector string."""
+    if hasattr(audio_only, "formats") or hasattr(audio_only, "has_capability"):
+        src = audio_only
+        audio_only = False
     q = (quality or "").strip().lower()
     if audio_only or q in ("audio", "audio only", "audio_only"):
         return "ba/b"
-    if q in ("", QUALITY_BEST, "best available"):
+    if not q or q in (QUALITY_BEST, "best", "source", "best available"):
         return "bv*+ba/b"
     m = re.search(r"(\d{3,4})p?", q)
     if m:
         h = int(m.group(1))
         return f"bv*[height<={h}]+ba/b[height<={h}]/bv*+ba/b"
+    if src and getattr(src, "formats", None):
+        matching = next(
+            (f for f in src.formats if getattr(f, "format_id", None) == quality or getattr(f, "id", None) == quality),
+            None,
+        )
+        if getattr(matching, "video_only", False) or getattr(src, "format_Needs_audio_merge", False) or getattr(src, "format_needs_audio_merge", False):
+            return f"{quality}+bestaudio/{quality}/best"
+        return f"{quality}/best"
     return q
 
 

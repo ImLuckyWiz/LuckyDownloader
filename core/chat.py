@@ -164,9 +164,9 @@ CHAT_RENDER_MODES = ("transparent", "prores", "compact")
 CHAT_RENDER_LOOKS = ("outline", "panel")
 CHAT_RENDER_EXT = {"transparent": ".mov", "prores": ".mov", "compact": ".mp4"}
 CHAT_RENDER_LABELS = {
-    "transparent": "transparent, Animation",
-    "prores": "transparent, ProRes 4444",
-    "compact": "black background, H.264",
+    "transparent": t("transparent, Animation"),
+    "prores": t("transparent, ProRes 4444"),
+    "compact": t("black background, H.264"),
 }
 _TDCLI_RENDER_STATUS = re.compile(
     r"^\[STATUS\]\s*-\s*(?P<phase>[A-Za-z][A-Za-z ]*?)\s*(?:(?P<pct>\d+)%)?\s*"
@@ -385,9 +385,8 @@ def render_existing_chat(ctx: Ctx, tdcli: str, chat_json: Path, opts: JobOptions
         ctx, tdcli, chat_json, existing_chat_overlay_path(chat_json, mode), mode=mode, look=look, width=width,
         height=height, font_size=opts.chat_render_font_size, fps=fps, smooth=opts.chat_render_smooth,
         cache_dir=cache_dir, lead=lead)
-    ctx.log(f"✔ {out.name}  ({width}x{height}, {fps} fps, {CHAT_RENDER_LABELS[mode]}; "
-            + ("starts together with the part" if lead or video else "starts at the first second of the chat")
-            + ")")
+    start_msg = t("starts together with the part") if lead or video else t("starts at the first second of the chat")
+    ctx.log(t("✔ {name}  ({width}x{height}, {fps} fps, {label}; {start_msg})").format(name=out.name, width=width, height=height, fps=fps, label=t(CHAT_RENDER_LABELS[mode]), start_msg=start_msg))
     return out
 
 
@@ -402,18 +401,18 @@ def describe_chat_overlay(chat_json: Path, opts: JobOptions) -> str:
     base = chat_base_name(chat_json)
     lines = [
         " · ".join(x for x in (info.streamer, f"VOD {info.vod_id}" if info.vod_id else "") if x) or chat_json.name,
-        f"Covers {fmt_hms(info.start)} to {fmt_hms(info.end)} of the VOD · {info.messages:,} messages",
+        t("Covers {start} to {end} of the VOD · {messages} messages").format(start=fmt_hms(info.start), end=fmt_hms(info.end), messages=f"{info.messages:,}"),
         "",
-        f"Video next to it: {video.name}" if video else "No video next to it, so the size and frame rate come from Options.",
-        f"Overlay: {width}x{height}, {fps} fps, {CHAT_RENDER_LABELS[mode]}",
-        f"File: {existing_chat_overlay_path(chat_json, mode).name}",
+        t("Video next to it: {name}").format(name=video.name) if video else t("No video next to it, so the size and frame rate come from Options."),
+        t("Overlay: {width}x{height}, {fps} fps, {label}").format(width=width, height=height, fps=fps, label=t(CHAT_RENDER_LABELS[mode])),
+        t("File: {name}").format(name=existing_chat_overlay_path(chat_json, mode).name),
     ]
     if chat_lead_from_markers(chat_json, info) > 0:
-        lines.append(f"Lined up to the fraction of a second with {base}.markers.json.")
+        lines.append(t("Lined up to the fraction of a second with {base}.markers.json.").format(base=base))
     elif not chat_json.with_name(base + ".markers.json").is_file():
-        lines.append(f"No {base}.markers.json: lined up to the whole second (up to 1 s ahead of the video).")
-    lines.append("Emotes and badges are inside the file." if info.embedded
-                 else "Emotes and badges are fetched from the internet while it draws.")
+        lines.append(t("No {base}.markers.json: lined up to the whole second (up to 1 s ahead of the video).").format(base=base))
+    lines.append(t("Emotes and badges are inside the file.") if info.embedded
+                 else t("Emotes and badges are fetched from the internet while it draws."))
     return "\n".join(lines)
 
 
@@ -442,7 +441,7 @@ def chat_files_for_part(ctx: Ctx, tool: str, src: SourceInfo, opts: JobOptions, 
     try:
         if opts.chat:
             try:
-                label = f"Chat for part {part.index}/{total_parts}"
+                label = t("Chat for part {part}/{total}").format(part=part.index, total=total_parts)
                 if opts.chat_render:
                     stage(0.0, 0.1, label)
                 else:
@@ -465,18 +464,18 @@ def chat_files_for_part(ctx: Ctx, tool: str, src: SourceInfo, opts: JobOptions, 
             return
         try:
             if chat_json is None:  # the saved chat is not a .json (or not wanted): the overlay needs its own copy
-                stage(0.0, 0.1, f"Chat for the overlay of part {part.index}/{total_parts}")
+                stage(0.0, 0.1, t("Chat for the overlay of part {part}/{total}").format(part=part.index, total=total_parts))
                 chat_json = _dl_chat(ctx, tool, vod_id, real_start, real_end,
                                      cache / f"part{part.index}.chat.json", False, cache)
                 temp_json = True
             mode, look, width, height, fps = chat_overlay_settings(opts, _probe(dest))
             lead = max(0.0, real_start - math.floor(real_start))  # the chat file starts at a whole second
-            stage(0.1, 1.0, f"Chat overlay for part {part.index}/{total_parts}")
+            stage(0.1, 1.0, t("Chat overlay for part {part}/{total}").format(part=part.index, total=total_parts))
             out = _render_chat(
                 ctx, tool, chat_json, dest.with_suffix(".chat-overlay" + CHAT_RENDER_EXT[mode]), mode=mode, look=look,
                 width=width, height=height, font_size=opts.chat_render_font_size, fps=fps,
                 smooth=opts.chat_render_smooth, cache_dir=cache, lead=lead)
-            ctx.log(t("✔ {name}  ({width}x{height}, {fps} fps, {label}; starts together with the part)").format(name=out.name, width=width, height=height, fps=fps, label=CHAT_RENDER_LABELS[mode]))
+            ctx.log(t("✔ {name}  ({width}x{height}, {fps} fps, {label}; starts together with the part)").format(name=out.name, width=width, height=height, fps=fps, label=t(CHAT_RENDER_LABELS[mode])))
         except Cancelled:
             raise
         except EngineError as e:

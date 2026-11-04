@@ -24,7 +24,10 @@
   "Use custom dark title bar instead of native frame",
   "You are using the latest version."
  ],
- "glossary_exempt": [],
+ "glossary_exempt": [
+  "Lined up to the fraction of a second with {base}.markers.json.",
+  "No {base}.markers.json: lined up to the whole second (up to 1 s ahead of the video)."
+ ],
  "identical_ok": [
   "Auto",
   "Chat",
@@ -43,8 +46,9 @@
   "Streamer:",
   "VOD",
   "Video",
+  "yt-dlp: {line}",
   "{n} video",
-  "yt-dlp: {line}"
+  "✔ {name}  ({width}x{height}, {fps} fps, {label}; {start_msg})"
  ],
  "untranslated": [],
  "unwrapped": {}

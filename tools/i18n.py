@@ -61,7 +61,7 @@ DOMAIN = "luckydownloader"
 PROJECT = "LuckyDownloader"
 LANGUAGES = ("es",)
 PLURAL_FORMS = {"es": (2, "(n != 1)")}  # forms a language needs; Spanish: 1 = singular, everything else = plural
-KEYWORDS: dict[str, Any] = {"t": None, "tn": (1, 2), "tc": ((1, "c"), 2), "N_": None}
+KEYWORDS: dict[str, Any] = {"t": None, "_t": None, "tn": (1, 2), "tc": ((1, "c"), 2), "N_": None}
 COMMENT_TAGS = ("i18n:",)
 INDIRECT_COMMENT = "indirect: reached through a variable or a helper (tab names, option titles, add_row...)"
 

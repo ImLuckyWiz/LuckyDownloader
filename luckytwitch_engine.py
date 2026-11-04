@@ -1,8 +1,10 @@
 """
-LuckyTwitch engine facade.
+LuckyTwitch engine facade (legacy compatibility module).
 
 This module re-exports all symbols from the modular core package (`core/`),
 maintaining 100% backward compatibility for all importers and test suites.
+Kept for backward-compatible test monkeypatching:
+sys.modules["luckydownloader_engine"] = sys.modules[__name__]
 """
 
 from __future__ import annotations
@@ -210,6 +212,7 @@ from core.source_info import (
     is_playlist_dict,
     parse_playlist_info,
     YTDLP_MISSING,
+    _run_ytdlp_json,
     describe_quality,
     estimate_bytes,
     fetch_storyboard_sheet,

@@ -34,6 +34,17 @@ if TYPE_CHECKING:
 _FF_PROGRESS_KEYS = {"out_time_us", "out_time_ms", "total_size", "speed", "progress"}
 
 
+def _is_youtube_url(url: str) -> bool:
+    """Check if the given URL points to a YouTube host."""
+    try:
+        host = urlparse(url).hostname or ""
+        host = host.lower()
+        return host in {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"}
+    except Exception:
+        return False
+
+
+
 class FfmpegProgress:
     """
     Reads the `-progress pipe:1` key=value lines of ffmpeg. feed(line) returns (fraction, text) at the end of
@@ -324,8 +335,13 @@ def run_ytdlp(
         "--retries", "10",
         "--fragment-retries", "10",
         "--continue",
-        "--remote-components", "ejs:github",
-        "--extractor-args", "youtube:player_client=web_safari,web",
+    ]
+    if any(_is_youtube_url(a) for a in args if isinstance(a, str)):
+        cmd += [
+            "--remote-components", "ejs:github",
+            "--extractor-args", "youtube:player_client=web_safari,web",
+        ]
+    cmd += [
         "--quiet", "--progress", "--newline",
         "--progress-template", PROGRESS_TEMPLATE,
     ]
@@ -341,6 +357,7 @@ def run_ytdlp(
     ffmpeg = _find("ffmpeg")
     if ffmpeg:
         cmd += ["--ffmpeg-location", str(Path(ffmpeg).parent)]
+    cmd.append("--")
     cmd += args
     ctx.check_cancel()
     try:
@@ -655,7 +672,7 @@ def get_playlist_url(ctx: Ctx, url: str, format_id: str | None = None) -> str:
     quality_args = ["-f", format_id] if format_id else ["-S", "res,fps,tbr"]
     try:
         proc = _subp.run(
-            [ytdlp, "-g", *quality_args, "--no-warnings", url],
+            [ytdlp, "-g", *quality_args, "--no-warnings", "--", url],
             stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace",
             env=_tool_env(), creationflags=_NO_WINDOW, timeout=120,
         )

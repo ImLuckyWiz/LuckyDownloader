@@ -355,3 +355,42 @@ def test_run_job_generic_source_cuts(monkeypatch, tmp_path):
     assert sec_calls[1][0] == 60.0 and sec_calls[1][1] == 120.0
     assert sec_calls[0][2].get("cookies_browser") == "firefox"
 
+
+def test_run_job_twitch_clip_uses_generic_format_string(monkeypatch, tmp_path):
+    from core.providers.detect import TWITCH_PROVIDER
+    src = eng.SourceInfo(
+        url="https://clips.twitch.tv/GloriousClip123",
+        id="GloriousClip123",
+        title="Twitch Clip",
+        uploader="Streamer",
+        duration=30.0,
+        date="2026-01-01",
+        twitch_vod_id=None,
+        formats=[eng.VideoFormat(format_id="1080p", height=1080, source=True)],
+        site="twitch",
+        provider=TWITCH_PROVIDER,
+    )
+    opts = eng.JobOptions(
+        cut_text="",
+        out_dir=str(tmp_path / "out"),
+        strategy="full",
+        quality="1080p",
+    )
+    job = eng.Job(source=src, opts=opts)
+
+    calls = {}
+    raw = tmp_path / "raw.mp4"
+    raw.write_bytes(b"x" * 5000)
+
+    def fake_full(ctx, url, workdir, threads, **kw):
+        calls.update(kw)
+        return raw
+
+    _patch_run_job_wiring(monkeypatch, tmp_path, lambda *a, **k: None)
+    monkeypatch.setattr(eng, "download_full", fake_full)
+
+    ctx, logs = _ctx()
+    results = eng.run_job(job, ctx)
+    assert len(results) == 1
+    assert calls.get("format_id") == "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b"
+
