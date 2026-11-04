@@ -68,8 +68,12 @@ def test_compute_job_workdir_is_deterministic_and_unique_per_cuts(tmp_path):
     w1_retry = compute_job_workdir(src, opts1_retry, fmt=fmt)
     w2 = compute_job_workdir(src, opts2, fmt=fmt)
 
+    opts_exact = JobOptions(cut_text="0:00:00 - 0:10:00", out_dir=str(tmp_path), strategy="sections", quality="1080p60", exact=True)
+    w_exact = compute_job_workdir(src, opts_exact, fmt=fmt)
+
     assert w1 == w1_retry
     assert w1 != w2
+    assert w1 != w_exact
     assert w1.name.startswith(".luckytwitch_12345_1080p60_")
 
 
@@ -98,8 +102,14 @@ def test_cleanup_stale_workdirs_removes_old_and_keeps_recent(tmp_path):
     assert fresh_dir.exists()
     assert unrelated_dir.exists()
 
-    # Cleaning with max_age_hours=0 removes remaining temp workdirs too
+    # An active workdir with .running is preserved even on max_age_hours=0.0
+    active_dir = tmp_path / ".luckytwitch_789_active"
+    active_dir.mkdir()
+    (active_dir / ".running").write_text("1234", encoding="utf-8")
+
+    # Cleaning with max_age_hours=0 removes fresh_dir but skips active_dir
     removed_all = cleanup_stale_workdirs(tmp_path, max_age_hours=0.0)
     assert removed_all == 1
     assert not fresh_dir.exists()
+    assert active_dir.exists()
     assert unrelated_dir.exists()

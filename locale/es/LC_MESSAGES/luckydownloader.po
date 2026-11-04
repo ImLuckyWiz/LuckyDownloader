@@ -3752,3 +3752,20 @@ msgstr "Elimina las carpetas temporales de descargas incompletas en la carpeta d
 msgid "Temporary files"
 msgstr "Archivos temporales"
 
+#: core/updates.py
+#, python-brace-format
+msgid "Asset URL is not on the GitHub releases allow-list: {url}"
+msgstr "La URL del archivo no está en la lista de permitidos de lanzamientos de GitHub: {url}"
+
+#: qt_ui/background_jobs.py
+msgid "Cancelled."
+msgstr "Cancelado."
+
+#: qt_ui/background_jobs.py
+msgid "The download did not pass the integrity check."
+msgstr "La descarga no pasó la verificación de integridad."
+
+#: qt_ui/tabs/options.py
+msgid "Cannot clean temporary files while downloads are running."
+msgstr "No se pueden limpiar los archivos temporales mientras hay descargas en curso."
+

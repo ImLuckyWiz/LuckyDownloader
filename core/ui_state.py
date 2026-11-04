@@ -58,6 +58,11 @@ def load_ui_state(path: Path | None = None) -> UIState:
                     rate_limit=str(data.get('rate_limit', '')),
                     language=str(data.get('language', 'auto')),
                 )
+            from core.files import backup_corrupt_json
+            backup_corrupt_json(target)
+    except json.JSONDecodeError:
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(target)
     except Exception:  # noqa: BLE001
         pass
     return UIState()

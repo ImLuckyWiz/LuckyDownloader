@@ -33,7 +33,8 @@ The sample `tests/fixtures/markers_sample.json` is checked by the Python tests (
 | `duration` | Real length of the part in seconds. |
 | `fps` | Frame rate read from the part with ffprobe (30 if it could not be read). |
 | `part.start` / `part.end` | Where the part sits in the original VOD, in seconds. Useful to line up the chat file, whose times count from the start of the VOD. |
-| `source` | The VOD the part came from (omitted if unknown). |
+| `source` | The VOD the part came from (omitted if unknown). |
+
 | `preferences` | Optional object giving starting defaults for the Premiere panel (e.g. `pad_before`, `pad_after`). |
 | `markers[].kind` | `"game"` (a game / category stretch), `"clip"` (a Twitch clip) or `"muted"` (a stretch Twitch silenced, see below). A plugin that does not know a kind must skip it, not fail. |
 | `markers[].start` / `end` | Seconds **from the start of the part** (not the VOD). `end > start` for a range; a marker can also be a single point. |
@@ -58,4 +59,4 @@ Twitch silences copyrighted audio in a VOD, in whole HLS segments (10 s each; in
 - **`version` stays `1`.** The plugin refuses any file with a higher version, so bumping it would stop the current plugin from opening these files at all. Muted markers are supported by the plugin (`KNOWN_KINDS` includes `muted`, with `importMuted: true` and red marker color by default).
 - The sample is `tests/fixtures/markers_sample_muted.json` (checked by the Python tests: it must be exactly what the app writes). `markers_sample.json`, the one the plugin's own tests read, is deliberately unchanged and has no muted marker.
 
-Muted markers are accepted by the validation in `markers-core.js` and imported as red markers when `preferences.import_muted` is enabled.
+Muted markers are accepted by the validation in `markers-core.js` and imported as red markers when the plugin panel setting `importMuted` is enabled.

@@ -930,3 +930,13 @@ def test_options_tab_provider_routing_controls(tab, qtbot, tmp_path):
     tab._clear_provider_dir()
     assert tab.provider_dir_entry.text() == ""
     assert "youtube" not in tab.settings.get("provider_out_dirs", {})
+
+
+
+def test_clean_temp_files_aborts_when_queue_active(tab, monkeypatch):
+    tab.queue_busy_hook = lambda: True
+    assert tab.clean_temp_files() == 0
+
+    tab.queue_busy_hook = lambda: False
+    # When queue is inactive, it proceeds to clean
+    assert tab.clean_temp_files() >= 0

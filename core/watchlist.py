@@ -67,6 +67,11 @@ def load_watchlist(path: Path | None = None) -> list[WatchedChannel]:
                 for d in data
                 if isinstance(d, dict) and (d.get("login") or d.get("id") or d.get("url"))
             ]
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(f)
+    except json.JSONDecodeError:
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(f)
     except Exception:
         pass
     return []

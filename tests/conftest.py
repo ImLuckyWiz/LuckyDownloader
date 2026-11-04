@@ -17,11 +17,10 @@ import pytest  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _data_folder_in_tmp(request, tmp_path, monkeypatch):
-    """The Qt window saves its settings and removes the heartbeat file when it closes (Phase 3): keep that away from
-    the real data folder (the app folder when run from source). Only for the Qt test files (test_qt_*.py): the
-    tests of ``core`` itself check the real paths. Tests that want their own paths patch them again."""
-    if not request.module.__name__.rsplit(".", 1)[-1].startswith("test_qt_"):
-        return
+    """Keep test data away from the real data folder (the app folder when run from source).
+    Redirects DATA_DIR and all data files to a temporary folder for all tests.
+    Tests that want their own paths patch them again.
+    """
     try:
         from core import paths
     except ImportError:  # pragma: no cover
@@ -44,6 +43,16 @@ def _data_folder_in_tmp(request, tmp_path, monkeypatch):
     try:
         import core.watchlist
         monkeypatch.setattr(core.watchlist, "WATCHLIST_PATH", data_dir / "luckytwitch_watchlist.json")
+    except Exception:
+        pass
+    try:
+        import core.ui_state
+        monkeypatch.setattr(core.ui_state, "UI_STATE_PATH", data_dir / "luckytwitch_ui.json")
+    except Exception:
+        pass
+    try:
+        import core.config
+        monkeypatch.setattr(core.config, "CONFIG_PATH", data_dir / "config.json")
     except Exception:
         pass
     try:

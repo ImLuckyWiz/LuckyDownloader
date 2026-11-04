@@ -15,8 +15,16 @@ from core.twitch_api import TWITCH_CLIENT_ID, TwitchClient
 def read_config() -> dict:
     try:
         data = json.loads(paths.CONFIG_PATH.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
+        if isinstance(data, dict):
+            return data
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(paths.CONFIG_PATH)
+        return {}
+    except json.JSONDecodeError:
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(paths.CONFIG_PATH)
+        return {}
+    except OSError:
         return {}
 
 

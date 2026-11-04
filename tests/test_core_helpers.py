@@ -375,6 +375,48 @@ def test_settings_corrupt_file_backup(tmp_path, monkeypatch):
     assert loaded["container"] == settings.DEFAULTS["container"]
     assert (tmp_path / "settings.json.corrupt").exists()
 
+def test_corrupt_files_backed_up_across_all_storage(tmp_path, monkeypatch):
+    import core.history as history
+    import core.watchlist as watchlist
+    import core.ui_state as ui_state
+    import core.config as config
+    import core.tools as tools
+
+    # History
+    hist_file = tmp_path / "hist.json"
+    hist_file.write_text("CORRUPT JSON", encoding="utf-8")
+    assert history.load_history(hist_file) == []
+    assert (tmp_path / "hist.json.corrupt").exists()
+
+    # Watchlist
+    watch_file = tmp_path / "watch.json"
+    watch_file.write_text("CORRUPT JSON", encoding="utf-8")
+    assert watchlist.load_watchlist(watch_file) == []
+    assert (tmp_path / "watch.json.corrupt").exists()
+
+    # UI state
+    ui_file = tmp_path / "ui.json"
+    ui_file.write_text("CORRUPT JSON", encoding="utf-8")
+    assert ui_state.load_ui_state(ui_file) == ui_state.UIState()
+    assert (tmp_path / "ui.json.corrupt").exists()
+
+    # Config
+    cfg_file = tmp_path / "config.json"
+    cfg_file.write_text("CORRUPT JSON", encoding="utf-8")
+    monkeypatch.setattr(paths, "CONFIG_PATH", cfg_file)
+    assert config.read_config() == {}
+    assert (tmp_path / "config.json.corrupt").exists()
+
+    # Tools versions.json
+    tools_dir = tmp_path / "tools"
+    tools_dir.mkdir()
+    ver_file = tools_dir / "versions.json"
+    ver_file.write_text("CORRUPT JSON", encoding="utf-8")
+    monkeypatch.setattr(tools, "TOOLS_DIR", tools_dir)
+    assert tools._read_versions() == {}
+    assert (tools_dir / "versions.json.corrupt").exists()
+
+
 
 def test_settings_list_json_backup(tmp_path, monkeypatch):
     test_file = tmp_path / "settings.json"

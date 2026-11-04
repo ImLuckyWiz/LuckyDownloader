@@ -72,11 +72,42 @@ def _blocked_host(host: str) -> bool:
         return True
     if h.isdigit() or h.startswith("0x"):
         return True
-    # Block octal/hex dotted quads such as 0177.0.0.1
+
+    # Parse numeric IPv4 forms (1-4 parts, decimal, octal with leading 0, or hex with 0x)
     parts = h.split(".")
-    if len(parts) == 4 and all(p.isdigit() or p.startswith("0x") for p in parts):
-        if any(len(p) > 1 and p.startswith("0") for p in parts):
-            return True
+    if 1 <= len(parts) <= 4:
+        vals = []
+        for p in parts:
+            try:
+                if p.startswith("0x"):
+                    vals.append(int(p, 16))
+                elif len(p) > 1 and p.startswith("0"):
+                    vals.append(int(p, 8))
+                else:
+                    vals.append(int(p, 10))
+            except ValueError:
+                break
+        if len(vals) == len(parts):
+            try:
+                if len(vals) == 1:
+                    ip_int = vals[0]
+                elif len(vals) == 2:
+                    if vals[0] > 255 or vals[1] > 0xFFFFFF:
+                        return True
+                    ip_int = (vals[0] << 24) | vals[1]
+                elif len(vals) == 3:
+                    if vals[0] > 255 or vals[1] > 255 or vals[2] > 0xFFFF:
+                        return True
+                    ip_int = (vals[0] << 24) | (vals[1] << 16) | vals[2]
+                else:
+                    if any(v > 255 for v in vals):
+                        return True
+                    ip_int = (vals[0] << 24) | (vals[1] << 16) | (vals[2] << 8) | vals[3]
+                if 0 <= ip_int <= 0xFFFFFFFF:
+                    return not ipaddress.IPv4Address(ip_int).is_global
+            except Exception:
+                return True
+
     try:
         ip = ipaddress.ip_address(h)
     except ValueError:

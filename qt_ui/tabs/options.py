@@ -890,8 +890,26 @@ class OptionsTab(QWidget):
         except OSError as e:
             dialogs.info(self, t("Tools folder"), f"{TOOLS_DIR}\n\n{e}")
 
+    def is_queue_active(self) -> bool:
+        hook = getattr(self, "queue_busy_hook", None)
+        if callable(hook):
+            try:
+                return bool(hook())
+            except Exception:
+                pass
+        win = self.window()
+        if win is not None and hasattr(win, "tab_queue") and hasattr(win.tab_queue, "runner"):
+            try:
+                return bool(win.tab_queue.runner.is_running())
+            except Exception:
+                pass
+        return False
+
     def clean_temp_files(self) -> int:
         from core.finalize import cleanup_stale_workdirs
+        if self.is_queue_active():
+            dialogs.info(self, t("Temporary files"), t("Cannot clean temporary files while downloads are running."))
+            return 0
         out_dir = str(self.binder.get("out_dir") or DEFAULTS.get("out_dir") or APP_DIR)
         removed = cleanup_stale_workdirs(out_dir, max_age_hours=0.0)
         self.status_message.emit(t("Cleaned {count} temporary folder(s).").format(count=removed))

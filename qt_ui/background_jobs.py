@@ -54,7 +54,7 @@ class ToolsRunner:
             try:
                 ensure_tools(ctx, update_ytdlp=update, force=force)
             except Cancelled:
-                error = "Cancelled."
+                error = t("Cancelled.")
             except Exception as e:  # noqa: BLE001
                 error = str(e)
             try:
@@ -219,7 +219,7 @@ class UpdateDownloadRunner:
                         dest.unlink(missing_ok=True)
                     except OSError:
                         pass
-                    error = "The download did not pass the integrity check."
+                    error = t("The download did not pass the integrity check.")
             except Cancelled:
                 error = "Cancelled."
                 try:

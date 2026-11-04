@@ -124,7 +124,11 @@ def compute_job_workdir(src: SourceInfo, opts: JobOptions, fmt: VideoFormat | No
     base = Path(out_dir) if out_dir is not None else Path(opts.out_dir)
     id_slug = re.sub(r"[^A-Za-z0-9_-]", "_", str(src.twitch_vod_id or src.id or "unknown"))[:64] or "unknown"
     fmt_slug = f"_{re.sub(r'[^A-Za-z0-9_-]', '_', fmt.format_id)[:40]}" if fmt else ""
-    key = f"{src.url}|{fmt_slug}|{opts.cut_text}|{opts.strategy}|{opts.quality}|{opts.container}"
+    key = (
+        f"{src.url}|{fmt_slug}|{opts.cut_text}|{opts.strategy}|{opts.quality}|"
+        f"{opts.container}|{opts.exact}|{getattr(opts, 'keyframe_align', False)}|"
+        f"{getattr(opts, 'reencode', False)}|{opts.audio_format}|{opts.keep_full}"
+    )
     job_hash = hashlib.sha256(key.encode("utf-8")).hexdigest()[:8]
     return base / f".luckytwitch_{id_slug}{fmt_slug}_{job_hash}"
 
@@ -145,6 +149,8 @@ def cleanup_stale_workdirs(out_dir: str | Path, max_age_hours: float = 48.0) -> 
             if not entry.is_dir() or entry.is_symlink():
                 continue
             if not (entry.name.startswith(".luckytwitch_") or entry.name.startswith(".luckydownloader_work_")):
+                continue
+            if (entry / ".running").exists():
                 continue
             if max_age_hours <= 0 or entry.stat().st_mtime <= cutoff:
                 shutil.rmtree(entry, ignore_errors=True)
@@ -719,6 +725,15 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
     check_disk_space(out_dir, required_bytes)
     final_dir = stream_dir(src, opts)
     workdir = compute_job_workdir(src, opts, fmt=fmt, out_dir=out_dir)
+    if (workdir / ".running").exists():
+        import uuid
+        workdir = workdir.with_name(f"{workdir.name}_{os.getpid()}_{uuid.uuid4().hex[:6]}")
+    workdir.mkdir(parents=True, exist_ok=True)
+    lock_file = workdir / ".running"
+    try:
+        lock_file.write_text(str(os.getpid()), encoding="utf-8")
+    except OSError:
+        pass
     if not workdir.resolve().is_relative_to(out_dir.resolve()):
         raise EngineError(t("Unsafe work directory path"))
     tags = {
@@ -863,6 +878,11 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
             finish(p, f, real_start, real_end)
 
     shutil.rmtree(workdir, ignore_errors=True)
+    try:
+        if lock_file.exists():
+            lock_file.unlink()
+    except OSError:
+        pass
     ctx.stage(1.0, 1.0, "Done")
     try:
         from core import history

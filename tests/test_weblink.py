@@ -271,10 +271,16 @@ def test_blocked_host_encodings():
     assert wl._blocked_host("0x7f000001")
     assert wl._blocked_host("0177.0.0.1")
     assert wl._blocked_host("127.0.0.1")
+    assert wl._blocked_host("127.1")
+    assert wl._blocked_host("127.0.1")
+    assert wl._blocked_host("0177.1")
+    assert wl._blocked_host("0x7f.1")
+    assert wl._blocked_host("10.1")
     assert wl._blocked_host("localhost")
     assert not wl._blocked_host("example.com")
     assert not wl._blocked_host("twitch.tv")
     assert not wl._blocked_host("youtube.com")
+    assert not wl._blocked_host("8.8.8.8")
 
 
 def test_launch_command_for_the_packaged_app_and_for_source(monkeypatch):

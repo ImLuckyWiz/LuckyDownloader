@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-04 04:54-0300\n"
+"POT-Creation-Date: 2026-11-04 05:31-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -622,8 +622,17 @@ msgstr ""
 msgid "Twitch sign-in failed: {error}"
 msgstr ""
 
+#: core/updates.py
+#, python-brace-format
+msgid "Asset URL is not on the GitHub releases allow-list: {url}"
+msgstr ""
+
 #: luckytwitch_qt.py qt_ui/tabs/search.py
 msgid "Search"
+msgstr ""
+
+#: qt_ui/background_jobs.py
+msgid "Cancelled."
 msgstr ""
 
 #: qt_ui/background_jobs.py qt_ui/watchlist_controller.py
@@ -633,6 +642,10 @@ msgstr ""
 #: qt_ui/background_jobs.py
 #, python-brace-format
 msgid "Downloading {tag}"
+msgstr ""
+
+#: qt_ui/background_jobs.py
+msgid "The download did not pass the integrity check."
 msgstr ""
 
 #: qt_ui/dialogs.py
@@ -1350,6 +1363,10 @@ msgstr ""
 
 #: qt_ui/tabs/options.py
 msgid "Bigger file, but it works offline."
+msgstr ""
+
+#: qt_ui/tabs/options.py
+msgid "Cannot clean temporary files while downloads are running."
 msgstr ""
 
 #: qt_ui/tabs/options.py

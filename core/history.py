@@ -59,6 +59,11 @@ def load_history(path: Path | None = None) -> list[HistoryEntry]:
                 for item in data
                 if isinstance(item, dict) and (item.get("vod_id") or item.get("url"))
             ]
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(f)
+    except json.JSONDecodeError:
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(f)
     except Exception:
         pass
     return []

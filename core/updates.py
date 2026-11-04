@@ -5,6 +5,8 @@ Pure business logic (no Qt dependencies). Communicates with GitHub's releases AP
 
 from __future__ import annotations
 
+from core.i18n import t
+
 import hashlib
 import json
 import platform
@@ -326,7 +328,7 @@ def download_installer(ctx, info: UpdateInfo, dest: Path) -> Path:
     Validates destination URL against allow-list before downloading.
     """
     if not is_safe_asset_url(info.asset_url):
-        raise ValueError(f"Asset URL is not on the GitHub releases allow-list: {info.asset_url}")
+        raise ValueError(t("Asset URL is not on the GitHub releases allow-list: {url}").format(url=info.asset_url))
     dl_fn = resolve_dep("_download_file", _ORIG_DOWNLOAD_FILE, _download_file)
     dl_fn(ctx, info.asset_url, dest)
     return dest

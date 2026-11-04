@@ -716,9 +716,12 @@ def build_generic_download_args(
         "--retries", "10",
         "--fragment-retries", "10",
         "--continue",
-        "--remote-components", "ejs:github",
-        "--extractor-args", "youtube:player_client=web_safari,web",
     ]
+    if bool(re.search(r"(?:youtube\.com|youtu\.be)", url or "", re.I)):
+        args += [
+            "--remote-components", "ejs:github",
+            "--extractor-args", "youtube:player_client=web_safari,web",
+        ]
     if threads > 1:
         args += ["--concurrent-fragments", str(max(1, threads))]
     if rate_limit and str(rate_limit).strip():
@@ -741,7 +744,7 @@ def build_generic_download_args(
             args += ["--merge-output-format", cnt]
     if out_template:
         args += ["-o", out_template]
-    args.append(url)
+    args += ["--", url]
     return args
 
 

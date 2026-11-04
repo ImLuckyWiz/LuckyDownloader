@@ -216,7 +216,14 @@ def test_build_generic_download_args_defaults():
     assert "mp4" in args
     assert "--concurrent-fragments" in args
     assert "4" in args
+    assert "--remote-components" not in args
+    assert args[-2] == "--"
     assert args[-1] == "https://example.com/video"
+
+    args_yt = build_generic_download_args("https://youtube.com/watch?v=123")
+    assert "--remote-components" in args_yt
+    assert args_yt[-2] == "--"
+    assert args_yt[-1] == "https://youtube.com/watch?v=123"
 
 
 def test_build_generic_download_args_custom_container_and_rate_limit():

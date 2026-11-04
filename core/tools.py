@@ -50,9 +50,19 @@ def _is_managed(path: str | Path) -> bool:
 
 
 def _read_versions() -> dict:
+    target = TOOLS_DIR / "versions.json"
     try:
-        return json.loads((TOOLS_DIR / "versions.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        data = json.loads(target.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(target)
+        return {}
+    except json.JSONDecodeError:
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(target)
+        return {}
+    except OSError:
         return {}
 
 
@@ -60,7 +70,8 @@ def _write_version(name: str, value: str) -> None:
     data = _read_versions()
     data[name] = value
     TOOLS_DIR.mkdir(parents=True, exist_ok=True)
-    (TOOLS_DIR / "versions.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+    from core.files import atomic_write_json
+    atomic_write_json(TOOLS_DIR / "versions.json", data)
 
 
 def _run_version(path: str, flag: str) -> str:
