@@ -26,12 +26,25 @@ def _data_folder_in_tmp(request, tmp_path, monkeypatch):
         from core import paths
     except ImportError:  # pragma: no cover
         return
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(exist_ok=True)
+    monkeypatch.setattr(paths, "DATA_DIR", data_dir)
     for name, leaf in (("SETTINGS_PATH", "luckytwitch_settings.json"), ("RECENT_PATH", "luckytwitch_recent.json"),
                        ("RECENT_SEARCHES_PATH", "recent_searches.json"),
                        ("CONFIG_PATH", "config.json"), ("LINKS_DIR", "links"), ("BEAT_PATH", "running.beat"),
-                       ("UI_STATE_PATH", "luckytwitch_ui.json"), ("UPDATE_STATE_PATH", "luckytwitch_update.json")):
-        monkeypatch.setattr(paths, name, tmp_path / "data" / leaf)
-    (tmp_path / "data").mkdir(exist_ok=True)
+                       ("UI_STATE_PATH", "luckytwitch_ui.json"), ("UPDATE_STATE_PATH", "luckytwitch_update.json"),
+                       ("HISTORY_PATH", "luckytwitch_history.json"), ("WATCHLIST_PATH", "luckytwitch_watchlist.json")):
+        monkeypatch.setattr(paths, name, data_dir / leaf)
+    try:
+        import core.history
+        monkeypatch.setattr(core.history, "HISTORY_PATH", data_dir / "luckytwitch_history.json")
+    except Exception:
+        pass
+    try:
+        import core.watchlist
+        monkeypatch.setattr(core.watchlist, "WATCHLIST_PATH", data_dir / "luckytwitch_watchlist.json")
+    except Exception:
+        pass
     try:
         from qt_ui.motion import Motion
 
@@ -93,11 +106,14 @@ def pytest_unconfigure(config):
     during Python interpreter shutdown (Py_FinalizeEx) after all tests have completely passed.
     Calling os._exit(0) when all tests passed with 0 failures/errors bypasses this C++ teardown crash.
     """
-    if True:
-        tr = config.pluginmanager.get_plugin("terminalreporter")
-        failed = len(tr.stats.get("failed", [])) if tr else 0
-        errors = len(tr.stats.get("error", [])) if tr else 0
-        if failed == 0 and errors == 0 and len(tr.stats.get("passed", [])) > 0:
+    tr = config.pluginmanager.get_plugin("terminalreporter")
+    if tr:
+        failed = len(tr.stats.get("failed", []))
+        errors = len(tr.stats.get("error", []))
+        passed = len(tr.stats.get("passed", []))
+        session = getattr(tr, "_session", None)
+        exitstatus = getattr(session, "exitstatus", None)
+        if failed == 0 and errors == 0 and passed > 0 and (exitstatus == 0 or exitstatus is None):
             sys.stdout.flush()
             sys.stderr.flush()
             if sys.platform == "win32":

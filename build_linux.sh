@@ -68,8 +68,8 @@ cp assets/luckydownloader.png "$APPDIR/usr/share/icons/hicolor/512x512/apps/luck
 cat << 'EOF' > "$APPDIR/AppRun"
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "${0}")")"
-export PATH="${HERE}/usr/bin:${PATH}"
-export LD_LIBRARY_PATH="${HERE}/usr/bin:${LD_LIBRARY_PATH}"
+export PATH="${HERE}/usr/bin${PATH:+:$PATH}"
+export LD_LIBRARY_PATH="${HERE}/usr/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 exec "${HERE}/usr/bin/LuckyDownloader" "$@"
 EOF
 chmod +x "$APPDIR/AppRun"

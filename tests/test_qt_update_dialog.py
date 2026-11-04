@@ -192,3 +192,33 @@ def test_update_dialog_download_cancellation(qtbot, monkeypatch):
     assert dlg._download_ctx is None
     assert "cancelled" in dlg.progress_label.text().lower()
     assert dlg.btn_later.text() == "Later"
+
+
+def test_update_dialog_re_verifies_sha256_before_launch(qtbot, monkeypatch, tmp_path):
+    import hashlib
+    state_file = tmp_path / "update_state.json"
+    monkeypatch.setattr(paths, "UPDATE_STATE_PATH", state_file)
+
+    payload = b"valid installer binary"
+    expected_hash = hashlib.sha256(payload).hexdigest()
+    installer_path = tmp_path / "LuckyDownloader-Setup-v2.3.0.exe"
+    installer_path.write_bytes(b"tampered installer binary")
+
+    info = updates.UpdateInfo(
+        tag="v2.3.0",
+        asset_name="LuckyDownloader-Setup.exe",
+        asset_url="https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/v2.3.0/LuckyDownloader-Setup.exe",
+        asset_size=len(payload),
+        sha256=expected_hash,
+    )
+    dlg = UpdateDialog(info)
+    qtbot.addWidget(dlg)
+
+    launched = []
+    monkeypatch.setattr(updates, "launch_installer", lambda p: launched.append(p) or True)
+
+    dlg._install_and_restart(str(installer_path))
+    assert launched == []
+    assert not installer_path.exists()
+    assert "verification failed" in dlg.progress_label.text().lower()
+

@@ -122,11 +122,23 @@ def test_chat_command_embed_flag(tmp_path):
 
 
 # --------------------------------------------------------------------------- running it (fake CLI)
-posix_only = pytest.mark.skipif(sys.platform == "win32", reason="the fake CLI is a shebang script")
+posix_only = pytest.mark.skipif(False, reason="")
 
 
 def fake_cli(tmp_path: Path, body: str) -> str:
     """A script that behaves like TwitchDownloaderCLI: `body` runs with `out` = the -o argument."""
+    if sys.platform == "win32":
+        py_file = tmp_path / "fake_tdcli.py"
+        py_file.write_text(
+            f"import sys, time\nargs = sys.argv[1:]\nout = args[args.index('-o') + 1]\n{body}\n",
+            encoding="utf-8",
+        )
+        cmd_file = tmp_path / "fake_tdcli.cmd"
+        cmd_file.write_text(
+            f'@"{sys.executable}" "%~dp0fake_tdcli.py" %*\n',
+            encoding="utf-8",
+        )
+        return str(cmd_file)
     script = tmp_path / "fake_tdcli"
     script.write_text(
         f"#!{sys.executable}\nimport sys, time\nargs = sys.argv[1:]\nout = args[args.index('-o') + 1]\n{body}\n",

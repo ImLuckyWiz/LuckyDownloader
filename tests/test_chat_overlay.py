@@ -27,7 +27,7 @@ from luckytwitch_engine import (
     render_chat,
 )
 
-posix_only = pytest.mark.skipif(sys.platform == "win32", reason="the fake CLI is a shebang script")
+posix_only = pytest.mark.skipif(False, reason="")
 
 SRC = SourceInfo(url="https://www.twitch.tv/videos/99", id="99", title="Stream", uploader="Streamer",
                  duration=20000.0, date="2026-10-01", twitch_vod_id="99")
@@ -170,6 +170,12 @@ with open(log, 'a') as f:
 def fake_cli(tmp_path: Path, chatdownload: str = "open(out, 'w').write('{}')", chatrender: str = "open(out, 'wb').write(b'video')"):
     """A script that behaves like TwitchDownloaderCLI. Every call is logged (as JSON) in tmp_path/calls.log."""
     body = f"if mode == 'chatdownload':\n    {chatdownload}\nelif mode == 'chatrender':\n    {chatrender}\n"
+    if sys.platform == "win32":
+        py_file = tmp_path / "fake_tdcli.py"
+        py_file.write_text(FAKE.format(py=sys.executable, log=str(tmp_path / "calls.log"), body=body), encoding="utf-8")
+        cmd_file = tmp_path / "fake_tdcli.cmd"
+        cmd_file.write_text(f'@"{sys.executable}" "%~dp0fake_tdcli.py" %*\n', encoding="utf-8")
+        return str(cmd_file)
     script = tmp_path / "fake_tdcli"
     script.write_text(FAKE.format(py=sys.executable, log=str(tmp_path / "calls.log"), body=body), encoding="utf-8")
     script.chmod(script.stat().st_mode | stat.S_IEXEC)

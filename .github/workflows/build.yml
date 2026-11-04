@@ -7,7 +7,7 @@ on:
   workflow_dispatch:           # manual "Run workflow" button
 
 permissions:
-  contents: write              # needed to create the Release
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -20,11 +20,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.14"]
-        include:
-          - python-version: "3.14"
-            allow-failure: true
-    # Python 3.14 is emerging/pre-release and some dependencies (e.g. PySide6) may lack 3.14 binary wheels; continue-on-error keeps CI green.
-    continue-on-error: ${{ matrix.allow-failure || false }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,8 +36,11 @@ jobs:
 
   init-release:
     name: Initialize Release
+    needs: [test]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Prepare release notes for this tag
@@ -69,6 +67,11 @@ jobs:
           make_latest: ${{ contains(github.ref_name, '-') && 'false' || 'true' }}
 
   build:
+    needs: [test, init-release]
+    if: |
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      (needs.init-release.result == 'success' || needs.init-release.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
@@ -80,6 +83,8 @@ jobs:
           - os: ubuntu-latest      # Linux x86_64
             label: linux-x86_64
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Check release notes match the tag
@@ -101,8 +106,9 @@ jobs:
             libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
             libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 \
             patchelf file zsync
-          # Download standalone appimagetool
-          curl -sLO https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          # Download standalone appimagetool (pinned to 1.9.1 with SHA-256 verification)
+          curl -sLfO https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  appimagetool-x86_64.AppImage" | sha256sum -c -
           chmod +x appimagetool-x86_64.AppImage
           ./appimagetool-x86_64.AppImage --appimage-extract
           sudo mv squashfs-root /opt/appimagetool
@@ -156,12 +162,6 @@ jobs:
       - name: Smoke test packaged catalogs (Linux)
         if: runner.os == 'Linux'
         run: dist/LuckyDownloader/LuckyDownloader --i18n-selftest
-      - name: Smoke test standalone binary (Linux)
-        if: runner.os == 'Linux'
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: |
-          dist/LuckyDownloader/LuckyDownloader --help || true
       - uses: actions/upload-artifact@v4
         with:
           name: LuckyDownloader-${{ matrix.label }}
@@ -182,7 +182,14 @@ jobs:
           fail_on_unmatched_files: false
 
   plugin:
+    needs: [test, init-release]
+    if: |
+      !cancelled() &&
+      needs.test.result == 'success' &&
+      (needs.init-release.result == 'success' || needs.init-release.result == 'skipped')
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -227,8 +234,10 @@ jobs:
   checksums:
     name: Generate and Upload SHA256SUMS
     needs: [build, plugin]
-    if: always() && startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

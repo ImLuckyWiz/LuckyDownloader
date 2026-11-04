@@ -1,3 +1,14 @@
+## v2.14.5
+
+LuckyDownloader **v2.14.5** improves Windows installer upgrade behavior, hardens the Linux AppImage launcher and release pipeline, and expands automated cross-platform test coverage:
+
+- **Clean Windows Upgrades from Legacy Installations:** Configured the Windows installer (`UsePreviousAppDir=no`) so upgrading from an existing `LuckyTwitch` installation always installs into the new `%LOCALAPPDATA%\Programs\LuckyDownloader` directory instead of reusing the legacy application folder.
+- **Linux AppImage Search Path Hardening:** Fixed `PATH` and `LD_LIBRARY_PATH` expansion in the packaged `AppRun` launcher so empty environment variables never append a trailing colon or include the current working directory in shared-library lookups.
+- **Release Pipeline & Build Verification:** Gated all GitHub Release creation, platform binary builds, Premiere Pro extension packaging, and `SHA256SUMS.txt` publication on the automated test and translation verification suite, enforced least-privilege workflow permissions, and pinned `appimagetool` with SHA-256 verification and bounded dependency version ranges.
+- **Cross-Platform Test Suite & Environment Isolation:** Unlocked all 31 chat download and overlay rendering subprocess tests on Windows (`0 skipped`), isolated download history and watchlist paths during automated UI test runs, and hardened test runner teardown so collection or fixture errors are never masked on headless CI runners.
+
+---
+
 ## v2.14.4
 
 LuckyDownloader **v2.14.4** hardens the Adobe Premiere Pro CEP extension, improves `.markers.json` export compatibility across all video platforms, and applies exported cutting preferences automatically in the Premiere panel:

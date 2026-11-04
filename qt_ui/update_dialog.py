@@ -217,15 +217,19 @@ class UpdateDialog(QDialog):
         self._install_and_restart(dest_str)
 
     def _install_and_restart(self, dest_str: str) -> None:
+        # Re-verify download digest/size before saving state or launching installer (C-02 TOCTOU defense)
+        if getattr(self.info, "sha256", "") or getattr(self.info, "asset_size", 0) > 0:
+            if not updates.verify_download(Path(dest_str), getattr(self.info, "asset_size", 0), getattr(self.info, "sha256", "")):
+                try:
+                    Path(dest_str).unlink(missing_ok=True)
+                except OSError:
+                    pass
+                self.progress_label.setText(t("Update verification failed."))
+                return
+
         state = updates.load_state()
         state["installer_path"] = dest_str
         updates.save_state(state)
-
-        # Re-verify download digest if available before launching installer
-        if getattr(self.info, "sha256", ""):
-            if not updates.verify_download(Path(dest_str), getattr(self.info, "asset_size", 0), self.info.sha256):
-                self.progress_label.setText(t("Update verification failed."))
-                return
 
         ok = updates.launch_installer(dest_str)
         if not ok:

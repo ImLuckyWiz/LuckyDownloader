@@ -239,3 +239,21 @@ def test_watchlist_no_substring_matching_or_empty_string_wipe(tmp_path: Path):
     assert len(watchlist.load_watchlist(target)) == 0
 
 
+
+
+def test_g01_check_all_watchers_persists_last_seen_id(tmp_path):
+    target = tmp_path / "watchlist.json"
+    w = watchlist.WatchedChannel(login="shroud", name="Shroud", provider="twitch", last_vod_id="")
+    watchlist.save_watchlist([w], path=target)
+
+    class FakeClient:
+        def get_channel_videos(self, channel, first=6):
+            return [{"id": "vod_999", "title": "Big stream", "created_at": "2026-11-04T00:00:00Z"}]
+
+    results = watchlist.check_all_watchers(FakeClient(), path=target, throttle_seconds=0)
+    assert results == {}
+
+    reloaded = watchlist.load_watchlist(path=target)
+    assert len(reloaded) == 1
+    assert reloaded[0].last_vod_id == "vod_999"
+    assert reloaded[0].last_checked_at > 0

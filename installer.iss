@@ -24,6 +24,7 @@ AppPublisher=LuckyDownloader
 ; Per-user install: no admin rights needed, goes to %LOCALAPPDATA%\Programs\LuckyDownloader (or LuckyDownloader-Beta)
 PrivilegesRequired=lowest
 DefaultDirName={autopf}\{#EffectiveDirName}
+UsePreviousAppDir=no
 DefaultGroupName={#EffectiveAppName}
 DisableProgramGroupPage=yes
 OutputDir=dist

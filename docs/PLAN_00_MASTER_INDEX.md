@@ -61,16 +61,16 @@ This index maps **all 67 findings (`A-01`..`L-05`)** from [`docs/REVIEW_2026_11.
 - [x] **Plan 04 - Step 6 (RELEASE `v2.14.4`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.4`), commit & git tag `v2.14.4` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 05 — [`docs/PLAN_05_INSTALLER_CI_CD_AND_TESTS.md`](./PLAN_05_INSTALLER_CI_CD_AND_TESTS.md) -> Release `v2.14.5`
-- [ ] **Plan 05 - Step 1** (`I-02`): Set `UsePreviousAppDir=no` in `installer.iss` — `[Model: Gemini Flash]`
-- [ ] **Plan 05 - Step 2** (`I-01`): Gate GitHub Release jobs on the `test` job in `.github/workflows/build.yml` — `[Model: Gemini Flash]`
-- [ ] **Plan 05 - Step 3** (`I-03`): Pin CI permissions, `appimagetool` SHA-256, and Python dependencies — `[Model: Gemini Flash]`
-- [ ] **Plan 05 - Step 4** (`I-04`): Fix empty-colon `LD_LIBRARY_PATH` / `PATH` expansion in `build_linux.sh` — `[Model: Gemini Flash]`
-- [ ] **Plan 05 - Step 5** (`I-05`): Clean up CI matrix `allow-failure` and smoke test — `[Model: Gemini Flash]`
-- [ ] **Plan 05 - Step 6** (`J-01`): Fix `tests/conftest.py` `os._exit(0)` hiding pytest errors on Linux — `[Model: Gemini Flash]`
-- [ ] **Plan 05 - Step 7** (`J-02`): Isolate `DATA_DIR`, `HISTORY_PATH`, and `WATCHLIST_PATH` in `tests/conftest.py` — `[Model: Gemini Flash]`
-- [ ] **Plan 05 - Step 8** (`J-03`): Unlock all 31 skipped tests on Windows — `[Model: Gemini Flash]`
-- [ ] **Plan 05 - Step 9** (`J-04`): Add regression unit tests for `C-02`, `G-01`, and `D-01` — `[Model: Gemini Flash]`
-- [ ] **Plan 05 - Step 10 (RELEASE `v2.14.5`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.5`), commit & git tag `v2.14.5` — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 05 - Step 1** (`I-02`): Set `UsePreviousAppDir=no` in `installer.iss` — `[Model: Gemini Flash]`
+- [x] **Plan 05 - Step 2** (`I-01`): Gate GitHub Release jobs on the `test` job in `.github/workflows/build.yml` — `[Model: Gemini Flash]`
+- [x] **Plan 05 - Step 3** (`I-03`): Pin CI permissions, `appimagetool` SHA-256, and Python dependencies — `[Model: Gemini Flash]`
+- [x] **Plan 05 - Step 4** (`I-04`): Fix empty-colon `LD_LIBRARY_PATH` / `PATH` expansion in `build_linux.sh` — `[Model: Gemini Flash]`
+- [x] **Plan 05 - Step 5** (`I-05`): Clean up CI matrix `allow-failure` and smoke test — `[Model: Gemini Flash]`
+- [x] **Plan 05 - Step 6** (`J-01`): Fix `tests/conftest.py` `os._exit(0)` hiding pytest errors on Linux — `[Model: Gemini Flash]`
+- [x] **Plan 05 - Step 7** (`J-02`): Isolate `DATA_DIR`, `HISTORY_PATH`, and `WATCHLIST_PATH` in `tests/conftest.py` — `[Model: Gemini Flash]`
+- [x] **Plan 05 - Step 8** (`J-03`): Unlock all 31 skipped tests on Windows — `[Model: Gemini Flash]`
+- [x] **Plan 05 - Step 9** (`J-04`): Add regression unit tests for `C-02`, `G-01`, and `D-01` — `[Model: Gemini Flash]`
+- [x] **Plan 05 - Step 10 (RELEASE `v2.14.5`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.5`), commit & git tag `v2.14.5` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 06 — [`docs/PLAN_06_PROVIDERS_I18N_AND_REBRAND_HYGIENE.md`](./PLAN_06_PROVIDERS_I18N_AND_REBRAND_HYGIENE.md) -> Release `v2.14.6`
 - [ ] **Plan 06 - Step 1** (`B-01`): Normalize `YoutubeTab` extractor names and channel URLs — `[Model: Gemini Flash]`

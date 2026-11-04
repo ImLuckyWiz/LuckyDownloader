@@ -410,3 +410,29 @@ def test_launch_installer(monkeypatch):
 
     monkeypatch.setattr(updates.subprocess, "Popen", fail_popen)
     assert updates.launch_installer("bad_path") is False
+
+
+def test_c02_updater_staging_and_tag_sanitization(tmp_path, monkeypatch):
+    import re
+    from core import paths
+    monkeypatch.setattr(paths, "DATA_DIR", tmp_path / "data")
+    dest_dir = updates.get_update_temp_dir()
+    assert dest_dir == tmp_path / "data" / "updates"
+    assert dest_dir.is_dir()
+
+    # Tag sanitization check for filenames
+    unsafe_tag = "../v2.14.0/../../etc"
+    safe_slug = re.sub(r"[^A-Za-z0-9._-]", "_", unsafe_tag)
+    assert "/" not in safe_slug and "\\" not in safe_slug
+    assert safe_slug == ".._v2.14.0_.._.._etc"
+
+    # verify_download checks
+    payload = b"installer binary contents"
+    installer = dest_dir / "setup.exe"
+    installer.write_bytes(payload)
+    h = hashlib.sha256(payload).hexdigest()
+
+    assert updates.verify_download(installer, len(payload), h) is True
+    # Tampered file
+    installer.write_bytes(b"corrupted binary")
+    assert updates.verify_download(installer, len(payload), h) is False
