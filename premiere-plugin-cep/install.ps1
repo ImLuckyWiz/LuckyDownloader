@@ -2,7 +2,7 @@
 #   install.bat              install / update
 #   install.bat -Uninstall   remove the panel (the registry flag stays on)
 # Source layout (relative to this script):  cep-panel\ (CSXS, js, jsx, index.html, .debug)  +  src\*.js (shared code, copied into the panel's shared\)
-param([switch]$Uninstall)
+param([switch]$Uninstall, [switch]$Dev)
 $ErrorActionPreference = "Stop"
 
 $id = "com.luckytwitch.markers"
@@ -27,7 +27,7 @@ if ($Uninstall) {
 
 # Everything that must exist before we copy anything: fail loudly instead of installing half a panel.
 $need = @(
-    (Join-Path $panel "CSXS\manifest.xml"), (Join-Path $panel "index.html"), (Join-Path $panel ".debug"),
+    (Join-Path $panel "CSXS\manifest.xml"), (Join-Path $panel "index.html"),
     (Join-Path $panel "js\runner.js"), (Join-Path $panel "js\ui.js"), (Join-Path $panel "jsx\host.jsx"), (Join-Path $shared "timecode.js"), (Join-Path $shared "markers-core.js"), (Join-Path $shared "guard.js"), (Join-Path $shared "progress.js")
 )
 foreach ($f in $need) { if (-not (Test-Path $f)) { throw "Missing source file: $f" } }
@@ -45,7 +45,9 @@ Copy-Item (Join-Path $panel "CSXS") $target -Recurse
 Copy-Item (Join-Path $panel "js") $target -Recurse
 Copy-Item (Join-Path $panel "jsx") $target -Recurse
 Copy-Item (Join-Path $panel "index.html") $target
-Copy-Item (Join-Path $panel ".debug") $target -Force
+if ($Dev -and (Test-Path (Join-Path $panel ".debug"))) {
+    Copy-Item (Join-Path $panel ".debug") $target -Force
+}
 
 # Shared code from src\ goes to shared\: the panel page loads markers-core.js from there, and loads timecode.js into ExtendScript from there.
 New-Item -ItemType Directory -Path (Join-Path $target "shared") -Force | Out-Null
@@ -54,7 +56,7 @@ foreach ($f in Get-ChildItem (Join-Path $shared "*.js")) {
 }
 
 # Verify what actually landed.
-foreach ($rel in @("CSXS\manifest.xml", "index.html", ".debug", "js\runner.js", "js\ui.js", "jsx\host.jsx", "shared\timecode.js", "shared\markers-core.js", "shared\guard.js", "shared\progress.js")) {
+foreach ($rel in @("CSXS\manifest.xml", "index.html", "js\runner.js", "js\ui.js", "jsx\host.jsx", "shared\timecode.js", "shared\markers-core.js", "shared\guard.js", "shared\progress.js")) {
     if (-not (Test-Path (Join-Path $target $rel))) { throw "Install check failed: $rel is not in $target" }
 }
 # A broken manifest makes Premiere hide the panel without any error: check it is complete before saying "installed".

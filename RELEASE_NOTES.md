@@ -1,3 +1,15 @@
+## v2.14.4
+
+LuckyDownloader **v2.14.4** hardens the Adobe Premiere Pro CEP extension, improves `.markers.json` export compatibility across all video platforms, and applies exported cutting preferences automatically in the Premiere panel:
+
+- **Premiere Pro Extension Security & Production Packaging:** Removed unused Node.js and mixed-context CEF flags from the extension manifest, excluded the remote debugging configuration (`.debug`) from production `.zip` and `.zxp` extension packages, and gated local `.debug` installation behind an explicit developer flag (`-Dev` / `--dev`).
+- **Safe Chapter & Preset Dropdown Rendering:** Replaced raw HTML string concatenation in the Premiere panel UI with DOM element construction so chapter titles and recipe names containing special characters render safely and accurately.
+- **Verified ZXP Signing Tool Downloads:** Added cryptographic SHA-256 verification when downloading `ZXPSignCmd` binaries during extension packaging and added environment variable support (`CEP_CERT_PASSWORD`) for signing certificates.
+- **Automatic `.markers.json` Preferences in Premiere Panel:** Loading a `.markers.json` file in the Premiere Pro panel now applies exported `pad_before`, `pad_after`, and `max_delete_pct` preferences automatically when no custom panel settings override them, and cleaned up duplicate preference helpers in `markers-core.js`.
+- **Multi-Platform Source IDs & Marker Format Documentation:** Exporting `.markers.json` for non-Twitch videos (`YouTube`, `Kick`, `TikTok`, and generic sources) now populates `source.vod_id` with the video's source ID instead of leaving it blank, and updated the `.markers.json` format documentation to reflect full panel support for `"muted"` audio markers.
+
+---
+
 ## v2.14.3
 
 LuckyDownloader **v2.14.3** improves desktop UI responsiveness, parallel download queue accuracy, and native Windows frame handling:

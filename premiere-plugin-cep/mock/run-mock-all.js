@@ -88,10 +88,10 @@ function build(o) {
   if (o.extUrl) host.$ = { evalFile(p) { if (p !== o.extExpect + "/shared/timecode.js") throw new Error("evalFile got an unexpected path: " + p); vm.runInContext(fs.readFileSync(path.join(root, "src/timecode.js"), "utf8"), host); } };
   vm.runInContext(fs.readFileSync(path.join(root, "cep-panel/jsx/host.jsx"), "utf8"), host);
   const els = {}, handlers = {};
-  const el = (id) => els[id] || (els[id] = { value: "", scrollTop: 0, scrollHeight: 0, style: {}, textContent: "", className: "", hidden: false, open: false, scrollIntoView() {}, addEventListener(ev, fn) { if (ev === "click") handlers[id] = fn; } });
+  const el = (id) => els[id] || (els[id] = { value: "", options: [], appendChild(child) { this.options.push(child); }, scrollTop: 0, scrollHeight: 0, style: {}, textContent: "", className: "", hidden: false, open: false, scrollIntoView() {}, addEventListener(ev, fn) { if (ev === "click") handlers[id] = fn; } });
   const cepfs = { readdir: (p) => ({ err: 0, data: fs.readdirSync(p) }), readFile: (p) => ({ err: 0, data: fs.readFileSync(p, "utf8") }) };
   const panel = { window: { __adobe_cep__: { evalScript(code, cb) { setImmediate(() => { let out; try { out = String(vm.runInContext(code, host)); } catch (e) { out = "EvalScript error."; } cb(out); }); }, getSystemPath: () => o.extUrl }, cep: { fs: cepfs, encoding: { UTF8: "UTF-8" } } },
-    document: { getElementById: el }, setTimeout, clearTimeout, Promise, Date, JSON, String, Number, Object, Math, Array, isFinite, console };
+    document: { getElementById: el, createElement: (tag) => ({ tag, value: "", textContent: "" }) }, setTimeout, clearTimeout, Promise, Date, JSON, String, Number, Object, Math, Array, isFinite, console };
   vm.createContext(panel);
   vm.runInContext(fs.readFileSync(path.join(root, "src/markers-core.js"), "utf8") + "\nwindow.LTCore = LT_CORE_API;", panel);
   vm.runInContext(fs.readFileSync(path.join(root, "src/guard.js"), "utf8"), panel);

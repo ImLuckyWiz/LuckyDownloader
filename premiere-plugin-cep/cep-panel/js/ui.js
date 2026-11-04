@@ -53,11 +53,17 @@
       var chapters = window.LTCore.chapterList(r.file.parsed);
       var currentVal = sel.value;
       if (sel.options.length !== chapters.length + 1) {
-        var optHtml = '<option value="">All chapters (whole file)</option>';
+        sel.textContent = "";
+        var allOpt = document.createElement("option");
+        allOpt.value = "";
+        allOpt.textContent = "All chapters (whole file)";
+        sel.appendChild(allOpt);
         chapters.forEach(function (ch) {
-          optHtml += '<option value="' + ch.index + '">' + ch.name + '</option>';
+          var opt = document.createElement("option");
+          opt.value = ch.index;
+          opt.textContent = ch.name;
+          sel.appendChild(opt);
         });
-        sel.innerHTML = optHtml;
         sel.value = currentVal;
       }
     }
@@ -246,11 +252,13 @@
 
   var recSel = $("recipeSelect");
   if (recSel && window.LTCore && window.LTCore.DEFAULT_RECIPES) {
-    var recHtml = "";
+    recSel.textContent = "";
     window.LTCore.DEFAULT_RECIPES.forEach(function (rec) {
-      recHtml += '<option value="' + rec.name + '">' + rec.name + '</option>';
+      var opt = document.createElement("option");
+      opt.value = rec.name;
+      opt.textContent = rec.name;
+      recSel.appendChild(opt);
     });
-    recSel.innerHTML = recHtml;
     recSel.addEventListener("change", function () {
       if (R.applyRecipeByName) R.applyRecipeByName(recSel.value);
     });

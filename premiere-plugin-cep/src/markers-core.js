@@ -223,26 +223,6 @@ function applyRecipe(settings, recipe) {
   if (recipe.name) merged.activeRecipe = String(recipe.name);
   return normalizeSettings(merged);
 }
-
-function applyPreferences(settings, preferences) {
-  if (!preferences || typeof preferences !== "object") return normalizeSettings(settings);
-  const cur = normalizeSettings(settings);
-  const padBefore = preferences.padBefore !== undefined ? preferences.padBefore : (preferences.pad_before !== undefined ? preferences.pad_before : cur.padBefore);
-  const padAfter = preferences.padAfter !== undefined ? preferences.padAfter : (preferences.pad_after !== undefined ? preferences.pad_after : cur.padAfter);
-  const maxDeletePct = preferences.maxDeletePct !== undefined ? preferences.maxDeletePct : (preferences.max_delete_pct !== undefined ? preferences.max_delete_pct : cur.maxDeletePct);
-  return normalizeSettings(Object.assign({}, cur, { padBefore, padAfter, maxDeletePct }));
-}
-
-function applyRecipe(settings, recipe) {
-  if (!recipe || typeof recipe !== "object") return normalizeSettings(settings);
-  const cur = normalizeSettings(settings);
-  const merged = Object.assign({}, cur);
-  for (const k of ["padBefore", "padAfter", "mergeGap", "recipeCutClips", "recipeCutChapters", "recipeMarkers", "recipeDeleteGaps", "maxDeletePct", "minKeepPieces"]) {
-    if (recipe[k] !== undefined) merged[k] = recipe[k];
-  }
-  if (recipe.name) merged.activeRecipe = String(recipe.name);
-  return normalizeSettings(merged);
-}
 
 function colorForClip(views, s) {
   if (!s.colorByViews) return s.clipColor;

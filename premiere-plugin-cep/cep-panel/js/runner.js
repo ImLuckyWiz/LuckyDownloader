@@ -93,11 +93,18 @@
     try {
       var saved = window.localStorage.getItem("ltSettings");
       var padB = fieldEl("padBefore"), padA = fieldEl("padAfter");
-      if (padB && prefs.padBefore !== undefined && (fieldText("padBefore") === "0" || fieldText("padBefore") === "" || !saved)) {
-        padB.value = String(prefs.padBefore);
+      var pb = prefs.padBefore !== undefined ? prefs.padBefore : prefs.pad_before;
+      var pa = prefs.padAfter !== undefined ? prefs.padAfter : prefs.pad_after;
+      if (padB && pb !== undefined && (fieldText("padBefore") === "0" || fieldText("padBefore") === "" || !saved)) {
+        padB.value = String(pb);
       }
-      if (padA && prefs.padAfter !== undefined && (fieldText("padAfter") === "0" || fieldText("padAfter") === "" || !saved)) {
-        padA.value = String(prefs.padAfter);
+      if (padA && pa !== undefined && (fieldText("padAfter") === "0" || fieldText("padAfter") === "" || !saved)) {
+        padA.value = String(pa);
+      }
+      var maxDel = prefs.maxDeletePct !== undefined ? prefs.maxDeletePct : prefs.max_delete_pct;
+      var maxEl = fieldEl("maxDeletePct");
+      if (maxEl && maxDel !== undefined && (fieldText("maxDeletePct") === "0" || fieldText("maxDeletePct") === "" || !saved)) {
+        maxEl.value = String(maxDel);
       }
       appliedPrefs = true;
     } catch (ignore) {}

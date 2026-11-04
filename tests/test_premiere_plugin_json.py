@@ -80,6 +80,15 @@ def test_source_is_optional():
     assert "source" not in data and data["markers"] == [] and data["part"] == {"start": 0.0, "end": 10.0}
 
 
+def test_source_fallback_to_id_when_twitch_vod_id_missing():
+    src = eng.SourceInfo(
+        url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", id="dQw4w9WgXcQ", title="Video", uploader="Creator",
+        duration=100.0, date="2026-01-01", twitch_vod_id=None,
+    )
+    data = json.loads(premiere_markers_json("p", [], 10, 30, src))
+    assert data["source"]["vod_id"] == "dQw4w9WgXcQ"
+
+
 def test_the_shared_sample_matches_what_the_app_writes():
     # the plugin's tests read this same file, so if the format changes both sides notice
     assert SAMPLE.read_text(encoding="utf-8") == _sample_text(), (

@@ -179,7 +179,7 @@ def premiere_markers_json(
     if source is not None:
         data["source"] = {
             "url": source.url,
-            "vod_id": source.twitch_vod_id,
+            "vod_id": str(getattr(source, "twitch_vod_id", "") or getattr(source, "id", "") or ""),
             "title": source.title,
             "streamer": source.uploader,
             "date": source.date,

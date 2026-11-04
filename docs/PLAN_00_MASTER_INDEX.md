@@ -53,12 +53,12 @@ This index maps **all 67 findings (`A-01`..`L-05`)** from [`docs/REVIEW_2026_11.
 - [x] **Plan 03 - Step 13 (RELEASE `v2.14.3`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.3`), commit & git tag `v2.14.3` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 04 — [`docs/PLAN_04_PREMIERE_CEP_PLUGIN_HARDENING.md`](./PLAN_04_PREMIERE_CEP_PLUGIN_HARDENING.md) -> Release `v2.14.4`
-- [ ] **Plan 04 - Step 1** (`F-01`): Remove unused `--enable-nodejs`/`--mixed-context` and gate `.debug` on dev flag — `[Model: Gemini Flash]`
-- [ ] **Plan 04 - Step 2** (`F-02`): Replace `innerHTML` concatenation with safe DOM nodes in `ui.js` — `[Model: Gemini Flash]`
-- [ ] **Plan 04 - Step 3** (`F-03`): Verify `ZXPSignCmd` SHA-256 and read cert password from env — `[Model: Gemini Flash]`
-- [ ] **Plan 04 - Step 4** (`F-04`): Remove duplicate functions in `markers-core.js` and wire `applyPreferences` in `runner.js` — `[Model: Gemini Flash]`
-- [ ] **Plan 04 - Step 5** (`F-05`): Populate `source.id` for non-Twitch sources in `premiere_export.py` and sync docs — `[Model: Gemini Flash]`
-- [ ] **Plan 04 - Step 6 (RELEASE `v2.14.4`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.4`), commit & git tag `v2.14.4` — `[Model: Argon / Claude Sonnet]`
+- [x] **Plan 04 - Step 1** (`F-01`): Remove unused `--enable-nodejs`/`--mixed-context` and gate `.debug` on dev flag — `[Model: Gemini Flash]`
+- [x] **Plan 04 - Step 2** (`F-02`): Replace `innerHTML` concatenation with safe DOM nodes in `ui.js` — `[Model: Gemini Flash]`
+- [x] **Plan 04 - Step 3** (`F-03`): Verify `ZXPSignCmd` SHA-256 and read cert password from env — `[Model: Gemini Flash]`
+- [x] **Plan 04 - Step 4** (`F-04`): Remove duplicate functions in `markers-core.js` and wire `applyPreferences` in `runner.js` — `[Model: Gemini Flash]`
+- [x] **Plan 04 - Step 5** (`F-05`): Populate `source.id` for non-Twitch sources in `premiere_export.py` and sync docs — `[Model: Gemini Flash]`
+- [x] **Plan 04 - Step 6 (RELEASE `v2.14.4`)**: Final diff review, full test suite, `RELEASE_NOTES.md` (`## v2.14.4`), commit & git tag `v2.14.4` — `[Model: Argon / Claude Sonnet]`
 
 ### Plan 05 — [`docs/PLAN_05_INSTALLER_CI_CD_AND_TESTS.md`](./PLAN_05_INSTALLER_CI_CD_AND_TESTS.md) -> Release `v2.14.5`
 - [ ] **Plan 05 - Step 1** (`I-02`): Set `UsePreviousAppDir=no` in `installer.iss` — `[Model: Gemini Flash]`

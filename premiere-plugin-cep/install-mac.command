@@ -18,7 +18,7 @@ if [ -d "$TARGET" ]; then echo "Removing $TARGET"; rm -rf "$TARGET"; fi
 if [ "$1" = "--uninstall" ] || [ "$1" = "-Uninstall" ]; then echo "Uninstalled. Restart Premiere Pro."; exit 0; fi
 
 # Everything that must exist before we copy anything: fail loudly instead of installing half a panel.
-for f in "$PANEL/CSXS/manifest.xml" "$PANEL/index.html" "$PANEL/.debug" "$PANEL/js/runner.js" "$PANEL/js/ui.js" "$PANEL/jsx/host.jsx" \
+for f in "$PANEL/CSXS/manifest.xml" "$PANEL/index.html" "$PANEL/js/runner.js" "$PANEL/js/ui.js" "$PANEL/jsx/host.jsx" \
          "$SHARED/timecode.js" "$SHARED/markers-core.js" "$SHARED/guard.js" "$SHARED/progress.js"; do
   if [ ! -f "$f" ]; then echo "Missing source file: $f" >&2; exit 1; fi
 done
@@ -30,11 +30,14 @@ echo "Unsigned panels allowed (PlayerDebugMode = 1 for CSXS.9 to CSXS.14)."
 
 mkdir -p "$TARGET/shared"
 cp -R "$PANEL/CSXS" "$PANEL/js" "$PANEL/jsx" "$TARGET/"
-cp "$PANEL/index.html" "$PANEL/.debug" "$TARGET/"
+cp "$PANEL/index.html" "$TARGET/"
+if [ "$1" = "--dev" ] && [ -f "$PANEL/.debug" ]; then
+  cp "$PANEL/.debug" "$TARGET/.debug"
+fi
 cp "$SHARED"/*.js "$TARGET/shared/"
 
 # Verify what actually landed.
-for rel in CSXS/manifest.xml index.html .debug js/runner.js js/ui.js jsx/host.jsx shared/timecode.js shared/markers-core.js shared/guard.js shared/progress.js; do
+for rel in CSXS/manifest.xml index.html js/runner.js js/ui.js jsx/host.jsx shared/timecode.js shared/markers-core.js shared/guard.js shared/progress.js; do
   if [ ! -f "$TARGET/$rel" ]; then echo "Install check failed: $rel is not in $TARGET" >&2; exit 1; fi
 done
 # A broken manifest makes Premiere hide the panel without any error: check it is complete before saying "installed".
