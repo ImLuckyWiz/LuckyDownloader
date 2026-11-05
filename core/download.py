@@ -341,10 +341,8 @@ def run_ytdlp(
         "--continue",
     ]
     if any(_is_youtube_url(a) for a in args if isinstance(a, str)):
-        cmd += [
-            "--remote-components", "ejs:github",
-            "--extractor-args", "youtube:player_client=web_safari,web",
-        ]
+        from core.source_info import youtube_extra_args
+        cmd += youtube_extra_args()
     cmd += [
         "--quiet", "--progress", "--newline",
         "--progress-template", PROGRESS_TEMPLATE,
@@ -361,8 +359,11 @@ def run_ytdlp(
     ffmpeg = _find("ffmpeg")
     if ffmpeg:
         cmd += ["--ffmpeg-location", str(Path(ffmpeg).parent)]
-    cmd.append("--")
-    cmd += args
+    opts_in_args = [a for a in args if a != "--"]
+    if opts_in_args:
+        *leading_opts, target_url = opts_in_args
+        cmd += leading_opts
+        cmd += ["--", target_url]
     ctx.check_cancel()
     try:
         proc = _subp.Popen(

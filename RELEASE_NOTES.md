@@ -1,3 +1,13 @@
+## v2.15.2
+
+LuckyDownloader **v2.15.2** fixes YouTube downloads and format detection:
+
+- **Resolved `Requested format is not available` on YouTube:** Removed outdated, hardcoded `--extractor-args youtube:player_client=web_safari,web` which caused YouTube downloads to fail because YouTube's `web_safari` API client was deprecated and only returned storyboard image tracks. Allowed `yt-dlp` to use its modern built-in player client selection (`visionos`, `web`, `android`, etc.) out of the box.
+- **Configurable `yt-dlp` Overrides:** Added support for customizable `yt-dlp` arguments via `settings["ytdlp_extra_args"]` and the `LUCKYDOWNLOADER_YTDLP_EXTRA_ARGS` environment variable while maintaining automatic remote JS solver support (`--remote-components ejs:github`).
+- **Command-Line Option Placement:** Fixed argument terminator (`--`) placement in `run_ytdlp` so yt-dlp option flags (`-o`, `--download-sections`, etc.) are always parsed as options rather than being misinterpreted as URLs.
+
+---
+
 ## v2.15.1
 
 LuckyDownloader **v2.15.1** fixes queue additions and download preparation for Twitch VODs containing muted/silenced audio stretches:

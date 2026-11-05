@@ -330,13 +330,14 @@ def test_youtube_extractor_args_scoped(monkeypatch):
     si._run_ytdlp_json("https://www.youtube.com/watch?v=12345")
     cmd2 = executed_cmds[-1]
     assert "--remote-components" in cmd2
-    assert "--extractor-args" in cmd2
+    # extractor-args no longer hardcoded by default
+    assert "--remote-components" in cmd2
 
     # 3. is_youtube=True flag
     si._run_ytdlp_json("https://custom.site/video", is_youtube=True)
     cmd3 = executed_cmds[-1]
     assert "--remote-components" in cmd3
-    assert "--extractor-args" in cmd3
+    assert "--remote-components" in cmd3
 
     # 4. In core.download.run_ytdlp
     popen_cmds = []
@@ -368,3 +369,26 @@ def test_youtube_extractor_args_scoped(monkeypatch):
     dl.run_ytdlp(DummyCtx(), ["https://youtu.be/12345"], threads=1)
     assert "--remote-components" in popen_cmds[-1]
 
+
+
+def test_youtube_extra_args_default_and_override(monkeypatch):
+    from core.source_info import youtube_extra_args
+    # Default: only remote-components, no broken extractor-args
+    monkeypatch.delenv("LUCKYDOWNLOADER_YTDLP_EXTRA_ARGS", raising=False)
+    monkeypatch.setattr("core.settings.load_settings", lambda: {})
+    args = youtube_extra_args()
+    assert args == ["--remote-components", "ejs:github"]
+
+    # With settings override
+    monkeypatch.setattr("core.settings.load_settings", lambda: {"ytdlp_extra_args": "--extractor-args youtube:player_client=android"})
+    args_custom = youtube_extra_args()
+    assert "--remote-components" in args_custom
+    assert "--extractor-args" in args_custom
+    assert "youtube:player_client=android" in args_custom
+
+    # With env override
+    monkeypatch.setattr("core.settings.load_settings", lambda: {})
+    monkeypatch.setenv("LUCKYDOWNLOADER_YTDLP_EXTRA_ARGS", "--limit-rate 5M")
+    args_env = youtube_extra_args()
+    assert "--limit-rate" in args_env
+    assert "5M" in args_env

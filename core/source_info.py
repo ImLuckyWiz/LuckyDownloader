@@ -193,6 +193,21 @@ def _is_youtube_url(url: str) -> bool:
         return False
 
 
+def youtube_extra_args() -> list[str]:
+    """Extra yt-dlp arguments for YouTube requests (remote JS challenge solver, optional user overrides)."""
+    args = ["--remote-components", "ejs:github"]
+    from core.settings import load_settings
+    import shlex
+    try:
+        st = load_settings()
+        extra = st.get("ytdlp_extra_args") or os.environ.get("LUCKYDOWNLOADER_YTDLP_EXTRA_ARGS")
+        if extra and isinstance(extra, str):
+            args.extend(shlex.split(extra))
+    except Exception:
+        pass
+    return args
+
+
 def _run_ytdlp_json(
     target: str,
     *,
@@ -223,10 +238,7 @@ def _run_ytdlp_json(
         "--skip-download",
     ]
     if is_youtube or _is_youtube_url(target):
-        cmd += [
-            "--remote-components", "ejs:github",
-            "--extractor-args", "youtube:player_client=web_safari,web",
-        ]
+        cmd += youtube_extra_args()
     if max_items:
         cmd.extend(["--playlist-end", str(max_items)])
 
@@ -718,10 +730,7 @@ def build_generic_download_args(
         "--continue",
     ]
     if bool(re.search(r"(?:youtube\.com|youtu\.be)", url or "", re.I)):
-        args += [
-            "--remote-components", "ejs:github",
-            "--extractor-args", "youtube:player_client=web_safari,web",
-        ]
+        args += youtube_extra_args()
     if threads > 1:
         args += ["--concurrent-fragments", str(max(1, threads))]
     if rate_limit and str(rate_limit).strip():
