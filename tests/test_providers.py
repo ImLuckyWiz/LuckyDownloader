@@ -326,12 +326,19 @@ def test_youtube_extractor_args_scoped(monkeypatch):
     assert "--remote-components" not in cmd1
     assert "--extractor-args" not in cmd1
 
-    # 2. YouTube URL in _run_ytdlp_json
+    # 2. YouTube URL in _run_ytdlp_json (default: normal video, no safari)
     si._run_ytdlp_json("https://www.youtube.com/watch?v=12345")
     cmd2 = executed_cmds[-1]
     assert "--remote-components" in cmd2
-    # extractor-args no longer hardcoded by default
-    assert "--remote-components" in cmd2
+    assert "--extractor-args" not in cmd2
+
+    # 2b. YouTube URL with is_age_restricted=True enables web_safari fallback
+    si._run_ytdlp_json("https://www.youtube.com/watch?v=12345", is_age_restricted=True)
+    cmd2b = executed_cmds[-1]
+    assert "--remote-components" in cmd2b
+    assert "--extractor-args" in cmd2b
+    idx_ea2b = cmd2b.index("--extractor-args")
+    assert cmd2b[idx_ea2b + 1] == "youtube:player_client=default,web_safari"
 
     # 3. is_youtube=True flag
     si._run_ytdlp_json("https://custom.site/video", is_youtube=True)
@@ -378,6 +385,9 @@ def test_youtube_extra_args_default_and_override(monkeypatch):
     monkeypatch.setattr("core.settings.load_settings", lambda: {})
     args = youtube_extra_args()
     assert args == ["--remote-components", "ejs:github"]
+
+    args_age = youtube_extra_args(age_restricted=True)
+    assert args_age == ["--remote-components", "ejs:github", "--extractor-args", "youtube:player_client=default,web_safari"]
 
     # With settings override
     monkeypatch.setattr("core.settings.load_settings", lambda: {"ytdlp_extra_args": "--extractor-args youtube:player_client=android"})

@@ -1,8 +1,9 @@
 ## v2.15.2
 
-LuckyDownloader **v2.15.2** fixes YouTube downloads and format detection:
+LuckyDownloader **v2.15.2** fixes YouTube downloads, format detection, and age-restricted video support:
 
-- **Resolved `Requested format is not available` on YouTube:** Removed outdated, hardcoded `--extractor-args youtube:player_client=web_safari,web` which caused YouTube downloads to fail because YouTube's `web_safari` API client was deprecated and only returned storyboard image tracks. Allowed `yt-dlp` to use its modern built-in player client selection (`visionos`, `web`, `android`, etc.) out of the box.
+- **Resolved `Requested format is not available` on Standard YouTube Videos:** Removed outdated, hardcoded `--extractor-args youtube:player_client=web_safari,web` which caused standard YouTube downloads to fail because YouTube's `web_safari` API client only returned storyboard image tracks for regular videos. Allowed `yt-dlp` to use its modern built-in player client selection out of the box, detecting all resolutions up to 4K / 2160p60.
+- **Full-Resolution Age-Restricted YouTube Support with Browser Cookies:** Scoped the `default,web_safari` player client fallback strictly and exclusively to age-restricted YouTube videos when browser cookies are active. This circumvents YouTube's GVS PO Token restriction on `web_creator` clients (which previously dropped age-restricted videos down to 360p) and cleanly restores full 1080p, 720p, 480p, and audio formats.
 - **Configurable `yt-dlp` Overrides:** Added support for customizable `yt-dlp` arguments via `settings["ytdlp_extra_args"]` and the `LUCKYDOWNLOADER_YTDLP_EXTRA_ARGS` environment variable while maintaining automatic remote JS solver support (`--remote-components ejs:github`).
 - **Command-Line Option Placement:** Fixed argument terminator (`--`) placement in `run_ytdlp` so yt-dlp option flags (`-o`, `--download-sections`, etc.) are always parsed as options rather than being misinterpreted as URLs.
 

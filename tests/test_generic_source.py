@@ -561,6 +561,35 @@ def test_get_source_info_passes_cookies_and_remote_components(monkeypatch):
     assert "--extractor-args" not in captured_cmd
 
 
+def test_get_source_info_age_restricted_with_cookies_uses_safari(monkeypatch):
+    from core.source_info import get_source_info
+    captured_cmds = []
+
+    def fake_run(cmd, **kw):
+        captured_cmds.append(cmd)
+        if len(captured_cmds) == 1:
+            stdout = '{"id": "123", "title": "Age restricted", "duration": 100, "age_limit": 18, "formats": [{"format_id": "18", "height": 360, "vcodec": "avc"}]}'
+        else:
+            stdout = '{"id": "123", "title": "Age restricted", "duration": 100, "age_limit": 18, "formats": [{"format_id": "96", "height": 1080, "vcodec": "avc"}]}'
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=0,
+            stdout=stdout,
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr("luckytwitch_engine.find_tool", lambda name: "fake_ytdlp")
+
+    src = get_source_info("https://www.youtube.com/watch?v=123", cookies_browser="firefox")
+    assert len(captured_cmds) == 2
+    assert "--extractor-args" not in captured_cmds[0]
+    assert "--extractor-args" in captured_cmds[1]
+    idx_ea = captured_cmds[1].index("--extractor-args")
+    assert captured_cmds[1][idx_ea + 1] == "youtube:player_client=default,web_safari"
+    assert src.is_age_restricted is True
+
+
 def test_source_info_sanitizes_id_path_traversal():
     info = {"id": "../../etc/passwd", "title": "Evil ID", "duration": 10}
     src = parse_generic_source_info(info, "https://example.com/video")

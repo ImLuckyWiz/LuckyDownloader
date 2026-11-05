@@ -112,6 +112,7 @@ class SourceInfo:
     duration: float
     date: str  # YYYY-MM-DD or ""
     twitch_vod_id: str | None = None
+    is_age_restricted: bool = False
     segments: list[GameSegment] = field(default_factory=list)  # game changes; [] when yt-dlp gives none
     storyboard: Storyboard | None = None  # None when the site has no preview thumbnails
     # Stretches Twitch silenced, in VOD seconds. [] = checked, none; None = not checked or could not be told.
@@ -120,6 +121,7 @@ class SourceInfo:
     thumbnail: str = ""
     site: str = "twitch"
     provider: Any | None = None
+    is_age_restricted: bool = False
 
     def has_capability(self, cap: Any) -> bool:
         from core.providers.base import Capability
@@ -157,6 +159,7 @@ class PlaylistInfo:
     site: str = "generic"
     provider: Any | None = None
     twitch_vod_id: str | None = None
+    is_age_restricted: bool = False
 
     def has_capability(self, cap: Any) -> bool:
         from core.providers.base import Capability
@@ -193,9 +196,11 @@ def _is_youtube_url(url: str) -> bool:
         return False
 
 
-def youtube_extra_args() -> list[str]:
+def youtube_extra_args(age_restricted: bool = False) -> list[str]:
     """Extra yt-dlp arguments for YouTube requests (remote JS challenge solver, optional user overrides)."""
     args = ["--remote-components", "ejs:github"]
+    if age_restricted:
+        args.extend(["--extractor-args", "youtube:player_client=default,web_safari"])
     from core.settings import load_settings
     import shlex
     try:
@@ -221,6 +226,7 @@ def _run_ytdlp_json(
     tool_env_fn: Callable[[], dict[str, str] | None] | None = None,
     no_window_flag: int | None = None,
     json_error_msg: str | None = None,
+    is_age_restricted: bool = False,
 ) -> dict[str, Any]:
     """Execute yt-dlp --dump-single-json with fallback and error mapping."""
     _find = find_tool_fn if find_tool_fn is not None else resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
@@ -238,7 +244,7 @@ def _run_ytdlp_json(
         "--skip-download",
     ]
     if is_youtube or _is_youtube_url(target):
-        cmd += youtube_extra_args()
+        cmd += youtube_extra_args(age_restricted=is_age_restricted)
     if max_items:
         cmd.extend(["--playlist-end", str(max_items)])
 
@@ -298,9 +304,37 @@ def _run_ytdlp_json(
         from core.providers.generic import map_generic_error
         raise EngineError(map_generic_error(proc.stderr))
     try:
-        return json.loads(proc.stdout)
+        data = json.loads(proc.stdout)
     except json.JSONDecodeError as e:
         raise EngineError(json_error_msg or t("yt-dlp returned unreadable data for that URL.")) from e
+
+    # If YouTube video is age-restricted and cookies are active, but default client only yielded
+    # low resolution (<=360p) due to missing PO-token, re-fetch with web_safari fallback.
+    if (is_youtube or _is_youtube_url(target)) and resolved_cb and not is_age_restricted:
+        age_limit = int(data.get("age_limit") or 0)
+        is_age = age_limit >= 18 or data.get("is_age_restricted") is True
+        if is_age:
+            fmts = data.get("formats") or []
+            max_h = max((int(f.get("height") or 0) for f in fmts if f.get("vcodec") != "none"), default=0)
+            if max_h <= 360:
+                try:
+                    data = _run_ytdlp_json(
+                        target,
+                        cookies_browser=cookies_browser,
+                        cookies_url=cookies_url,
+                        flat_playlist=flat_playlist,
+                        max_items=max_items,
+                        timeout=timeout,
+                        is_youtube=is_youtube,
+                        find_tool_fn=_find,
+                        tool_env_fn=_env,
+                        no_window_flag=_nw,
+                        json_error_msg=json_error_msg,
+                        is_age_restricted=True,
+                    )
+                except Exception:
+                    pass
+    return data
 
 
 _ORIG_SOURCE_INFO_RUN_YTDLP_JSON = _run_ytdlp_json
@@ -634,6 +668,7 @@ def parse_playlist_info(info: dict, url: str) -> PlaylistInfo:
         thumbnail=thumbnail,
         site=site,
         provider=prov,
+        is_age_restricted=bool(int(info.get("age_limit") or 0) >= 18 or info.get("is_age_restricted") is True),
     )
 
 
@@ -676,6 +711,7 @@ def parse_generic_source_info(info: dict, url: str) -> SourceInfo:
         thumbnail=thumbnail,
         site=site,
         provider=prov,
+        is_age_restricted=bool(int(info.get("age_limit") or 0) >= 18 or info.get("is_age_restricted") is True),
     )
 
 
@@ -720,6 +756,7 @@ def build_generic_download_args(
     threads: int = 4,
     cookies_browser: str | None = None,
     download_archive: str | None = None,
+    is_age_restricted: bool = False,
 ) -> list[str]:
     format_str = build_generic_format_string(quality=quality, audio_only=audio_only)
     args = [
@@ -730,7 +767,8 @@ def build_generic_download_args(
         "--continue",
     ]
     if bool(re.search(r"(?:youtube\.com|youtu\.be)", url or "", re.I)):
-        args += youtube_extra_args()
+        has_cookies = bool(cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""))
+        args += youtube_extra_args(age_restricted=bool(is_age_restricted and has_cookies))
     if threads > 1:
         args += ["--concurrent-fragments", str(max(1, threads))]
     if rate_limit and str(rate_limit).strip():

@@ -318,6 +318,7 @@ def run_ytdlp(
     rate_limit: str | None = None,
     cookies_browser: str | None = None,
     download_archive: str | None = None,
+    is_age_restricted: bool = False,
     *,
     deps: Any = None,
 ) -> None:
@@ -342,7 +343,9 @@ def run_ytdlp(
     ]
     if any(_is_youtube_url(a) for a in args if isinstance(a, str)):
         from core.source_info import youtube_extra_args
-        cmd += youtube_extra_args()
+        has_cookies = bool(cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""))
+        use_safari = bool(is_age_restricted and has_cookies)
+        cmd += youtube_extra_args(age_restricted=use_safari)
     cmd += [
         "--quiet", "--progress", "--newline",
         "--progress-template", PROGRESS_TEMPLATE,
@@ -461,6 +464,8 @@ def download_full(
         kw["cookies_browser"] = str(cookies_browser).strip().lower()
     if download_archive and str(download_archive).strip():
         kw["download_archive"] = str(download_archive).strip()
+    if kwargs.get("is_age_restricted"):
+        kw["is_age_restricted"] = True
     deps = kwargs.get("deps")
     _ytdlp = getattr(deps, "run_ytdlp", None) or resolve_dep("run_ytdlp", _ORIG_RUN_YTDLP, run_ytdlp)
     _ytdlp(ctx, ["-o", _out_template(workdir, "full"), url], threads, **kw)
@@ -502,6 +507,8 @@ def download_section(
         kw["cookies_browser"] = str(cookies_browser).strip().lower()
     if download_archive and str(download_archive).strip():
         kw["download_archive"] = str(download_archive).strip()
+    if kwargs.get("is_age_restricted"):
+        kw["is_age_restricted"] = True
     deps = kwargs.get("deps")
     _ytdlp = getattr(deps, "run_ytdlp", None) or resolve_dep("run_ytdlp", _ORIG_RUN_YTDLP, run_ytdlp)
     _ytdlp(ctx, args + [url], threads, total_secs=part.duration, watch_dir=pdir, **kw)

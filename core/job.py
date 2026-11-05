@@ -95,6 +95,7 @@ def serialize_job(job: Job) -> dict[str, Any]:
         "formats": [asdict(fmt) for fmt in (src.formats or [])],
         "thumbnail": getattr(src, "thumbnail", ""),
         "site": getattr(src, "site", "twitch"),
+        "is_age_restricted": bool(getattr(src, "is_age_restricted", False)),
     }
     opts_dict = asdict(job.opts)
     return {
@@ -170,6 +171,7 @@ def deserialize_job(data: dict[str, Any], client: TwitchClient | None = None) ->
         formats=formats,
         thumbnail=str(src_raw.get("thumbnail", "")),
         site=str(src_raw.get("site", "twitch")),
+        is_age_restricted=bool(src_raw.get("is_age_restricted", False)),
     )
 
     opts_raw = dict(data.get("opts") or {})

@@ -822,11 +822,13 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
 
     full_archive_kw = {"download_archive": download_archive} if (download_archive and _supports_kw(_dl_full, "download_archive")) else {}
     sec_archive_kw = {"download_archive": download_archive} if (download_archive and _supports_kw(_dl_sec, "download_archive")) else {}
+    full_age_kw = {"is_age_restricted": getattr(src, "is_age_restricted", False)} if _supports_kw(_dl_full, "is_age_restricted") else {}
+    sec_age_kw = {"is_age_restricted": getattr(src, "is_age_restricted", False)} if _supports_kw(_dl_sec, "is_age_restricted") else {}
 
     if plan.strategy == "full":
         ctx.stage(0.0, 0.85, t("Downloading VOD"))
         try:
-            full = _dl_full(ctx, src.url, workdir, opts.threads, **fmt_kw, **rate_kw, **cookies_kw, **full_archive_kw)
+            full = _dl_full(ctx, src.url, workdir, opts.threads, **fmt_kw, **rate_kw, **cookies_kw, **full_archive_kw, **full_age_kw)
         except ArchiveSkippedError as e:
             ctx.log(str(e))
             shutil.rmtree(workdir, ignore_errors=True)
@@ -879,7 +881,7 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
                     real_start, real_end = p.start, p.end
             else:
                 try:
-                    f = _dl_sec(ctx, src.url, p, workdir, opts.threads, opts.exact, **fmt_kw, **rate_kw, **cookies_kw, **sec_archive_kw)
+                    f = _dl_sec(ctx, src.url, p, workdir, opts.threads, opts.exact, **fmt_kw, **rate_kw, **cookies_kw, **sec_archive_kw, **sec_age_kw)
                 except ArchiveSkippedError as e:
                     ctx.log(str(e))
                     continue
