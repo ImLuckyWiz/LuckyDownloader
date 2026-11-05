@@ -138,7 +138,18 @@ MUTED_COMMENT = "Silenced by Twitch (usually copyrighted audio)"
 
 def muted_chapters(ranges: list[Range] | None) -> list[Chapter]:
     """The stretches Twitch silenced as chapters of kind "muted" (absolute VOD time)."""
-    return [Chapter(s, e, MUTED_TITLE, kind="muted") for s, e in (ranges or [])]
+    out: list[Chapter] = []
+    for r in (ranges or []):
+        if isinstance(r, (tuple, list)) and len(r) >= 2:
+            s, e = float(r[0]), float(r[1])
+        elif isinstance(r, dict):
+            s, e = float(r.get("start", 0.0)), float(r.get("end", 0.0))
+        elif hasattr(r, "start") and hasattr(r, "end"):
+            s, e = float(r.start), float(r.end)
+        else:
+            continue
+        out.append(Chapter(s, e, MUTED_TITLE, kind="muted"))
+    return out
 
 
 def fill_gaps(chapters: list[Chapter], total: float, title: str) -> list[Chapter]:

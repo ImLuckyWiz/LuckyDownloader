@@ -338,3 +338,32 @@ def test_close_event_cancels_runner_directly(qtbot, monkeypatch):
     win.closeEvent(ev)
     assert ev.isAccepted()
     assert cancelled == [True]
+
+
+def test_vod_with_muted_audio_adds_to_queue_and_starts(win, monkeypatch):
+    from core.source_info import SourceInfo
+    info = SourceInfo(
+        url="https://www.twitch.tv/videos/2905959676",
+        id="2905959676",
+        title="Stream with muted sections",
+        uploader="Streamer",
+        duration=3600.0,
+        date="2026-11-04",
+        muted=[(100.0, 200.0), (1500.0, 1800.0)],
+    )
+
+    # 1. on_info_ok should format muted duration without tuple attribute errors
+    win.on_info_ok(info, [], False, "")
+    assert "2 muted (0:06:40)" in win.vod_strip.meta_label.text()
+
+    # 2. add_to_queue(start=False) should serialize job and enqueue without error
+    win.add_to_queue(start=False)
+    assert len(win.tab_queue.items) == 1
+    assert win.tab_queue.items[0].job.source.muted == [(100.0, 200.0), (1500.0, 1800.0)]
+
+    # 3. add_to_queue(start=True) should succeed and trigger runner
+    started = []
+    monkeypatch.setattr(win.tab_queue, "start_queue", lambda: started.append(True))
+    win.add_to_queue(start=True)
+    assert len(win.tab_queue.items) == 2
+    assert started == [True]

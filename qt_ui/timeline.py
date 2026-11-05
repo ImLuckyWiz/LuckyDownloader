@@ -314,7 +314,19 @@ class Timeline(TimelinePaintersMixin, TimelinePreviewMixin, QWidget):
 
     def set_muted(self, ranges: Sequence[Range] | None, redraw: bool = True) -> None:
         """The stretches Twitch silenced (None / empty = none, or not known). Drawn as a red line; cuts snap to them."""
-        self.muted = sorted((float(s), float(e)) for s, e in (ranges or []) if e > s)
+        parsed: list[tuple[float, float]] = []
+        for r in (ranges or []):
+            if isinstance(r, (tuple, list)) and len(r) >= 2:
+                s, e = float(r[0]), float(r[1])
+            elif isinstance(r, dict):
+                s, e = float(r.get("start", 0.0)), float(r.get("end", 0.0))
+            elif hasattr(r, "start") and hasattr(r, "end"):
+                s, e = float(r.start), float(r.end)
+            else:
+                continue
+            if e > s:
+                parsed.append((s, e))
+        self.muted = sorted(parsed)
         if self.muted:
             total = sum(e - s for s, e in self.muted)
             n = len(self.muted)

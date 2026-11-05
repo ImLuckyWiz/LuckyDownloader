@@ -17,6 +17,9 @@ running.beat
 # Downloads and tools fetched at runtime
 downloads/
 bin/
+*.part
+*.part-*
+*.ytdl
 
 # Build output
 build/
@@ -39,3 +42,5 @@ venv/
 .DS_Store
 Thumbs.db
 .vscode/
+discord_summary.txt
+proyectos_faltantes.txt

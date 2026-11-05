@@ -102,4 +102,15 @@ def fetch_muted_ranges(formats, duration: float | None = None) -> list[Range] | 
 
 def muted_overlap(muted: list[Range] | None, start: float, end: float) -> float:
     """Seconds of [start, end] that fall inside muted stretches."""
-    return sum(max(0.0, min(e, end) - max(s, start)) for s, e in (muted or []))
+    total = 0.0
+    for r in (muted or []):
+        if isinstance(r, (tuple, list)) and len(r) >= 2:
+            s, e = float(r[0]), float(r[1])
+        elif isinstance(r, dict):
+            s, e = float(r.get("start", 0.0)), float(r.get("end", 0.0))
+        elif hasattr(r, "start") and hasattr(r, "end"):
+            s, e = float(r.start), float(r.end)
+        else:
+            continue
+        total += max(0.0, min(e, end) - max(s, start))
+    return total

@@ -626,7 +626,17 @@ def _load_muted(ctx: Ctx, job: Job, *, deps: PipelineDeps | None = None) -> list
         ctx.log(t("Muted audio: could not read which parts Twitch silenced, so no muted markers this time."))
         return []
     if ranges:
-        ctx.log(t("Muted audio: {count} stretch(es), {total} in total").format(count=len(ranges), total=fmt_hms(sum(e - s for s, e in ranges))))
+        def _dur(r):
+            if isinstance(r, (tuple, list)) and len(r) >= 2:
+                return float(r[1]) - float(r[0])
+            if isinstance(r, dict):
+                return float(r.get("end", 0.0)) - float(r.get("start", 0.0))
+            if hasattr(r, "duration"):
+                return float(r.duration)
+            if hasattr(r, "start") and hasattr(r, "end"):
+                return float(r.end) - float(r.start)
+            return 0.0
+        ctx.log(t("Muted audio: {count} stretch(es), {total} in total").format(count=len(ranges), total=fmt_hms(sum(_dur(r) for r in ranges))))
     return muted_chapters(ranges)
 
 

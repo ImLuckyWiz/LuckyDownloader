@@ -557,7 +557,18 @@ class VodStrip(QFrame):
             bits.append(f"{len(clips)} clips")
         muted = getattr(src, "muted", None) or []
         if muted:
-            total_m = sum(r.duration for r in muted)
+            def _muted_dur(r):
+                if hasattr(r, "duration"):
+                    return float(r.duration)
+                if isinstance(r, (tuple, list)) and len(r) >= 2:
+                    return max(0.0, float(r[1]) - float(r[0]))
+                if isinstance(r, dict):
+                    return max(0.0, float(r.get("end", 0.0)) - float(r.get("start", 0.0)))
+                if hasattr(r, "start") and hasattr(r, "end"):
+                    return max(0.0, float(r.end) - float(r.start))
+                return 0.0
+
+            total_m = sum(_muted_dur(r) for r in muted)
             bits.append(f"{len(muted)} muted ({fmt_hms(total_m)})")
         if warn:
             bits.append(f"({warn})")

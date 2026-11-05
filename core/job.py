@@ -70,6 +70,17 @@ class Job:
 def serialize_job(job: Job) -> dict[str, Any]:
     """Serialize a Job (SourceInfo + JobOptions + clips + single_clip) into a JSON-safe dict."""
     src = job.source
+    muted_serialized = None
+    if src.muted is not None:
+        muted_serialized = []
+        for r in src.muted:
+            if isinstance(r, (tuple, list)) and len(r) >= 2:
+                muted_serialized.append({"start": float(r[0]), "end": float(r[1])})
+            elif isinstance(r, dict):
+                muted_serialized.append({"start": float(r.get("start", 0.0)), "end": float(r.get("end", 0.0))})
+            else:
+                muted_serialized.append({"start": float(getattr(r, "start", 0.0)), "end": float(getattr(r, "end", 0.0))})
+
     src_dict: dict[str, Any] = {
         "url": src.url,
         "id": src.id,
@@ -80,7 +91,7 @@ def serialize_job(job: Job) -> dict[str, Any]:
         "twitch_vod_id": src.twitch_vod_id,
         "segments": [asdict(seg) for seg in (src.segments or [])],
         "storyboard": asdict(src.storyboard) if src.storyboard is not None else None,
-        "muted": [{"start": r.start, "end": r.end} for r in src.muted] if src.muted is not None else None,
+        "muted": muted_serialized,
         "formats": [asdict(fmt) for fmt in (src.formats or [])],
         "thumbnail": getattr(src, "thumbnail", ""),
         "site": getattr(src, "site", "twitch"),
@@ -121,11 +132,14 @@ def deserialize_job(data: dict[str, Any], client: TwitchClient | None = None) ->
         else None
     )
     muted_raw = src_raw.get("muted")
-    muted = (
-        [Range(float(r.get("start", 0.0)), float(r.get("end", 0.0))) for r in muted_raw if isinstance(r, dict)]
-        if isinstance(muted_raw, list)
-        else None
-    )
+    muted = None
+    if isinstance(muted_raw, list):
+        muted = []
+        for r in muted_raw:
+            if isinstance(r, dict):
+                muted.append((float(r.get("start", 0.0)), float(r.get("end", 0.0))))
+            elif isinstance(r, (tuple, list)) and len(r) >= 2:
+                muted.append((float(r[0]), float(r[1])))
     formats = [
         VideoFormat(
             format_id=str(f.get("format_id", "")),

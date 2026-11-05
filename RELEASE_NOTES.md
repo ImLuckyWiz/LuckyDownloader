@@ -1,3 +1,13 @@
+## v2.15.1
+
+LuckyDownloader **v2.15.1** fixes queue additions and download preparation for Twitch VODs containing muted/silenced audio stretches:
+
+- **Muted Audio Range Handling & Queue Serialization:** Fixed an `AttributeError` on `r.duration` in the VOD strip and `r.start` in queue serialization when loading and enqueueing Twitch streams that contain silenced audio by properly supporting `(start, end)` tuple ranges.
+- **Queue State Deserialization:** Fixed job reconstruction from saved queue state to deserialize muted ranges as `(start, end)` tuples rather than calling `Range` as a constructor.
+- **Defensive Duration & Chapter Calculations:** Guarded muted duration and overlap calculations across the finalization pipeline, chapters exporter, and Timeline widgets against arbitrary range representations (tuples, dicts, and objects).
+
+---
+
 ## v2.15.0
 
 LuckyDownloader **v2.15.0** adds automatic download queue recovery across restarts and updates, pre-flight disk-space checks, one-click diagnostics export, resumable work directories, and modularized core and UI architecture:
