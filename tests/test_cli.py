@@ -46,6 +46,7 @@ def test_cli_parser_defaults():
     assert args.clean_title is True
     assert args.subfolders is True
     assert args.threads == 8
+    assert args.name_template == ""
     assert args.dry_run is False
 
 
@@ -69,6 +70,7 @@ def test_cli_parser_custom_args():
         "--threads", "4",
         "--rate-limit", "10M",
         "--cookies-browser", "firefox",
+        "--template", "{streamer} - {title} - {game} - part{n}",
         "--dry-run",
     ])
 
@@ -87,6 +89,7 @@ def test_cli_parser_custom_args():
     assert args.threads == 4
     assert args.rate_limit == "10M"
     assert args.cookies_browser == "firefox"
+    assert args.name_template == "{streamer} - {title} - {game} - part{n}"
     assert args.dry_run is True
 
 
@@ -192,3 +195,31 @@ def test_console_reporter(capsys):
     quiet_reporter.progress(0.5, "Halfway")
     quiet_out, _ = capsys.readouterr()
     assert quiet_out == ""
+
+
+@patch("cli.run_job")
+@patch("cli.get_source_info")
+def test_cli_template_passed_to_job(mock_get_source_info, mock_run_job):
+    """Ensure --template sets both name_template and generic_name_template on JobOptions."""
+    mock_src = SourceInfo(
+        url="https://www.twitch.tv/videos/123456789",
+        id="123456789",
+        title="Epic Stream",
+        uploader="LuckyStreamer",
+        duration=7200.0,
+        date="2026-11-06",
+        formats=[],
+        site="twitch",
+    )
+    mock_get_source_info.return_value = mock_src
+
+    ret = cli.main([
+        "https://www.twitch.tv/videos/123456789",
+        "--template", "{streamer} - {title} - {game} - part{n}",
+    ])
+
+    assert ret == 0
+    mock_run_job.assert_called_once()
+    called_job = mock_run_job.call_args[0][0]
+    assert called_job.opts.name_template == "{streamer} - {title} - {game} - part{n}"
+    assert called_job.opts.generic_name_template == "{streamer} - {title} - {game} - part{n}"

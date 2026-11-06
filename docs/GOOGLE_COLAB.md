@@ -74,7 +74,18 @@ Cut points follow the exact syntax as the desktop app:
     --strategy sections
 ```
 
-### Example 3: Preview with Dry Run (no files downloaded)
+### Example 3: Custom Filename Template
+
+Customize the generated filenames using metadata variables like `{streamer}`, `{title}`, `{game}`, and `{n}`:
+
+```bash
+!python cli.py "https://www.twitch.tv/videos/123456789" \
+    --cuts "0:00:00 - 1:18:55 - end" \
+    --template "{streamer} - {title} - {game} - part{n}" \
+    --out "/content/drive/MyDrive/LuckyDownloader"
+```
+
+### Example 4: Preview with Dry Run (no files downloaded)
 
 Use `--dry-run` to inspect stream title, duration, coverage percentage, and the calculated cut parts before starting the download:
 
@@ -84,7 +95,7 @@ Use `--dry-run` to inspect stream title, duration, coverage percentage, and the 
     --dry-run
 ```
 
-### Example 4: Audio-Only Extraction
+### Example 5: Audio-Only Extraction
 
 ```bash
 !python cli.py "https://www.twitch.tv/videos/123456789" \
@@ -101,6 +112,7 @@ Use `--dry-run` to inspect stream title, duration, coverage percentage, and the 
 |---|---|---|---|
 | `url` | | VOD or video URL (Twitch, YouTube, etc.) | Required |
 | `--cuts` | `-c` | Cut points string (e.g. `"0:00:00 - 1:18:55 - end"`) | Entire video |
+| `--template` | | Filename template (e.g. `"{streamer} - {title} - {game} - part{n}"`) | `"{streamer} - {date} - {id} - part{n}"` |
 | `--out` | `-o` | Target directory | `./downloads` |
 | `--quality` | `-q` | Quality selector (`best`, `1080p60`, `720p60`, `audio`) | `best` |
 | `--strategy` | `-s` | `auto`, `sections` (download only parts), `full` (download all, then cut) | `auto` |

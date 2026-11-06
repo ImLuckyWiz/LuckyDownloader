@@ -137,6 +137,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Target output directory (default: ./downloads).",
     )
     parser.add_argument(
+        "--template",
+        "--name-template",
+        dest="name_template",
+        default="",
+        help='Filename template for downloaded parts (e.g. "{streamer} - {title} - {game} - part{n}"). '
+        'Defaults to "{streamer} - {date} - {id} - part{n}".',
+    )
+    parser.add_argument(
         "-q",
         "--quality",
         default=QUALITY_BEST,
@@ -295,6 +303,11 @@ def main(argv: list[str] | None = None) -> int:
             reporter.log("Dry run finished successfully. No files were downloaded.")
             return 0
 
+        opts_kwargs = {}
+        if args.name_template:
+            opts_kwargs["name_template"] = args.name_template
+            opts_kwargs["generic_name_template"] = args.name_template
+
         opts = JobOptions(
             cut_text=cut_text,
             out_dir=os.path.abspath(args.out),
@@ -312,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
             rate_limit=args.rate_limit or "",
             cookies_browser=args.cookies_browser or "",
             subfolders=args.subfolders,
+            **opts_kwargs,
         )
 
         job = Job(source=src, opts=opts)
