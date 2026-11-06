@@ -21,7 +21,7 @@ Colab already comes with Python and system utilities. You only need to clone the
 
 ```bash
 # Clone the repository
-!git clone https://github.com/Lucky-Puppet/LuckyDownloader.git
+!git clone https://github.com/ImLuckyWiz/LuckyDownloader.git
 %cd LuckyDownloader
 
 # Install lightweight dependencies (takes < 10 seconds)
