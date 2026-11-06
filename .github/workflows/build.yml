@@ -231,9 +231,82 @@ jobs:
             dist/LuckyTwitch-Premiere-Plugin-CEP.zxp
           fail_on_unmatched_files: false
 
+  build-cli:
+    name: Build CLI (${{ matrix.label }})
+    needs: [build]
+    if: |
+      !cancelled() &&
+      needs.build.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows
+          - os: macos-latest
+            label: macos-arm64
+          - os: ubuntu-latest
+            label: linux-x86_64
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache Nuitka compiler cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/Nuitka
+            ~/AppData/Local/Nuitka/Nuitka/Cache
+            ~/Library/Caches/Nuitka
+          key: ${{ runner.os }}-nuitka-cli-${{ hashFiles('requirements-cli.txt', 'cli.py') }}
+          restore-keys: |
+            ${{ runner.os }}-nuitka-cli-
+      - name: Build CLI (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: build_windows_cli.bat ${{ github.ref_type == 'tag' && github.ref_name || '1.0' }}
+      - name: Build CLI (macOS)
+        if: runner.os == 'macOS'
+        run: bash build_mac_cli.sh "${{ github.ref_type == 'tag' && github.ref_name || '1.0' }}"
+      - name: Build CLI (Linux)
+        if: runner.os == 'Linux'
+        run: bash build_linux_cli.sh "${{ github.ref_type == 'tag' && github.ref_name || '1.0' }}"
+      - name: Smoke test CLI help (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\LuckyDownloader-CLI\LuckyDownloader-CLI.exe" -ArgumentList "--help" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "CLI --help failed with exit code $($p.ExitCode)" }
+      - name: Smoke test CLI help (macOS)
+        if: runner.os == 'macOS'
+        run: dist/LuckyDownloader-CLI/LuckyDownloader-CLI --help
+      - name: Smoke test CLI help (Linux)
+        if: runner.os == 'Linux'
+        run: dist/LuckyDownloader-CLI/LuckyDownloader-CLI --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LuckyDownloader-CLI-${{ matrix.label }}
+          path: |
+            dist/LuckyDownloader-CLI-windows.zip
+            dist/LuckyDownloader-CLI-macos-*.tar.gz
+            dist/LuckyDownloader-CLI-linux-*.tar.gz
+      - name: Upload CLI binaries to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/LuckyDownloader-CLI-windows.zip
+            dist/LuckyDownloader-CLI-macos-*.tar.gz
+            dist/LuckyDownloader-CLI-linux-*.tar.gz
+          fail_on_unmatched_files: false
+
   checksums:
     name: Generate and Upload SHA256SUMS
-    needs: [build, plugin]
+    needs: [build, build-cli, plugin]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

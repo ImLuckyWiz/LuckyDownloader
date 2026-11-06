@@ -15,6 +15,7 @@ Obtén la versión más reciente en la página de [Versiones](../../releases):
 | Windows | `LuckyDownloader-Setup.exe` |
 | macOS (Apple Silicon: M1, M2, M3, M4) | `LuckyDownloader-macos-arm64.dmg` |
 | Linux (x86_64) | `LuckyDownloader-x86_64.AppImage`, `LuckyDownloader-linux-x86_64.tar.gz` |
+| CLI sin interfaz gráfica | `LuckyDownloader-CLI-windows.zip`, `LuckyDownloader-CLI-macos-arm64.tar.gz`, `LuckyDownloader-CLI-linux-x86_64.tar.gz` |
 
 ### Instalación
 
@@ -67,6 +68,25 @@ Al cargar un VOD de Twitch, aparece un selector de **Calidad** en la pestaña Pl
 
 - **Resoluciones:** `Fuente (1080p60)`, `720p60`, `480p`, etc.
 - **Solo audio:** descarga únicamente la pista de sonido (formato `.m4a`), reduciendo drásticamente el tamaño del archivo y el tiempo de descarga.
+
+---
+
+## CLI y Google Colab
+
+LuckyDownloader incluye una interfaz por línea de comandos (`cli.py`) completamente desacoplada de la interfaz gráfica, ideal para servidores y **Google Colab**:
+
+```bash
+# Instalar dependencias ligeras (sin PySide6)
+pip install -r requirements-cli.txt
+
+# Descargar secciones usando la sintaxis de puntos de corte
+python cli.py "https://www.twitch.tv/videos/123456789" \
+    --cuts "0:00:00 - 1:18:55 - end" \
+    --out "./downloads" \
+    --quality best
+```
+
+Consulta [docs/GOOGLE_COLAB.md](docs/GOOGLE_COLAB.md) para una guía paso a paso y celdas listas para Google Colab con montaje en Google Drive.
 
 ---
 

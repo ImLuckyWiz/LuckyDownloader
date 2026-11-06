@@ -1,3 +1,16 @@
+## v2.16.0
+
+LuckyDownloader **v2.16.0** introduces a dedicated headless CLI, Google Colab cloud-trimming support, and standalone CLI binary packaging across Windows, Linux, and macOS:
+
+- **Headless Command-Line Interface (`cli.py`):** Added a lightweight CLI entrypoint with zero GUI dependencies (`PySide6`/`qt_ui`), powered directly by LuckyDownloader's core engine. Supports trimming VODs into parts using the app's standard cut point syntax (`--cuts "0:00:00 - 1:18:55 - end"`), quality presets (`--quality best`, `1080p60`, `720p60`, `audio`), download strategies (`auto`, `sections`, `full`), frame-exact cuts (`--exact`), format containers (`mp4`, `mkv`), Twitch chat (`--chat`), chapters (`--chapters`), and title cleaning.
+- **Dry-Run Inspection Mode:** Added `--dry-run` to inspect stream metadata, parse cut points, and preview the full part breakdown, durations, and download strategy without fetching video files.
+- **Cloud & Google Colab Workflow (`docs/GOOGLE_COLAB.md`):** Added complete documentation and ready-to-run notebook cells for Google Colab, allowing users to leverage high-speed cloud bandwidth to trim long VODs and export segments directly into Google Drive.
+- **Lightweight Dependencies (`requirements-cli.txt`):** Added a minimal dependency specification for headless and cloud environments that excludes PySide6, enabling sub-10-second installations.
+- **Standalone Headless CLI Compilations:** Created dedicated Nuitka build scripts (`build_windows_cli.bat`, `build_linux_cli.sh`, `build_mac_cli.sh`) producing standalone CLI binaries for Windows, Linux (x86_64), and macOS (Apple Silicon arm64) free of GUI libraries.
+- **GitHub Actions Release Pipeline:** Integrated a sequential `build-cli` job in `.github/workflows/build.yml` running after GUI builds finish to prevent macOS runner concurrency bottlenecks, publishing portable CLI archives (`LuckyDownloader-CLI-*`) to GitHub Releases with verified SHA-256 checksums.
+
+---
+
 ## v2.15.2
 
 LuckyDownloader **v2.15.2** fixes YouTube downloads, format detection, and age-restricted video support:

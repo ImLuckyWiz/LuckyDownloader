@@ -13,6 +13,7 @@ Get the latest version from the [Releases](../../releases) page:
 | Windows | `LuckyDownloader-Setup.exe` |
 | macOS (Apple Silicon: M1, M2, M3, M4) | `LuckyDownloader-macos-arm64.dmg` |
 | Linux (x86_64) | `LuckyDownloader-x86_64.AppImage`, `LuckyDownloader-linux-x86_64.tar.gz` |
+| Headless CLI (All OS) | `LuckyDownloader-CLI-windows.zip`, `LuckyDownloader-CLI-macos-arm64.tar.gz`, `LuckyDownloader-CLI-linux-x86_64.tar.gz` |
 
 ### Install
 
@@ -157,6 +158,23 @@ The data folder also holds a small `links` folder and a `running.beat` file: the
 
 Uninstalling the app leaves this data folder in place; delete it for a clean removal. To reinstall ffmpeg, delete `ffmpeg` and `ffprobe` from the `tools` folder and restart the app.
 
+## Headless CLI & Google Colab
+
+LuckyDownloader includes a headless command-line interface (`cli.py`) with zero GUI dependencies, ideal for servers, scripts, and **Google Colab**:
+
+```bash
+# Install lightweight CLI requirements (no PySide6 needed)
+pip install -r requirements-cli.txt
+
+# Download specific parts using cut points syntax
+python cli.py "https://www.twitch.tv/videos/123456789" \
+    --cuts "0:00:00 - 1:18:55 - end" \
+    --out "./downloads" \
+    --quality best
+```
+
+See [docs/GOOGLE_COLAB.md](docs/GOOGLE_COLAB.md) for a ready-to-use Google Colab notebook workflow with Google Drive mounting.
+
 ## Run from source
 
 ```
@@ -170,9 +188,9 @@ Python 3.10+ is required. When run from source, settings and downloads stay next
 
 Nuitka compiles native standalone binaries, so build each system on that system.
 
-- **Windows:** run `build_windows.bat [version]` → `dist\LuckyDownloader\LuckyDownloader.exe`, plus `dist\LuckyDownloader-Setup.exe` if [Inno Setup 6](https://jrsoftware.org/isdl.php) is installed.
-- **macOS:** run `./build_mac.sh` → `dist/LuckyDownloader.app` and `dist/LuckyDownloader-macos-<arch>.dmg`. It also installs the app into Applications on that Mac. The result matches the Mac's chip (Apple Silicon or Intel).
-- **Linux:** run `./build_linux.sh [version]` → `dist/LuckyDownloader-x86_64.AppImage` and `dist/LuckyDownloader-linux-x86_64.tar.gz`.
+- **Windows:** run `build_windows.bat [version]` → `dist\LuckyDownloader\LuckyDownloader.exe`, plus `dist\LuckyDownloader-Setup.exe` if [Inno Setup 6](https://jrsoftware.org/isdl.php) is installed. To build the headless CLI only, run `build_windows_cli.bat [version]`.
+- **macOS:** run `./build_mac.sh` → `dist/LuckyDownloader.app` and `dist/LuckyDownloader-macos-<arch>.dmg`. It also installs the app into Applications on that Mac. The result matches the Mac's chip (Apple Silicon or Intel). To build the headless CLI only, run `./build_mac_cli.sh [version]`.
+- **Linux:** run `./build_linux.sh [version]` → `dist/LuckyDownloader-x86_64.AppImage` and `dist/LuckyDownloader-linux-x86_64.tar.gz`. To build the headless CLI only, run `./build_linux_cli.sh [version]`.
 
 ## Development
 
