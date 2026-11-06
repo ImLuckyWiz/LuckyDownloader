@@ -246,6 +246,10 @@ def main(argv: list[str] | None = None) -> int:
     ctx = Ctx(log=reporter.log, progress=reporter.progress)
 
     try:
+        # Ensure tools (ffmpeg, yt-dlp) are present before fetching metadata or downloading
+        reporter.log("Verifying tools (ffmpeg, yt-dlp)...")
+        ensure_tools(ctx)
+
         reporter.log(f"Fetching metadata for: {args.url}")
         src = get_source_info(args.url, cookies_browser=args.cookies_browser or None)
         reporter.log(f"Title: {src.title or 'Unknown'}")
@@ -285,10 +289,6 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             reporter.log("Dry run finished successfully. No files were downloaded.")
             return 0
-
-        # Ensure tools (ffmpeg, yt-dlp) are present before downloading
-        reporter.log("Verifying tools (ffmpeg, yt-dlp)...")
-        ensure_tools(ctx)
 
         opts = JobOptions(
             cut_text=cut_text,
