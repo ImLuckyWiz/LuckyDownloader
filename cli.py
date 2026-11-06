@@ -75,6 +75,11 @@ class ConsoleReporter:
             if self.is_tty:
                 sys.stdout.write(f"\r[LuckyDownloader] {text} ...\033[K")
                 sys.stdout.flush()
+            else:
+                if text != self.last_label or (now - self.last_print_time) >= 10.0:
+                    self.last_label = text
+                    self.last_print_time = now
+                    print(f"[LuckyDownloader] {text} ...", flush=True)
             return
 
         pct = int(min(max(frac, 0.0), 1.0) * 100)
@@ -84,7 +89,7 @@ class ConsoleReporter:
         if not self.is_tty:
             should_print = (
                 pct != self.last_pct
-                and (pct % 10 == 0 or pct == 100 or text != self.last_label or (now - self.last_print_time) >= 5.0)
+                and (pct % 5 == 0 or pct == 100 or text != self.last_label or (now - self.last_print_time) >= 5.0)
             )
             if should_print:
                 self.last_pct = pct

@@ -176,12 +176,14 @@ def test_console_reporter(capsys):
     reporter.log("Starting download")
     reporter.progress(0.1, "Downloading segment 1/10")
     reporter.progress(0.2, "Downloading segment 2/10")
+    reporter.progress(-1.0, "Assembling video")
     reporter.progress(1.0, "Complete")
 
     out, _ = capsys.readouterr()
     assert "Starting download" in out
     assert "[ 10%] Downloading segment 1/10" in out
     assert "[ 20%] Downloading segment 2/10" in out
+    assert "Assembling video ..." in out
     assert "[100%] Complete" in out
 
     # Quiet mode

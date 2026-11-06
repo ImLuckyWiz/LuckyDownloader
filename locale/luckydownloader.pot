@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-04 05:31-0300\n"
+"POT-Creation-Date: 2026-11-06 03:22-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -154,6 +154,14 @@ msgid "✔ {name}  ({width}x{height}, {fps} fps, {label}; {start_msg})"
 msgstr ""
 
 #: core/download.py
+msgid "All fragments downloaded. Assembling video…"
+msgstr ""
+
+#: core/download.py
+msgid "Assembling video"
+msgstr ""
+
+#: core/download.py
 #, python-brace-format
 msgid "Could not get the playlist address: {error}"
 msgstr ""
@@ -242,7 +250,15 @@ msgid "Cutting"
 msgstr ""
 
 #: core/finalize.py
+msgid "Cutting video into parts with ffmpeg…"
+msgstr ""
+
+#: core/finalize.py
 msgid "Downloading VOD"
+msgstr ""
+
+#: core/finalize.py
+msgid "Downloading full video…"
 msgstr ""
 
 #: core/finalize.py
@@ -280,6 +296,16 @@ msgstr ""
 #: core/finalize.py
 #, python-brace-format
 msgid "Re-encoding part {part}/{total}"
+msgstr ""
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Saving {name}…"
+msgstr ""
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Splitting into {count} part(s) using stream copy…"
 msgstr ""
 
 #: core/finalize.py

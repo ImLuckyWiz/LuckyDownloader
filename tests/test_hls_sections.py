@@ -266,6 +266,16 @@ def test_ffmpeg_progress_without_speed_still_reports_fraction():
     assert frac == pytest.approx(0.5) and "ETA" not in text
 
 
+def test_ffmpeg_progress_stream_copy_shows_time():
+    pr = eng.FfmpegProgress(total=100.0)
+    pr.feed("out_time_us=25000000")
+    pr.feed("total_size=N/A")
+    pr.feed("speed=2.0x")
+    frac, text = pr.feed("progress=continue")
+    assert frac == pytest.approx(0.25)
+    assert text == "0:00:25 · 2.0x · ETA 0:00:38"
+
+
 def test_hls_rejects_unsafe_urls():
     from core.download import _is_safe_hls_url
     assert not _is_safe_hls_url("file:///etc/passwd")

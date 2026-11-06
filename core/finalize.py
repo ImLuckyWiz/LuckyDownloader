@@ -513,6 +513,7 @@ def split_copy(
     if not inner:  # whole video is a single part
         return {parts[0].index: (full, 0.0, duration)}
 
+    ctx.log(t("Splitting into {count} part(s) using stream copy…").format(count=len(parts)))
     seg_dir = workdir / "segments"
     if seg_dir.exists():
         shutil.rmtree(seg_dir)
@@ -769,6 +770,8 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
         else:
             media_tags["title"] = src.title.strip()
         finalize_fn = _fin_audio if audio_only else _fin_part
+        dest_filename = f"{stem.name}.{out_container}"
+        ctx.log(t("Saving {name}…").format(name=dest_filename))
         dest = finalize_fn(ctx, file, stem, out_container, chs, media_tags, real_end - real_start, copy)
         if opts.sidecar and n_clip_chapters:
             _write_sidecar(dest, [c for c in chs if c.clips])
@@ -827,6 +830,7 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
 
     if plan.strategy == "full":
         ctx.stage(0.0, 0.85, t("Downloading VOD"))
+        ctx.log(t("Downloading full video…"))
         try:
             full = _dl_full(ctx, src.url, workdir, opts.threads, **fmt_kw, **rate_kw, **cookies_kw, **full_archive_kw, **full_age_kw)
         except ArchiveSkippedError as e:
@@ -835,6 +839,7 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
             ctx.stage(1.0, 1.0, "Done")
             return results
         ctx.stage(0.85, 1.0, t("Cutting"))
+        ctx.log(t("Cutting video into parts with ffmpeg…"))
         if opts.exact:
             for i, p in enumerate(plan.parts):
                 ctx.stage(0.85 + 0.15 * i / total_parts, 0.85 + 0.15 * (i + 1) / total_parts, t("Re-encoding part {part}/{total}").format(part=p.index, total=total_parts))

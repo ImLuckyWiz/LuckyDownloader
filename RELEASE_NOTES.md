@@ -1,3 +1,15 @@
+## v2.16.1
+
+LuckyDownloader **v2.16.1** enhances progress visibility, live metrics, and logging across long fragment merges and FFmpeg cutting passes in both the desktop app and the headless CLI:
+
+- **Fragment Assembly Progress & Speed Tracking:** Fixed the apparent freeze at 85% during multi-threaded HLS/VOD downloads. When all fragments finish downloading, LuckyDownloader now transitions the stage label to "Assembling video" and actively tracks concatenation bytes, throughput speed, and estimated time remaining (ETA) as the destination file grows on disk.
+- **Real-Time FFmpeg Cutting & Stream-Copy Progress:** Stream-copy segment cutting (`split_copy`) and finishing operations now continuously report elapsed video timestamp position, processing speed multiplier (e.g. `210x`), and ETA, giving full visibility into FFmpeg's operation rather than appearing stalled at a static percentage.
+- **Stage Logging Across GUI & Headless CLI:** Added descriptive log messages for stage transitions ("Downloading full video…", "All fragments downloaded. Assembling video…", "Cutting video into parts with ffmpeg…", "Splitting into {count} part(s) using stream copy…", "Saving {name}…") across both the desktop application log pane and CLI console output.
+- **Google Colab & Non-TTY Progress Output:** Indeterminate progress phases (such as fragment assembly and initial remuxing) are now emitted periodically rather than suppressed in non-TTY environments like Google Colab, and progress milestones are reported in 5% intervals to eliminate false appearances of hanging while keeping notebook cell logs clean.
+- **Google Colab Storage Performance Best Practices:** Documented local scratch directory usage (`./downloads`) vs Google Drive FUSE latency in `docs/GOOGLE_COLAB.md` to maximize I/O throughput during multi-gigabyte fragment merges before exporting final trimmed parts to Drive.
+
+---
+
 ## v2.16.0
 
 LuckyDownloader **v2.16.0** introduces a dedicated headless CLI, Google Colab cloud-trimming support, and standalone CLI binary packaging across Windows, Linux, and macOS:

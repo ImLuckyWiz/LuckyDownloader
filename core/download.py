@@ -83,6 +83,8 @@ class FfmpegProgress:
             if self.size:
                 mib = self.size / (1024 * 1024)
                 bits.append(f"{mib:.1f} MiB" if mib < 10 else f"{mib:.0f} MiB")
+            else:
+                bits.append(fmt_hms(self.t))
             if self.speed and self.speed > 0:
                 bits.append(f"{self.speed:.1f}x")
                 if self.total:
@@ -185,7 +187,7 @@ def run_ffmpeg(ctx: Ctx, args: list[str], total: float | None = None, *, deps: A
             line = line.strip()
             if line.partition("=")[0] in _FF_PROGRESS_KEYS:
                 parsed = progress.feed(line)
-                if parsed and total:
+                if parsed:
                     ctx.report(parsed[0], parsed[1])
                     ctx.log_progress(parsed[0], parsed[1])
             elif line and "=" not in line.split(" ")[0]:
@@ -295,12 +297,51 @@ def _folder_size(folder: Path) -> int:
 def _watch_folder(ctx: Ctx, folder: Path, stop: threading.Event, last_real: list[float]) -> None:
     """Fallback progress: if the downloader reports nothing for a while, show how much has landed on disk."""
     samples: list[tuple[float, int]] = []
+    assembly_samples: list[tuple[float, int]] = []
     while not stop.wait(1.0):
         now = time.monotonic()
-        size = _folder_size(folder)
-        samples = (samples + [(now, size)])[-8:]
-        if now - last_real[0] < 5 or size <= 0:
+        if now - last_real[0] < 5:
             continue
+
+        # Check for active fragment assembly (merging fragments into .part file)
+        part_file = None
+        frag_total = 0
+        try:
+            part_candidates = [
+                p for p in folder.iterdir()
+                if p.is_file() and p.name.endswith(".part") and "-Frag" not in p.name
+            ]
+            if part_candidates:
+                part_file = part_candidates[0]
+                frag_files = [p for p in folder.iterdir() if p.is_file() and "-Frag" in p.name]
+                if frag_files:
+                    frag_total = sum(p.stat().st_size for p in frag_files)
+        except OSError:
+            pass
+
+        if part_file is not None and frag_total > 0:
+            try:
+                part_size = part_file.stat().st_size
+            except OSError:
+                part_size = 0
+            assembly_samples = (assembly_samples + [(now, part_size)])[-8:]
+            t0, s0 = assembly_samples[0]
+            speed = (part_size - s0) / (now - t0) if now > t0 else 0
+            frac = min(max(part_size / frag_total, 0.0), 1.0) if frag_total > 0 else None
+            part_mib = part_size / 1048576
+            total_mib = frag_total / 1048576
+            speed_str = f" · {speed / 1048576:.1f} MiB/s" if speed > 0 else ""
+            rem = max(frag_total - part_size, 0)
+            eta_str = f" · ETA {fmt_hms(rem / speed)}" if (speed > 0 and rem > 0) else ""
+            text = f"{part_mib:.0f} / {total_mib:.0f} MiB{speed_str}{eta_str}"
+            ctx.report(frac, text)
+            ctx.log_progress(frac, text)
+            continue
+
+        size = _folder_size(folder)
+        if size <= 0:
+            continue
+        samples = (samples + [(now, size)])[-8:]
         t0, s0 = samples[0]
         speed = (size - s0) / (now - t0) if now > t0 else 0
         text = f"{size / 1048576:.0f} MiB" + (f" · {speed / 1048576:.1f} MiB/s" if speed > 0 else "")
@@ -391,6 +432,7 @@ def run_ytdlp(
         watcher = threading.Thread(target=_watch_folder, args=(ctx, watch_dir, stop, last_real), daemon=True)
         watcher.start()
     tail: list[str] = []
+    assembly_announced = False
     try:
         assert proc.stdout is not None
         # text mode turns the "\r" that ffmpeg uses between stats updates into line breaks
@@ -403,6 +445,15 @@ def run_ytdlp(
                 last_real[0] = time.monotonic()
                 ctx.report(*parsed)
                 ctx.log_progress(*parsed)
+                if not assembly_announced and line.startswith("LTPROG|"):
+                    fields = line.split("|")
+                    if len(fields) >= 7:
+                        f_idx = _num(fields[5])
+                        f_cnt = _num(fields[6])
+                        if f_idx is not None and f_cnt is not None and f_cnt > 0 and f_idx >= f_cnt:
+                            assembly_announced = True
+                            ctx.log(t("All fragments downloaded. Assembling video…"))
+                            ctx.relabel(t("Assembling video"))
                 continue
             tail.append(line)
             if line.startswith(("WARNING", "ERROR")):
@@ -447,6 +498,7 @@ def download_full(
     rate_limit: str | None = None,
     cookies_browser: str | None = None,
     download_archive: str | None = None,
+    watch_dir: Path | None = None,
     **kwargs: Any,
 ) -> Path:
     workdir.mkdir(parents=True, exist_ok=True)
@@ -468,7 +520,7 @@ def download_full(
         kw["is_age_restricted"] = True
     deps = kwargs.get("deps")
     _ytdlp = getattr(deps, "run_ytdlp", None) or resolve_dep("run_ytdlp", _ORIG_RUN_YTDLP, run_ytdlp)
-    _ytdlp(ctx, ["-o", _out_template(workdir, "full"), url], threads, **kw)
+    _ytdlp(ctx, ["-o", _out_template(workdir, "full"), url], threads, watch_dir=watch_dir or workdir, **kw)
     media = _find_media(workdir)
     if not media:
         if download_archive and str(download_archive).strip():
