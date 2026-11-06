@@ -35,6 +35,23 @@ Colab already comes with Python and system utilities. You only need to clone the
 
 ## Step 3: Run the CLI
 
+> [!TIP]
+> **Performance Tip (Local SSD vs Google Drive FUSE):**  
+> While you *can* download directly into `/content/drive/MyDrive/...`, Google Drive FUSE operates over a network layer. Multi-threaded HLS downloads generate thousands of temporary fragment files; assembling them directly on Google Drive introduces network I/O latency.  
+>  
+> For **maximum speed**, download to Colab's local NVMe disk (`./downloads`) first, and copy only the final finished files to Google Drive at the end:
+> ```bash
+> # 1. Download & cut at lightning NVMe speed
+> !python cli.py "https://www.twitch.tv/videos/123456789" \
+>     --cuts "0:00:00 - 1:18:55 - end" \
+>     --out "./downloads" \
+>     --format mp4
+> 
+> # 2. Copy the final video files to Google Drive in seconds
+> !mkdir -p "/content/drive/MyDrive/LuckyDownloader"
+> !cp -r ./downloads/* "/content/drive/MyDrive/LuckyDownloader/"
+> ```
+
 ### Example 1: Trim VOD into sections using cut points
 
 Cut points follow the exact syntax as the desktop app:
