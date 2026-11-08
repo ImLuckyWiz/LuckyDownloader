@@ -8,6 +8,14 @@ echo "=========================================================="
 echo " [LuckyDownloader] Google Colab Batch Runner"
 echo "=========================================================="
 
+# Ensure we are in /content/LuckyDownloader with the latest code
+if [ ! -f "cli.py" ]; then
+    cd /content
+    rm -rf /content/LuckyDownloader
+    git clone https://github.com/ImLuckyWiz/LuckyDownloader.git
+    cd /content/LuckyDownloader
+fi
+
 # Ensure Google Drive is mounted
 if [ ! -d "/content/drive/MyDrive" ]; then
     echo "ERROR: Google Drive is not mounted at /content/drive/MyDrive."
