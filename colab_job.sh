@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TARGET="/content/drive/MyDrive/Lucky/Vexoria_The_SunEater"
+TARGET="${TARGET:-/content/drive/MyDrive/Lucky/Vexoria_The_SunEater}"
 DOWNLOAD_DIR="/content/downloads"
 
 echo "=========================================================="
-echo " [LuckyDownloader] Google Colab Batch Runner"
+echo " [LuckyDownloader] Google Colab Runner"
 echo "=========================================================="
 
-# Ensure we are in /content/LuckyDownloader with the latest code
-if [ ! -f "cli.py" ]; then
+# Ensure we have the latest code
+if [ -d "/content/LuckyDownloader/.git" ]; then
+    cd /content/LuckyDownloader
+    git fetch origin main -q
+    git reset --hard origin/main -q
+else
     cd /content
     rm -rf /content/LuckyDownloader
-    git clone https://github.com/ImLuckyWiz/LuckyDownloader.git
+    git clone -q https://github.com/ImLuckyWiz/LuckyDownloader.git
     cd /content/LuckyDownloader
 fi
 
@@ -36,49 +40,33 @@ fi
 echo "--> Installing Python requirements..."
 pip install -q -r requirements-cli.txt
 
-# --- VOD 1: Day 1 ---
+# Target VOD configuration (configurable via arguments or defaults to Day 4)
+VOD_URL="${1:-https://www.twitch.tv/videos/2924107710}"
+VOD_CUT="${2:-0:07:10 - end}"
+
 echo ""
 echo "=========================================================="
-echo " [1/2] Processing Day 1 (https://www.twitch.tv/videos/2921207042)"
-echo " Cut: 0:09:20 - end"
+echo " Processing: $VOD_URL"
+echo " Cut: $VOD_CUT"
+echo " Destination: $TARGET"
 echo "=========================================================="
-python -u cli.py "https://www.twitch.tv/videos/2921207042" \
-    -c "0:09:20 - end" \
+
+python -u cli.py "$VOD_URL" \
+    -c "$VOD_CUT" \
     --template "{streamer} - {title} - {game} - part{n}" \
     --no-subfolders \
     -o "$DOWNLOAD_DIR"
 
-echo "--> Moving Day 1 output to Google Drive..."
+echo "--> Moving output to Google Drive..."
 mv "$DOWNLOAD_DIR"/*.mp4 "$TARGET/"
 
 echo "--> Cleaning temporary files to free VM disk space..."
 rm -rf "$DOWNLOAD_DIR"/* /tmp/* /root/.cache/* 2>/dev/null || true
 sync
-echo "--> Day 1 complete and saved."
-
-# --- VOD 2: Day 3 ---
-echo ""
-echo "=========================================================="
-echo " [2/2] Processing Day 3 (https://www.twitch.tv/videos/2922207633)"
-echo " Cut: 0:08:30 - end"
-echo "=========================================================="
-python -u cli.py "https://www.twitch.tv/videos/2922207633" \
-    -c "0:08:30 - end" \
-    --template "{streamer} - {title} - {game} - part{n}" \
-    --no-subfolders \
-    -o "$DOWNLOAD_DIR"
-
-echo "--> Moving Day 3 output to Google Drive..."
-mv "$DOWNLOAD_DIR"/*.mp4 "$TARGET/"
-
-echo "--> Cleaning temporary files..."
-rm -rf "$DOWNLOAD_DIR"/* /tmp/* /root/.cache/* 2>/dev/null || true
-sync
-echo "--> Day 3 complete and saved."
 
 echo ""
 echo "=========================================================="
-echo " SUCCESS! Both videos have been processed and saved."
+echo " SUCCESS! Video has been processed and saved to Google Drive."
 echo " Destination: $TARGET"
 echo "=========================================================="
 ls -lh "$TARGET"
