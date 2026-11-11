@@ -40,8 +40,8 @@ if ! command -v ffmpeg >/dev/null 2>&1; then
     apt-get update -qq && apt-get install -y -qq ffmpeg
 fi
 
-echo "--> Installing faster-whisper..."
-pip install -q faster-whisper
+echo "--> Installing faster-whisper and PyAV..."
+pip install -q "faster-whisper" "av<19"
 
 echo "--> Starting transcription..."
 python -u transcribe_colab.py

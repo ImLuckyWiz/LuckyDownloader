@@ -81,31 +81,35 @@ def main():
             continue
 
         # 1. Extract audio
-        print("--> Step 1: Extracting 16kHz mono audio via ffmpeg...")
-        if temp_audio.exists():
-            temp_audio.unlink(missing_ok=True)
+        if temp_audio.exists() and temp_audio.stat().st_size > 100 * 1024 * 1024:
+            audio_size_mb = temp_audio.stat().st_size / (1024 * 1024)
+            print(f"--> Step 1: Reusing already extracted audio ({audio_size_mb:.1f} MB)!")
+        else:
+            print("--> Step 1: Extracting 16kHz mono audio via ffmpeg (please wait)...")
+            if temp_audio.exists():
+                temp_audio.unlink(missing_ok=True)
 
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(video_path),
-            "-vn",
-            "-acodec",
-            "pcm_s16le",
-            "-ar",
-            "16000",
-            "-ac",
-            "1",
-            str(temp_audio),
-        ]
-        ret = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if ret.returncode != 0 or not temp_audio.exists():
-            print(f"ERROR: Failed to extract audio from {video_path.name}")
-            continue
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(video_path),
+                "-vn",
+                "-acodec",
+                "pcm_s16le",
+                "-ar",
+                "16000",
+                "-ac",
+                "1",
+                str(temp_audio),
+            ]
+            ret = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if ret.returncode != 0 or not temp_audio.exists():
+                print(f"ERROR: Failed to extract audio from {video_path.name}")
+                continue
 
-        audio_size_mb = temp_audio.stat().st_size / (1024 * 1024)
-        print(f"--> Audio extracted successfully ({audio_size_mb:.1f} MB).")
+            audio_size_mb = temp_audio.stat().st_size / (1024 * 1024)
+            print(f"--> Audio extracted successfully ({audio_size_mb:.1f} MB).")
 
         # 2. Transcribe
         print("--> Step 2: Transcribing with Whisper (VAD enabled)...")
