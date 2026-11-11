@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Batch Whisper transcription runner for Google Colab (T4 GPU).
 
-Scans Google Drive for gameplay VODs, extracts lightweight audio,
-runs faster-whisper (large-v3-turbo on CUDA), and outputs timestamped
-text files directly into Google Drive for AI chapter analysis.
+Scans Google Drive for gameplay VODs, extracts lightweight audio in 30-minute
+chunks to prevent PyAV/Python RAM exhaustion, runs faster-whisper
+(large-v3-turbo on CUDA), and outputs timestamped text files directly into
+Google Drive for AI chapter analysis.
 """
 
 import functools
+import gc
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -72,6 +75,7 @@ def main():
     print("--> Whisper model loaded successfully on GPU!\n")
 
     temp_audio = Path("/content/temp_audio.wav")
+    chunks_dir = Path("/content/audio_chunks")
 
     for idx, video_path in enumerate(video_files, 1):
         out_txt = drive_dir / f"{video_path.stem}_transcript.txt"
@@ -84,15 +88,33 @@ def main():
             print(f"--> Transcript already exists! Skipping: {out_txt.name}")
             continue
 
-        # 1. Extract audio
+        # Prepare clean chunks directory
+        if chunks_dir.exists():
+            shutil.rmtree(chunks_dir, ignore_errors=True)
+        chunks_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1. Generate 30-minute (1800s) audio chunks to stay well within RAM limits
         if temp_audio.exists() and temp_audio.stat().st_size > 100 * 1024 * 1024:
             audio_size_mb = temp_audio.stat().st_size / (1024 * 1024)
-            print(f"--> Step 1: Reusing already extracted audio ({audio_size_mb:.1f} MB)!")
+            print(f"--> Splitting existing temp_audio.wav ({audio_size_mb:.1f} MB) into 30m chunks...")
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(temp_audio),
+                "-f",
+                "segment",
+                "-segment_time",
+                "1800",
+                "-c",
+                "copy",
+                str(chunks_dir / "chunk_%03d.wav"),
+            ]
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            # Delete temp_audio to free ~1.4 GB disk space
+            temp_audio.unlink(missing_ok=True)
         else:
-            print("--> Step 1: Extracting 16kHz mono audio via ffmpeg (please wait)...")
-            if temp_audio.exists():
-                temp_audio.unlink(missing_ok=True)
-
+            print("--> Extracting audio into 30m chunks directly from video via ffmpeg...")
             cmd = [
                 "ffmpeg",
                 "-y",
@@ -105,52 +127,75 @@ def main():
                 "16000",
                 "-ac",
                 "1",
-                str(temp_audio),
+                "-f",
+                "segment",
+                "-segment_time",
+                "1800",
+                str(chunks_dir / "chunk_%03d.wav"),
             ]
             ret = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if ret.returncode != 0 or not temp_audio.exists():
-                print(f"ERROR: Failed to extract audio from {video_path.name}")
+            if ret.returncode != 0:
+                print(f"ERROR: Failed to extract audio chunks from {video_path.name}")
                 continue
 
-            audio_size_mb = temp_audio.stat().st_size / (1024 * 1024)
-            print(f"--> Audio extracted successfully ({audio_size_mb:.1f} MB).")
+        chunks = sorted(chunks_dir.glob("chunk_*.wav"))
+        if not chunks:
+            print(f"ERROR: No audio chunks created for {video_path.name}")
+            continue
 
-        # 2. Transcribe
-        print("--> Step 2: Transcribing directly on T4 GPU (Whisper Turbo, beam_size=1)...", flush=True)
-        segments, info = model.transcribe(
-            str(temp_audio),
-            beam_size=1,  # Fast greedy decoding optimized for Whisper Turbo
-            language="en",
-            vad_filter=False,  # Skip CPU VAD pre-pass; Whisper handles silences natively on GPU
-        )
-
-        print(f"--> Detected language: {info.language} ({info.language_probability:.2%})", flush=True)
-        print("--> Writing transcript to Drive (live stream below):", flush=True)
+        print(f"--> Created {len(chunks)} audio chunk(s) (~30 min each). Starting GPU transcription...\n")
 
         line_count = 0
+        current_time_offset = 0.0
+
         with open(out_txt, "w", encoding="utf-8") as f_out:
             f_out.write(f"VOD: {video_path.name}\n")
-            f_out.write(f"Language: {info.language}\n")
+            f_out.write("Language: en\n")
             f_out.write("==========================================================\n\n")
 
-            for seg in segments:
-                ts = format_timestamp(seg.start)
-                text = seg.text.strip()
-                if text:
-                    f_out.write(f"{ts} {text}\n")
-                    f_out.flush()
-                    line_count += 1
-                    if line_count % 25 == 0:
-                        print(f"    {ts} {text[:80]}", flush=True)
+            for c_idx, chunk_file in enumerate(chunks, 1):
+                # Calculate exact chunk duration from sample count (16000 Hz, 16-bit mono = 32000 bytes/sec)
+                chunk_bytes = chunk_file.stat().st_size - 44
+                chunk_duration = max(0.0, chunk_bytes / (16000 * 2))
 
-        print(f"--> Done! Total {line_count} spoken lines saved to:", flush=True)
-        print(f"    {out_txt}", flush=True)
+                print(
+                    f"  [Chunk {c_idx}/{len(chunks)}] Transcribing "
+                    f"{format_timestamp(current_time_offset)} -> {format_timestamp(current_time_offset + chunk_duration)}..."
+                )
 
-        # Clean up temp audio to keep VM clean
-        if temp_audio.exists():
-            temp_audio.unlink(missing_ok=True)
+                segments, _ = model.transcribe(
+                    str(chunk_file),
+                    beam_size=1,
+                    language="en",
+                    vad_filter=False,
+                )
 
-    print("\n==========================================================")
+                chunk_lines = 0
+                for seg in segments:
+                    actual_ts = format_timestamp(seg.start + current_time_offset)
+                    text = seg.text.strip()
+                    if text:
+                        f_out.write(f"{actual_ts} {text}\n")
+                        f_out.flush()
+                        line_count += 1
+                        chunk_lines += 1
+                        if chunk_lines % 15 == 0:
+                            print(f"    {actual_ts} {text[:75]}")
+
+                current_time_offset += chunk_duration
+
+                # Delete processed chunk to save disk & free memory
+                chunk_file.unlink(missing_ok=True)
+                gc.collect()
+
+        print(f"\n--> Done! Total {line_count} spoken lines saved to:")
+        print(f"    {out_txt}\n")
+
+        # Clean up chunk dir
+        if chunks_dir.exists():
+            shutil.rmtree(chunks_dir, ignore_errors=True)
+
+    print("==========================================================")
     print(" ALL TRANSCRIPTIONS COMPLETED SUCCESSFULLY!")
     print(f" Transcripts saved in: {drive_dir}")
     print("==========================================================")
