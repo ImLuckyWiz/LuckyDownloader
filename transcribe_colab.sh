@@ -40,8 +40,14 @@ if ! command -v ffmpeg >/dev/null 2>&1; then
     apt-get update -qq && apt-get install -y -qq ffmpeg
 fi
 
-echo "--> Installing faster-whisper and PyAV..."
-pip install -q "faster-whisper" "av<19"
+echo "--> Installing faster-whisper, PyAV, and CUDA 12 runtime libraries..."
+pip install -q "faster-whisper" "av<19" "nvidia-cublas-cu12" "nvidia-cudnn-cu12"
+
+# Configure dynamic linker search paths for CTranslate2 / CUDA 12
+NV_LIB_PATHS=$(python3 -c "import site, os; paths = [os.path.join(p, 'nvidia', sub, 'lib') for p in site.getsitepackages() for sub in ['cublas', 'cudnn']]; print(':'.join(x for x in paths if os.path.isdir(x)))" 2>/dev/null || true)
+if [ -n "$NV_LIB_PATHS" ]; then
+    export LD_LIBRARY_PATH="${NV_LIB_PATHS}:${LD_LIBRARY_PATH:-}"
+fi
 
 echo "--> Starting transcription..."
 python -u transcribe_colab.py

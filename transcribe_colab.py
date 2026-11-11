@@ -7,16 +7,34 @@ chunks to prevent PyAV/Python RAM exhaustion, runs faster-whisper
 Google Drive for AI chapter analysis.
 """
 
+import ctypes
 import functools
 import gc
 import os
 import shutil
+import site
 import subprocess
 import sys
 from pathlib import Path
 
 # Force unbuffered streaming output in Google Colab / pipes
 print = functools.partial(print, flush=True)
+
+# Preload CUDA 12 libraries (cuBLAS, cuDNN) so CTranslate2 dlopen succeeds
+for site_pkg in site.getsitepackages():
+    for sub in ("cublas", "cudnn"):
+        lib_dir = os.path.join(site_pkg, "nvidia", sub, "lib")
+        if os.path.isdir(lib_dir):
+            if "LD_LIBRARY_PATH" in os.environ:
+                os.environ["LD_LIBRARY_PATH"] = f"{lib_dir}:{os.environ['LD_LIBRARY_PATH']}"
+            else:
+                os.environ["LD_LIBRARY_PATH"] = lib_dir
+            for fname in sorted(os.listdir(lib_dir)):
+                if fname.endswith(".so") or ".so." in fname:
+                    try:
+                        ctypes.CDLL(os.path.join(lib_dir, fname), mode=ctypes.RTLD_GLOBAL)
+                    except Exception:
+                        pass
 
 
 def format_timestamp(seconds: float) -> str:
@@ -88,62 +106,64 @@ def main():
             print(f"--> Transcript already exists! Skipping: {out_txt.name}")
             continue
 
-        # Prepare clean chunks directory
-        if chunks_dir.exists():
-            shutil.rmtree(chunks_dir, ignore_errors=True)
-        chunks_dir.mkdir(parents=True, exist_ok=True)
+        # Check if chunks already exist from an interrupted run
+        chunks = sorted(chunks_dir.glob("chunk_*.wav")) if chunks_dir.exists() else []
 
-        # 1. Generate 30-minute (1800s) audio chunks to stay well within RAM limits
-        if temp_audio.exists() and temp_audio.stat().st_size > 100 * 1024 * 1024:
-            audio_size_mb = temp_audio.stat().st_size / (1024 * 1024)
-            print(f"--> Splitting existing temp_audio.wav ({audio_size_mb:.1f} MB) into 30m chunks...")
-            cmd = [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(temp_audio),
-                "-f",
-                "segment",
-                "-segment_time",
-                "1800",
-                "-c",
-                "copy",
-                str(chunks_dir / "chunk_%03d.wav"),
-            ]
-            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-            # Delete temp_audio to free ~1.4 GB disk space
-            temp_audio.unlink(missing_ok=True)
+        if chunks:
+            print(f"--> Reusing {len(chunks)} already extracted audio chunks!")
         else:
-            print("--> Extracting audio into 30m chunks directly from video via ffmpeg...")
-            cmd = [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(video_path),
-                "-vn",
-                "-acodec",
-                "pcm_s16le",
-                "-ar",
-                "16000",
-                "-ac",
-                "1",
-                "-f",
-                "segment",
-                "-segment_time",
-                "1800",
-                str(chunks_dir / "chunk_%03d.wav"),
-            ]
-            ret = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if ret.returncode != 0:
-                print(f"ERROR: Failed to extract audio chunks from {video_path.name}")
-                continue
+            chunks_dir.mkdir(parents=True, exist_ok=True)
+            # 1. Generate 30-minute (1800s) audio chunks to stay well within RAM limits
+            if temp_audio.exists() and temp_audio.stat().st_size > 100 * 1024 * 1024:
+                audio_size_mb = temp_audio.stat().st_size / (1024 * 1024)
+                print(f"--> Splitting existing temp_audio.wav ({audio_size_mb:.1f} MB) into 30m chunks...")
+                cmd = [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(temp_audio),
+                    "-f",
+                    "segment",
+                    "-segment_time",
+                    "1800",
+                    "-c",
+                    "copy",
+                    str(chunks_dir / "chunk_%03d.wav"),
+                ]
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+                temp_audio.unlink(missing_ok=True)
+            else:
+                print("--> Extracting audio into 30m chunks directly from video via ffmpeg...")
+                cmd = [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(video_path),
+                    "-vn",
+                    "-acodec",
+                    "pcm_s16le",
+                    "-ar",
+                    "16000",
+                    "-ac",
+                    "1",
+                    "-f",
+                    "segment",
+                    "-segment_time",
+                    "1800",
+                    str(chunks_dir / "chunk_%03d.wav"),
+                ]
+                ret = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if ret.returncode != 0:
+                    print(f"ERROR: Failed to extract audio chunks from {video_path.name}")
+                    continue
 
-        chunks = sorted(chunks_dir.glob("chunk_*.wav"))
+            chunks = sorted(chunks_dir.glob("chunk_*.wav"))
+
         if not chunks:
-            print(f"ERROR: No audio chunks created for {video_path.name}")
+            print(f"ERROR: No audio chunks found for {video_path.name}")
             continue
 
-        print(f"--> Created {len(chunks)} audio chunk(s) (~30 min each). Starting GPU transcription...\n")
+        print(f"--> Total {len(chunks)} audio chunk(s) ready (~30 min each). Starting GPU transcription...\n")
 
         line_count = 0
         current_time_offset = 0.0
@@ -154,7 +174,6 @@ def main():
             f_out.write("==========================================================\n\n")
 
             for c_idx, chunk_file in enumerate(chunks, 1):
-                # Calculate exact chunk duration from sample count (16000 Hz, 16-bit mono = 32000 bytes/sec)
                 chunk_bytes = chunk_file.stat().st_size - 44
                 chunk_duration = max(0.0, chunk_bytes / (16000 * 2))
 
