@@ -6,10 +6,14 @@ runs faster-whisper (large-v3-turbo on CUDA), and outputs timestamped
 text files directly into Google Drive for AI chapter analysis.
 """
 
+import functools
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+# Force unbuffered streaming output in Google Colab / pipes
+print = functools.partial(print, flush=True)
 
 
 def format_timestamp(seconds: float) -> str:
@@ -112,17 +116,16 @@ def main():
             print(f"--> Audio extracted successfully ({audio_size_mb:.1f} MB).")
 
         # 2. Transcribe
-        print("--> Step 2: Transcribing with Whisper (VAD enabled)...")
+        print("--> Step 2: Transcribing directly on T4 GPU (Whisper Turbo, beam_size=1)...", flush=True)
         segments, info = model.transcribe(
             str(temp_audio),
-            beam_size=5,
+            beam_size=1,  # Fast greedy decoding optimized for Whisper Turbo
             language="en",
-            vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500),
+            vad_filter=False,  # Skip CPU VAD pre-pass; Whisper handles silences natively on GPU
         )
 
-        print(f"--> Detected language: {info.language} ({info.language_probability:.2%})")
-        print("--> Writing transcript...")
+        print(f"--> Detected language: {info.language} ({info.language_probability:.2%})", flush=True)
+        print("--> Writing transcript to Drive (live stream below):", flush=True)
 
         line_count = 0
         with open(out_txt, "w", encoding="utf-8") as f_out:
@@ -137,11 +140,11 @@ def main():
                     f_out.write(f"{ts} {text}\n")
                     f_out.flush()
                     line_count += 1
-                    if line_count % 200 == 0:
-                        print(f"    {ts} ({line_count} lines transcribed...)")
+                    if line_count % 25 == 0:
+                        print(f"    {ts} {text[:80]}", flush=True)
 
-        print(f"--> Done! Total {line_count} spoken lines saved to:")
-        print(f"    {out_txt}")
+        print(f"--> Done! Total {line_count} spoken lines saved to:", flush=True)
+        print(f"    {out_txt}", flush=True)
 
         # Clean up temp audio to keep VM clean
         if temp_audio.exists():
