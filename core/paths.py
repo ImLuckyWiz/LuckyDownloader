@@ -166,6 +166,7 @@ DATA_DIR = resolve_data_dir(FROZEN, BUNDLED_VERSION)
 CONFIG_PATH = DATA_DIR / "config.json"
 SETTINGS_PATH = DATA_DIR / "luckytwitch_settings.json"
 RECENT_PATH = DATA_DIR / "luckytwitch_recent.json"
+FAVORITES_PATH = DATA_DIR / "luckytwitch_favorites.json"
 RECENT_SEARCHES_PATH = DATA_DIR / "recent_searches.json"
 LINKS_DIR = DATA_DIR / "links"  # links other launches leave for the open window (see weblink.py)
 BEAT_PATH = DATA_DIR / "running.beat"  # the open window touches this so a second launch knows it is there

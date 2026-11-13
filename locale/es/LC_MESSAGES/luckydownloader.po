@@ -13,7 +13,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.18.0\n"
+"Generated-By: tools/i18n.py (Babel)\n"
 
 #: qt_ui/main_window.py qt_ui/session_persistence.py
 msgid "Plan"
@@ -3976,4 +3976,28 @@ msgid ""
 msgstr ""
 "macOS envía estos enlaces a la aplicación automáticamente una vez que está en Aplicaciones. Si un"
 " enlace no hace nada, abre LuckyDownloader desde Aplicaciones una vez e inténtalo de nuevo."
+
+#: qt_ui/tabs/search.py
+msgid "Add to favorites"
+msgstr "Añadir a favoritos"
+
+#: qt_ui/tabs/search.py
+msgid "Click the heart on any streamer to save them here."
+msgstr "Haz clic en el corazón de cualquier streamer para guardarlo aquí."
+
+#: qt_ui/tabs/search.py
+msgid "Favorites"
+msgstr "Favoritos"
+
+#: qt_ui/tabs/search.py
+msgid "Remove"
+msgstr "Quitar"
+
+#: qt_ui/tabs/search.py
+msgid "Remove from favorites"
+msgstr "Quitar de favoritos"
+
+#: qt_ui/tabs/search.py
+msgid "Your saved streamers"
+msgstr "Tus streamers guardados"
 

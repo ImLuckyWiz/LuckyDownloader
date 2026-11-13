@@ -21,13 +21,15 @@ from __future__ import annotations
 import threading
 import types
 
-from PySide6.QtCore import QItemSelectionModel, Qt, Signal
+from PySide6.QtCore import QEvent, QItemSelectionModel, QPointF, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListView, QPushButton,
-    QSizePolicy, QStackedWidget, QTableView, QToolButton, QVBoxLayout, QWidget,
+    QSizePolicy, QStackedWidget, QTableView, QToolButton, QToolTip, QVBoxLayout, QWidget,
 )
 
-from core.recent import load_recent, save_recent, load_recent_searches, save_recent_searches
+from core.recent import (
+    load_favorites, load_recent, load_recent_searches, save_favorites, save_recent, save_recent_searches,
+)
 from core.providers import get_browsable_providers
 from core.paths import MAX_RECENT
 from core.search import VIDEO_KINDS
@@ -102,10 +104,112 @@ class VodGridView(QListView):
         super().keyPressEvent(event)
 
 
-def _channel_list(model: ChannelModel, rows: int, live_marker: bool = False) -> QListView:
-    view = QListView()
+class _ChannelListView(QListView):
+    """Channel list that optionally shows hover favorite ('heart') and remove ('x') buttons without triggering selection."""
+
+    remove_requested = Signal(int)
+    favorite_requested = Signal(int)
+
+    def __init__(self, removable: bool = False, favoritable: bool = False, parent: QWidget | None = None):
+        super().__init__(parent)
+        self._removable = removable
+        self._favoritable = favoritable
+        self._pressed_action: tuple[str, int] | None = None
+        if removable or favoritable:
+            self.setMouseTracking(True)
+            self.viewport().setMouseTracking(True)
+
+    def set_favoritable(self, enabled: bool) -> None:
+        self._favoritable = enabled
+        delegate = self.itemDelegate()
+        if hasattr(delegate, "favoritable"):
+            delegate.favoritable = enabled
+        if enabled or self._removable:
+            self.setMouseTracking(True)
+            self.viewport().setMouseTracking(True)
+        self.viewport().update()
+
+    def _action_at(self, pos) -> tuple[str, int] | None:
+        if not (self._removable or self._favoritable):
+            return None
+        idx = self.indexAt(pos)
+        if not idx.isValid():
+            return None
+        delegate = self.itemDelegate()
+        rect = self.visualRect(idx)
+        pt = QPointF(pos)
+        if self._removable and hasattr(delegate, "remove_button_rect") and delegate.remove_button_rect(rect).contains(pt):
+            return ("remove", idx.row())
+        if self._favoritable and hasattr(delegate, "favorite_button_rect"):
+            from qt_ui.search_models import CHANNEL_ROLE
+            ch = idx.data(CHANNEL_ROLE) or {}
+            raw_name = str(ch.get("name") or ch.get("login") or idx.data(Qt.ItemDataRole.DisplayRole) or "")
+            is_live = bool(ch.get("live", False)) or raw_name.startswith("● ")
+            if delegate.favorite_button_rect(rect, is_live=is_live).contains(pt):
+                return ("favorite", idx.row())
+        return None
+
+    def viewportEvent(self, event) -> bool:  # noqa: N802
+        if self._removable or self._favoritable:
+            etype = event.type()
+            if etype == QEvent.Type.ToolTip:
+                hit = self._action_at(event.pos())
+                if hit is not None:
+                    kind, row = hit
+                    if kind == "remove":
+                        tip = t("Remove")
+                    else:
+                        from qt_ui.search_models import FAVORITE_ROLE
+                        is_fav = bool(self.model().index(row, 0).data(FAVORITE_ROLE))
+                        tip = t("Remove from favorites") if is_fav else t("Add to favorites")
+                    QToolTip.showText(event.globalPos(), tip, self.viewport())
+                    return True
+                QToolTip.hideText()
+            elif etype == QEvent.Type.MouseMove:
+                pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+                delegate = self.itemDelegate()
+                if hasattr(delegate, "set_hover_pos"):
+                    delegate.set_hover_pos(pos)
+                self.viewport().update()
+                if self._pressed_action is not None or self._action_at(pos) is not None:
+                    return True
+            elif etype == QEvent.Type.Leave:
+                delegate = self.itemDelegate()
+                if hasattr(delegate, "set_hover_pos"):
+                    delegate.set_hover_pos(None)
+                self.viewport().update()
+            elif etype == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
+                pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+                hit = self._action_at(pos)
+                if hit is not None:
+                    self._pressed_action = hit
+                    return True
+                self._pressed_action = None
+            elif etype == QEvent.Type.MouseButtonDblClick and event.button() == Qt.MouseButton.LeftButton:
+                pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+                if self._action_at(pos) is not None:
+                    return True
+            elif etype == QEvent.Type.MouseButtonRelease and event.button() == Qt.MouseButton.LeftButton:
+                if self._pressed_action is not None:
+                    pressed = self._pressed_action
+                    self._pressed_action = None
+                    pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+                    if self._action_at(pos) == pressed:
+                        kind, row = pressed
+                        if kind == "remove":
+                            self.remove_requested.emit(row)
+                        else:
+                            self.favorite_requested.emit(row)
+                    return True
+        return super().viewportEvent(event)
+
+
+def _channel_list(
+    model: ChannelModel, rows: int, live_marker: bool = False, removable: bool = False, favoritable: bool = False,
+) -> _ChannelListView:
+    view = _ChannelListView(removable=removable, favoritable=favoritable)
     view.setModel(model)
-    view.setItemDelegate(ChannelDelegate(live_marker=live_marker, parent=view))
+    view.setItemDelegate(ChannelDelegate(live_marker=live_marker, removable=removable, favoritable=favoritable, parent=view))
     view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
     view.setUniformItemSizes(True)
@@ -129,6 +233,7 @@ class SearchTab(QWidget):
         self.reload_client = lambda: None
         # state of the search (names as in the tkinter app)
         self.recent = load_recent()
+        self.favorites = load_favorites()
         self.recent_yt = load_recent_searches()
         self.sv_channel: dict | None = None
         self.sv_results: list[dict] = []
@@ -136,6 +241,7 @@ class SearchTab(QWidget):
         self.sv_loading = False  # a page of VODs is being fetched
         self.sv_cursor: str | None = None
         self.results_model = ChannelModel(live_marker=True, parent=self)
+        self.favorites_model = ChannelModel(parent=self)
         self.recent_model = ChannelModel(parent=self)
         self.vod_model = VodModel(parent=self)
         self._gen = types.SimpleNamespace(value=0)  # the generation lives in a small object of its own, so the
@@ -164,7 +270,9 @@ class SearchTab(QWidget):
         self.bridge.thumb.connect(self.on_thumb)
         self.avatar_ready.connect(self._on_avatar_ready)
         self.results_view.selectionModel().selectionChanged.connect(self._results_selected)
+        self.favorites_view.selectionModel().selectionChanged.connect(self._favorites_selected)
         self.recent_view.selectionModel().selectionChanged.connect(self._recent_selected)
+        self.refresh_favorites()
         self.refresh_recent()  # fills the recent list and shows the empty-state messages
         self.update_search_state()
         language_bus().changed.connect(self.refresh_language)
@@ -216,18 +324,26 @@ class SearchTab(QWidget):
         self.scroll.body_layout.addLayout(holder)
 
     def _build_left(self) -> QWidget:
-        """Found channels and recent streamers."""
+        """Found channels, favorite streamers, and recent streamers."""
         left = QWidget()
         left.setFixedWidth(LEFT_WIDTH)
         box = QVBoxLayout(left)
         box.setContentsMargins(0, 0, 0, 0)
         box.setSpacing(10)
         self.results_card = Card(t("Results"), t("● = live now"), padding=12)
-        self.results_view = _channel_list(self.results_model, 6, live_marker=True)
+        self.results_view = _channel_list(self.results_model, 5, live_marker=True, favoritable=True)
+        self.results_view.favorite_requested.connect(lambda row: self.toggle_favorite_from_list("results", row))
         self.results_card.add_widget(self.results_view)
         box.addWidget(self.results_card)
+        self.favorites_card = Card(t("Favorites"), t("Your saved streamers"), padding=12)
+        self.favorites_view = _channel_list(self.favorites_model, 4, favoritable=True)
+        self.favorites_view.favorite_requested.connect(lambda row: self.toggle_favorite_from_list("favorites", row))
+        self.favorites_card.add_widget(self.favorites_view)
+        box.addWidget(self.favorites_card)
         self.recent_card = Card(t("Recent streamers"), t("The ones you opened lately"), padding=12)
-        self.recent_view = _channel_list(self.recent_model, 8)
+        self.recent_view = _channel_list(self.recent_model, 5, removable=True, favoritable=True)
+        self.recent_view.remove_requested.connect(self.remove_recent)
+        self.recent_view.favorite_requested.connect(lambda row: self.toggle_favorite_from_list("recent", row))
         self.recent_card.add_widget(self.recent_view)
         self.recent_card.body_layout.setStretchFactor(self.recent_view, 1)
         self.clear_recent_btn = QPushButton(t("Clear recent"))
@@ -240,6 +356,7 @@ class SearchTab(QWidget):
         self.recent_card.body_layout.addLayout(clear_row)
         box.addWidget(self.recent_card, 1)
         self.ch_empty = EmptyState(self.results_view, compact=True)
+        self.favorites_empty = EmptyState(self.favorites_view, compact=True)
         self.recent_empty = EmptyState(self.recent_view, compact=True)
         return left
 
@@ -366,7 +483,7 @@ class SearchTab(QWidget):
         chain = [self.search_edit, self.search_btn]
         if hasattr(self, "provider_combo") and self.provider_combo.isVisible():
             chain.insert(0, self.provider_combo)
-        chain.extend([self.signin_btn, self.results_view, self.recent_view,
+        chain.extend([self.signin_btn, self.results_view, self.favorites_view, self.recent_view,
                       self.clear_recent_btn, self.type_combo, self.vod_table, self.more_btn, self.use_btn])
         for a, b in zip(chain, chain[1:]):
             QWidget.setTabOrder(a, b)
@@ -397,6 +514,10 @@ class SearchTab(QWidget):
             self.type_combo.setVisible(is_twitch)
         if hasattr(self, "results_card") and self.results_card:
             self.results_card.setVisible(is_twitch)
+        if hasattr(self, "favorites_card") and self.favorites_card:
+            self.favorites_card.setVisible(is_twitch)
+        if hasattr(self, "recent_view") and self.recent_view:
+            self.recent_view.set_favoritable(is_twitch)
         if hasattr(self, "recent_card") and self.recent_card and self.recent_card.title_label:
             self.recent_card.title_label.setText(t("Recent streamers") if is_twitch else t("Recent searches"))
         if hasattr(self, "use_btn") and self.use_btn:
@@ -456,6 +577,8 @@ class SearchTab(QWidget):
         self.search_btn.setEnabled(signed_in)
         self.refresh_search_empty_states()
         if signed_in:
+            if self.favorites:
+                self._spawn_avatar_fetch(self.favorites, model=self.favorites_model)
             if self.recent:
                 self._spawn_avatar_fetch(self.recent, for_results=False)
             if self.sv_results:
@@ -501,6 +624,13 @@ class SearchTab(QWidget):
             else:
                 self.ch_empty.show_message("", t("Search results show up here."))
 
+        # the favorite streamers
+        if is_twitch:
+            if self.favorites:
+                self.favorites_empty.hide_message()
+            else:
+                self.favorites_empty.show_message("", t("Click the heart on any streamer to save them here."))
+
         # the recent streamers / searches
         active_recent = self.recent if is_twitch else self.recent_yt
         if active_recent:
@@ -509,6 +639,36 @@ class SearchTab(QWidget):
             hint = t("Streamers you open show up here.") if is_twitch else t("Searches you run show up here.")
             self.recent_empty.show_message("", hint)
         self.clear_recent_btn.setEnabled(bool(active_recent))
+
+    # ---------------------------- favorites ---------------------------- #
+    def refresh_favorites(self) -> None:
+        fav_ids = {str(c["id"]) for c in self.favorites}
+        self.favorites_model.set_channels(self.favorites)
+        self.favorites_model.set_favorite_ids(fav_ids)
+        self.recent_model.set_favorite_ids(fav_ids)
+        self.results_model.set_favorite_ids(fav_ids)
+        if self.client and self.favorites:
+            self._spawn_avatar_fetch(self.favorites, model=self.favorites_model)
+        self.refresh_search_empty_states()
+
+    def toggle_favorite(self, ch: dict) -> None:
+        cid = str(ch.get("id") or "")
+        if not cid:
+            return
+        if any(str(c["id"]) == cid for c in self.favorites):
+            self.favorites = [c for c in self.favorites if str(c["id"]) != cid]
+        else:
+            entry = {"id": cid, "login": ch.get("login", ""), "name": ch.get("name") or ch.get("login", "")}
+            self.favorites = [entry] + self.favorites
+        save_favorites(self.favorites)
+        self.refresh_favorites()
+
+    def toggle_favorite_from_list(self, source: str, row: int) -> None:
+        items = {"results": self.sv_results, "favorites": self.favorites, "recent": self.recent}.get(source, [])
+        if source == "recent" and self.current_provider_name() != "twitch":
+            return
+        if 0 <= row < len(items):
+            self.toggle_favorite(items[row])
 
     # ---------------------------- recent streamers ---------------------------- #
     def refresh_recent(self) -> None:
@@ -545,6 +705,20 @@ class SearchTab(QWidget):
             save_recent(self.recent)
         else:
             self.recent_yt = []
+            save_recent_searches(self.recent_yt)
+        self.refresh_recent()
+
+    def remove_recent(self, row: int) -> None:
+        """Remove a single entry from the active recent list and persist it."""
+        if self.current_provider_name() == "twitch":
+            if not 0 <= row < len(self.recent):
+                return
+            self.recent.pop(row)
+            save_recent(self.recent)
+        else:
+            if not 0 <= row < len(self.recent_yt):
+                return
+            self.recent_yt.pop(row)
             save_recent_searches(self.recent_yt)
         self.refresh_recent()
 
@@ -631,13 +805,17 @@ class SearchTab(QWidget):
         view.setCurrentIndex(index)
 
     def _results_selected(self, *_args) -> None:
-        self._on_pick(True)
+        self._on_pick("results")
+
+    def _favorites_selected(self, *_args) -> None:
+        self._on_pick("favorites")
 
     def _recent_selected(self, *_args) -> None:
-        self._on_pick(False)
+        self._on_pick("recent")
 
-    def _on_pick(self, from_results: bool) -> None:
-        view, other = (self.results_view, self.recent_view) if from_results else (self.recent_view, self.results_view)
+    def _on_pick(self, source: str) -> None:
+        views = {"results": self.results_view, "favorites": self.favorites_view, "recent": self.recent_view}
+        view = views[source]
         rows = view.selectionModel().selectedRows()
         if not rows:
             return
@@ -646,8 +824,11 @@ class SearchTab(QWidget):
             self.search_edit.setText(ch["name"])
             self.on_search()
             return
-        ch = (self.sv_results if from_results else self.recent)[rows[0].row()]
-        other.selectionModel().clearSelection()
+        items = {"results": self.sv_results, "favorites": self.favorites, "recent": self.recent}[source]
+        ch = items[rows[0].row()]
+        for key, other in views.items():
+            if key != source:
+                other.selectionModel().clearSelection()
         self.load_channel(ch)
 
     def _on_kind_chosen(self, _index: int) -> None:
@@ -806,13 +987,15 @@ class SearchTab(QWidget):
         pix = load_avatar(path)
         if pix is not None and not pix.isNull():
             self.results_model.set_avatar(cid, pix)
+            self.favorites_model.set_avatar(cid, pix)
             self.recent_model.set_avatar(cid, pix)
 
-    def _spawn_avatar_fetch(self, channels: list[dict], for_results: bool = True) -> None:
+    def _spawn_avatar_fetch(self, channels: list[dict], for_results: bool = True, model: ChannelModel | None = None) -> None:
         if not self.client or not channels:
             return
         client = self.client
-        model = self.results_model if for_results else self.recent_model
+        if model is None:
+            model = self.results_model if for_results else self.recent_model
         needed = [c for c in channels if c.get("id") and not model.has_avatar(str(c["id"]))]
         if not needed:
             return
@@ -886,6 +1069,11 @@ class SearchTab(QWidget):
                 self.results_card.title_label.setText(t("Results"))
             if self.results_card.subtitle_label:
                 self.results_card.subtitle_label.setText(t("● = live now"))
+        if hasattr(self, "favorites_card") and self.favorites_card:
+            if self.favorites_card.title_label:
+                self.favorites_card.title_label.setText(t("Favorites"))
+            if self.favorites_card.subtitle_label:
+                self.favorites_card.subtitle_label.setText(t("Your saved streamers"))
         if hasattr(self, "recent_card") and self.recent_card:
             if self.recent_card.title_label:
                 self.recent_card.title_label.setText(t("Recent streamers") if is_twitch else t("Recent searches"))

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-13 02:47-0300\n"
+"POT-Creation-Date: 2026-11-13 17:56-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -2783,11 +2783,19 @@ msgid "Unlimited speed"
 msgstr ""
 
 #: qt_ui/tabs/search.py
+msgid "Add to favorites"
+msgstr ""
+
+#: qt_ui/tabs/search.py
 msgid "Check the spelling."
 msgstr ""
 
 #: qt_ui/tabs/search.py
 msgid "Clear recent"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Click the heart on any streamer to save them here."
 msgstr ""
 
 #: qt_ui/tabs/search.py
@@ -2800,6 +2808,10 @@ msgstr ""
 
 #: qt_ui/tabs/search.py
 msgid "Double-click a video to use it"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Favorites"
 msgstr ""
 
 #: qt_ui/tabs/search.py
@@ -2872,6 +2884,14 @@ msgstr ""
 
 #: qt_ui/tabs/search.py
 msgid "Recent streamers"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Remove"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Remove from favorites"
 msgstr ""
 
 #: qt_ui/tabs/search.py
@@ -3033,6 +3053,10 @@ msgstr ""
 #: qt_ui/tabs/search.py
 #, python-brace-format
 msgid "YouTube: searching «{query}»…"
+msgstr ""
+
+#: qt_ui/tabs/search.py
+msgid "Your saved streamers"
 msgstr ""
 
 #: qt_ui/tabs/search.py

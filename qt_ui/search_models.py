@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from PySide6.QtCore import QAbstractListModel, QAbstractTableModel, QModelIndex, QRect, QSize, Qt
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtCore import QAbstractListModel, QAbstractTableModel, QModelIndex, QPoint, QPointF, QRect, QRectF, QSize, Qt
+from PySide6.QtGui import QImage, QPen, QPixmap
 from PySide6.QtWidgets import QStyledItemDelegate, QStyle, QStyleOptionViewItem
 
 from core.i18n import N_, t, tn
@@ -24,6 +24,7 @@ from luckytwitch_engine import fmt_hms
 
 CHANNEL_ROLE = Qt.ItemDataRole.UserRole + 1  # the streamer dict of a row: {id, login, name, live}
 AVATAR_ROLE = Qt.ItemDataRole.UserRole + 2  # QPixmap of streamer avatar (or None)
+FAVORITE_ROLE = Qt.ItemDataRole.UserRole + 3  # bool: whether the streamer is in Favorites
 VIDEO_ROLE = Qt.ItemDataRole.UserRole + 1  # the VOD dict of a row
 THUMB_ROLE = Qt.ItemDataRole.UserRole + 2  # the QPixmap of a row (or None)
 THUMB_MARGIN = 6  # space to the left of a thumbnail
@@ -104,6 +105,7 @@ class ChannelModel(QAbstractListModel):
         self.live_marker = live_marker
         self.channels: list[dict] = []
         self._avatars: dict[str, QPixmap] = {}
+        self._favorite_ids: set[str] = set()
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return 0 if parent.isValid() else len(self.channels)
@@ -119,12 +121,20 @@ class ChannelModel(QAbstractListModel):
         if role == AVATAR_ROLE:
             cid = str(ch.get("id") or "")
             return self._avatars.get(cid)
+        if role == FAVORITE_ROLE:
+            cid = str(ch.get("id") or "")
+            return cid in self._favorite_ids
         return None
 
     def set_channels(self, channels: list[dict]) -> None:
         self.beginResetModel()
         self.channels = list(channels)
         self.endResetModel()
+
+    def set_favorite_ids(self, ids: set[str]) -> None:
+        self._favorite_ids = set(ids)
+        if self.channels:
+            self.dataChanged.emit(self.index(0, 0), self.index(len(self.channels) - 1, 0), [FAVORITE_ROLE])
 
     def has_avatar(self, channel_id: str) -> bool:
         return str(channel_id) in self._avatars
@@ -363,18 +373,41 @@ def channel_avatar_colour(name: str) -> str:
 
 
 class ChannelDelegate(QStyledItemDelegate):
-    """Paints streamer list rows: avatar initials circle, display name, and a red LIVE badge (C1, C5)."""
+    """Paints streamer list rows: avatar initials circle, display name, red LIVE badge (C1, C5), and optional favorite/remove buttons."""
 
-    def __init__(self, live_marker: bool = False, parent=None):
+    def __init__(self, live_marker: bool = False, removable: bool = False, favoritable: bool = False, parent=None):
         super().__init__(parent)
         self.live_marker = live_marker
+        self.removable = removable
+        self.favoritable = favoritable
+        self._hover_pos: QPoint | None = None
+
+    def set_hover_pos(self, pos: QPoint | None) -> None:
+        self._hover_pos = pos
+
+    @staticmethod
+    def remove_button_rect(rect: QRect) -> QRectF:
+        size = 20.0
+        bx = rect.right() - size - 6.0
+        by = rect.top() + (rect.height() - size) / 2.0
+        return QRectF(bx, by, size, size)
+
+    def favorite_button_rect(self, rect: QRect, is_live: bool = False) -> QRectF:
+        size = 20.0
+        by = rect.top() + (rect.height() - size) / 2.0
+        if self.removable:
+            bx = rect.right() - size - 6.0 - size - 2.0
+        elif self.live_marker and is_live:
+            bx = rect.right() - 38.0 - 6.0 - size - 4.0
+        else:
+            bx = rect.right() - size - 6.0
+        return QRectF(bx, by, size, size)
 
     def paint(self, painter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
         painter.save()
         painter.setRenderHint(painter.RenderHint.Antialiasing, True)
         from PySide6.QtGui import QColor, QFont
-        from PySide6.QtCore import QRectF
-        from core.palette import BG2, FG, WHITE
+        from core.palette import BG2, ERR, FG, HOVER, MUTED, WHITE
 
         rect = option.rect
         selected = bool(option.state & QStyle.StateFlag.State_Selected)
@@ -421,11 +454,19 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setPen(QColor(WHITE))
             painter.drawText(avatar_rect, int(Qt.AlignmentFlag.AlignCenter), initial)
 
+        is_fav = bool(index.data(FAVORITE_ROLE))
+        show_fav = self.favoritable and (hovered or is_fav)
+        show_rem = self.removable and hovered
+
         # Streamer name
         name_x = rect.left() + pad_x + size + 8.0
         avail_w = rect.width() - (name_x - rect.left()) - 6.0
         if is_live and self.live_marker:
-            avail_w -= 46.0
+            avail_w -= 46.0 + (24.0 if show_fav else 0.0)
+        elif show_rem and show_fav:
+            avail_w -= 48.0
+        elif show_rem or show_fav:
+            avail_w -= 26.0
 
         font_name = QFont(option.font)
         font_name.setPointSize(10)
@@ -462,6 +503,43 @@ class ChannelDelegate(QStyledItemDelegate):
             painter.setFont(font_live)
             painter.setPen(QColor(WHITE))
             painter.drawText(badge_rect, int(Qt.AlignmentFlag.AlignCenter), "LIVE")
+
+        # Heart button (always shown when favorited; shown on hover otherwise)
+        if show_fav:
+            fav_rect = self.favorite_button_rect(rect, is_live=is_live)
+            fav_hovered = self._hover_pos is not None and fav_rect.contains(QPointF(self._hover_pos))
+            if fav_hovered:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(HOVER))
+                painter.drawRoundedRect(fav_rect, 4.0, 4.0)
+                heart_col = ERR
+            elif is_fav:
+                heart_col = ERR
+            else:
+                heart_col = option.palette.highlightedText().color().name() if selected else MUTED
+            from qt_ui.icons import pixmap as icon_pixmap
+            dpr = painter.device().devicePixelRatioF() if painter.device() else 1.0
+            hpix = icon_pixmap("heart-filled" if is_fav else "heart", 14, heart_col, dpr=dpr)
+            hx = fav_rect.center().x() - 7.0
+            hy = fav_rect.center().y() - 7.0
+            painter.drawPixmap(QPointF(hx, hy), hpix)
+
+        # Hover remove ('x') button for recent items
+        if show_rem:
+            btn_rect = self.remove_button_rect(rect)
+            btn_hovered = self._hover_pos is not None and btn_rect.contains(QPointF(self._hover_pos))
+            if btn_hovered:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(HOVER))
+                painter.drawRoundedRect(btn_rect, 4.0, 4.0)
+                x_col = QColor(ERR)
+            else:
+                x_col = option.palette.highlightedText().color() if selected else QColor(MUTED)
+            painter.setPen(QPen(x_col, 1.6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            cx, cy = btn_rect.center().x(), btn_rect.center().y()
+            r = 4.0
+            painter.drawLine(QPointF(cx - r, cy - r), QPointF(cx + r, cy + r))
+            painter.drawLine(QPointF(cx + r, cy - r), QPointF(cx - r, cy + r))
 
         painter.restore()
 

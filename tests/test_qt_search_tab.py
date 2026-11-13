@@ -190,7 +190,8 @@ def test_the_streamer_lists_keep_working_as_before(tab):
 def test_the_card_titles_and_hints(tab):
     from qt_ui.widgets import Card
     cards = {c.title_label.text(): c for c in tab.findChildren(Card)}
-    assert set(cards) == {"Results", "Recent streamers"}
+    assert set(cards) == {"Results", "Favorites", "Recent streamers"}
+    assert cards["Favorites"].subtitle_label.text() == "Your saved streamers"
     assert cards["Results"].subtitle_label.text() == "● = live now"
     assert cards["Recent streamers"].subtitle_label.text() == "The ones you opened lately"
 
@@ -308,7 +309,7 @@ def test_keyboard_order_has_nothing_decorative(qtbot, tab, session):
         stops.append(w)
         w = w.nextInFocusChain()
     inside = [x for x in stops if tab.isAncestorOf(x) and x.isVisibleTo(tab) and x.focusPolicy() != Qt.FocusPolicy.NoFocus]
-    wanted = [tab.search_edit, tab.search_btn, tab.results_view, tab.recent_view, tab.clear_recent_btn,
+    wanted = [tab.search_edit, tab.search_btn, tab.results_view, tab.favorites_view, tab.recent_view, tab.clear_recent_btn,
               tab.type_combo, tab.vod_table, tab.more_btn, tab.use_btn]
     order = [x for x in inside if x in wanted]
     assert order == wanted
@@ -1109,3 +1110,108 @@ def test_switching_back_to_twitch_restores_state(tab):
     assert tab.type_combo.isVisible()
     assert tab.results_card.isVisible()
     assert tab.use_btn.text() == "Use this VOD"
+
+
+def test_hover_remove_button_deletes_single_recent_streamer_without_loading(qtbot, tab, monkeypatch):
+    tab.show()
+    tab.add_recent(dict(id="1", login="a", name="Alpha"))
+    tab.add_recent(dict(id="2", login="b", name="Beta"))
+    tab.add_recent(dict(id="3", login="c", name="Gamma"))
+    qtbot.waitExposed(tab)
+    assert row_texts(tab.recent_view) == ["Gamma", "Beta", "Alpha"]
+
+    loaded = []
+    monkeypatch.setattr(tab, "load_channel", lambda ch, **kw: loaded.append(ch))
+
+    # Click the 'x' button on the middle row ("Beta")
+    idx = tab.recent_model.index(1, 0)
+    row_rect = tab.recent_view.visualRect(idx)
+    btn_pos = tab.recent_view.itemDelegate().remove_button_rect(row_rect).center().toPoint()
+
+    qtbot.mouseMove(tab.recent_view.viewport(), pos=btn_pos)
+    qtbot.mouseClick(tab.recent_view.viewport(), Qt.MouseButton.LeftButton, pos=btn_pos)
+
+    assert loaded == []
+    assert row_texts(tab.recent_view) == ["Gamma", "Alpha"]
+    assert [c["id"] for c in tab.recent] == ["3", "1"]
+    assert tab.clear_recent_btn.isEnabled()
+    assert not tab.recent_empty.shown
+
+    # Remove the remaining two entries
+    tab.remove_recent(0)
+    tab.remove_recent(0)
+    assert tab.recent == []
+    assert row_texts(tab.recent_view) == []
+    assert not tab.clear_recent_btn.isEnabled()
+    assert tab.recent_empty.shown
+
+
+def test_remove_recent_works_for_youtube_searches(tab, monkeypatch, tmp_path):
+    from core import paths
+    monkeypatch.setattr(paths, "RECENT_SEARCHES_PATH", tmp_path / "recent_searches.json")
+
+    tab.set_provider("youtube")
+    tab.add_recent_yt("first")
+    tab.add_recent_yt("second")
+    assert row_texts(tab.recent_view) == ["second", "first"]
+
+    tab.remove_recent(0)
+    assert row_texts(tab.recent_view) == ["first"]
+    assert [c["name"] for c in tab.recent_yt] == ["first"]
+
+
+def test_heart_button_toggles_favorites_from_recent_results_and_favorites(qtbot, tab, session, monkeypatch):
+    sign_in(tab, session)
+    tab.add_recent(dict(id="1", login="a", name="Alpha"))
+    tab.add_recent(dict(id="2", login="b", name="Beta"))
+    assert tab.favorites_empty.shown
+
+    loaded = []
+    monkeypatch.setattr(tab, "load_channel", lambda ch, **kw: loaded.append(ch))
+
+    # Click the heart button (left of 'x') on "Beta" in recent_view
+    idx = tab.recent_model.index(0, 0)
+    row_rect = tab.recent_view.visualRect(idx)
+    fav_pos = tab.recent_view.itemDelegate().favorite_button_rect(row_rect).center().toPoint()
+    qtbot.mouseMove(tab.recent_view.viewport(), pos=fav_pos)
+    qtbot.mouseClick(tab.recent_view.viewport(), Qt.MouseButton.LeftButton, pos=fav_pos)
+
+    assert loaded == []
+    assert row_texts(tab.favorites_view) == ["Beta"]
+    assert not tab.favorites_empty.shown
+    assert json.loads(paths.FAVORITES_PATH.read_text(encoding="utf-8")) == [
+        dict(id="2", login="b", name="Beta"),
+    ]
+
+    # Also favorite a live streamer from results_view (heart sits left of LIVE badge)
+    tab.on_search_ok("stre", RESULTS)
+    res_idx = tab.results_model.index(0, 0)
+    res_rect = tab.results_view.visualRect(res_idx)
+    res_fav_pos = tab.results_view.itemDelegate().favorite_button_rect(res_rect, is_live=True).center().toPoint()
+    qtbot.mouseMove(tab.results_view.viewport(), pos=res_fav_pos)
+    qtbot.mouseClick(tab.results_view.viewport(), Qt.MouseButton.LeftButton, pos=res_fav_pos)
+
+    assert loaded == []
+    assert row_texts(tab.favorites_view) == ["Streamer", "Beta"]
+
+    # Clicking the heart in favorites_view removes "Streamer" from favorites
+    fav_idx = tab.favorites_model.index(0, 0)
+    fav_rect = tab.favorites_view.visualRect(fav_idx)
+    unfav_pos = tab.favorites_view.itemDelegate().favorite_button_rect(fav_rect).center().toPoint()
+    qtbot.mouseMove(tab.favorites_view.viewport(), pos=unfav_pos)
+    qtbot.mouseClick(tab.favorites_view.viewport(), Qt.MouseButton.LeftButton, pos=unfav_pos)
+
+    assert loaded == []
+    assert row_texts(tab.favorites_view) == ["Beta"]
+
+    # Selecting a favorite streamer loads their VODs
+    tab.select_channel(tab.favorites_view, 0)
+    assert [c["id"] for c in loaded] == ["2"]
+
+
+def test_favorites_card_is_hidden_on_youtube_and_shown_on_twitch(tab):
+    assert not tab.favorites_card.isHidden()
+    tab.set_provider("youtube")
+    assert tab.favorites_card.isHidden()
+    tab.set_provider("twitch")
+    assert not tab.favorites_card.isHidden()

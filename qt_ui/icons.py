@@ -384,6 +384,22 @@ def _user() -> list[Shape]:
     return [(_circle(12, 8, 4), "s"), (shoulders, "s")]
 
 
+def _heart_path() -> QPainterPath:
+    return _svgish(
+        "M 12 20.2 C 12 20.2 3.5 14.8 3.5 8.8 C 3.5 5.9 5.8 3.8 8.4 3.8 "
+        "C 10.1 3.8 11.4 4.7 12 5.9 C 12.6 4.7 13.9 3.8 15.6 3.8 "
+        "C 18.2 3.8 20.5 5.9 20.5 8.8 C 20.5 14.8 12 20.2 12 20.2 Z"
+    )
+
+
+def _heart() -> list[Shape]:
+    return [(_heart_path(), "s")]
+
+
+def _heart_filled() -> list[Shape]:
+    return [(_heart_path(), "fs")]
+
+
 
 def _window_minimize() -> list[Shape]:
     return [(_line(6, 16.5, 18, 16.5), "s")]
@@ -415,6 +431,7 @@ _BUILDERS: dict[str, Callable[[], list[Shape]]] = {
     "refresh": _refresh, "external-link": _external_link, "link": _link,
     # status and feedback
     "check": _check, "x": _x, "alert": _alert, "info": _info, "clock": _clock, "eye": _eye, "flag": _flag,
+    "heart": _heart, "heart-filled": _heart_filled,
     # ui controls
     "chevron-right": _chevron_right, "chevron-left": _chevron_left, "chevron-down": _chevron_down, "grid": _grid, "list-view": _list_view,
     "filter": _filter, "sliders": _sliders, "user": _user,

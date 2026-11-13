@@ -1,3 +1,13 @@
+## v2.18.0
+
+LuckyDownloader **v2.18.0** adds a **Favorites** streamer list and quick per-row hover actions in the Search tab:
+
+- **Favorite Streamers Section (`SearchTab`):** Added a dedicated **Favorites** card (`luckytwitch_favorites.json`) between **Results** and **Recent streamers** so you can save and jump to your favorite Twitch channels directly (hidden in YouTube mode).
+- **Heart Toggle Buttons (`ChannelDelegate`, `qt_ui/icons.py`):** Added vector `heart` and `heart-filled` icons on streamer rows across **Results** (next to the `LIVE` badge), **Recent streamers**, and **Favorites**. Favorited streamers keep a filled heart visible and clicking it toggles favorite status without triggering a channel load.
+- **Manual Recent Removal (`_ChannelListView`):** Added a hover **`×`** button to each row in **Recent streamers** / **Recent searches** to remove individual entries manually without opening them.
+
+---
+
 ## v2.17.0
 
 LuckyDownloader **v2.17.0** brings headless CLI feature parity, parameterized Google Colab tooling, batch queue ergonomics, privacy controls, Premiere Pro CEP sequence backup, and Windows/security/CI hardening:
