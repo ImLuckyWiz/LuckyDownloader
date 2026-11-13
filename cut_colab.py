@@ -26,7 +26,7 @@ TASKS = [
     {
         "day": "Zelda 1",
         "pattern": "*Day 1*part2.mp4",
-        "base_title": "Vexoria_The_SunEater - [New Model Debut] Zeldathon Day 1 - The Legend of Zelda Ocarina of Time",
+        "base_title": "Vexoria - Zelda Day 1",
         "cuts": [
             ("00:00:00", "01:54:30"),
             ("01:54:30", "03:31:03"),
@@ -39,7 +39,7 @@ TASKS = [
     {
         "day": "Zelda 2",
         "pattern": "*Day 2*.mp4",
-        "base_title": "Vexoria_The_SunEater - [NEW MODEL SUBATHON] Zeldathon Day 2 - The Legend of Zelda Ocarina of Time",
+        "base_title": "Vexoria - Zelda Day 2",
         "cuts": [
             ("00:00:00", "01:34:40"),
             ("01:34:40", "02:58:42"),
@@ -53,7 +53,7 @@ TASKS = [
     {
         "day": "Zelda 3",
         "pattern": "*Day 3*.mp4",
-        "base_title": "Vexoria_The_SunEater - [NEW MODEL SUBATHON] Zeldathon Day 3 - The Legend of Zelda Ocarina of Time",
+        "base_title": "Vexoria - Zelda Day 3",
         "cuts": [
             ("00:00:00", "01:29:54"),
             ("01:29:54", "03:20:50"),
@@ -66,7 +66,7 @@ TASKS = [
     {
         "day": "Zelda 4",
         "pattern": "*Day 4*.mp4",
-        "base_title": "Vexoria_The_SunEater - [NEW MODEL SUBATHON] Zeldathon Day 4 - The Legend of Zelda Ocarina of Time",
+        "base_title": "Vexoria - Zelda Day 4",
         "cuts": [
             ("00:00:00", "01:43:35"),
             ("01:43:35", "03:40:11"),
@@ -175,7 +175,7 @@ def main():
 
         for part_num, (start, end) in enumerate(cuts, 1):
             processed_count += 1
-            out_filename = f"{base_title} - Part {part_num:02d}.mp4"
+            out_filename = f"{base_title} - Chapter {part_num}.mp4"
             final_target = TARGET_DIR / out_filename
             end_label = end if end else "END"
 
