@@ -102,14 +102,17 @@ def test_cleanup_stale_workdirs_removes_old_and_keeps_recent(tmp_path):
     assert fresh_dir.exists()
     assert unrelated_dir.exists()
 
-    # An active workdir with .running is preserved even on max_age_hours=0.0
+    # A live-PID .running workdir is preserved under normal age cleanup (max_age_hours=48.0)
     active_dir = tmp_path / ".luckytwitch_789_active"
     active_dir.mkdir()
-    (active_dir / ".running").write_text("1234", encoding="utf-8")
-
-    # Cleaning with max_age_hours=0 removes fresh_dir but skips active_dir
-    removed_all = cleanup_stale_workdirs(tmp_path, max_age_hours=0.0)
-    assert removed_all == 1
-    assert not fresh_dir.exists()
+    (active_dir / ".running").write_text(str(os.getpid()), encoding="utf-8")
+    os.utime(active_dir, (old_mtime, old_mtime))
+    assert cleanup_stale_workdirs(tmp_path, max_age_hours=48.0) == 0
     assert active_dir.exists()
+
+    # Cleaning with max_age_hours=0 removes both fresh_dir and .running workdirs (A-01)
+    removed_all = cleanup_stale_workdirs(tmp_path, max_age_hours=0.0)
+    assert removed_all == 2
+    assert not fresh_dir.exists()
+    assert not active_dir.exists()
     assert unrelated_dir.exists()

@@ -27,7 +27,6 @@ from luckytwitch_engine import (
     render_chat,
 )
 
-posix_only = pytest.mark.skipif(False, reason="")
 
 SRC = SourceInfo(url="https://www.twitch.tv/videos/99", id="99", title="Stream", uploader="Streamer",
                  duration=20000.0, date="2026-10-01", twitch_vod_id="99")
@@ -197,7 +196,6 @@ def make_ctx():
 RENDER_KW = dict(mode="transparent", look="outline", width=400, height=1080, font_size=18, fps=30, smooth=False)
 
 
-@posix_only
 def test_render_chat_success(tmp_path):
     cli = fake_cli(tmp_path, chatrender=(
         "print('[STATUS] - Fetching Images [1/2]', flush=True)\n"
@@ -212,7 +210,6 @@ def test_render_chat_success(tmp_path):
     assert any("Failed to fetch 7TV emotes" in m and m.startswith("Warning") for m in logs)  # the person hears of it
 
 
-@posix_only
 def test_render_chat_does_not_overwrite_an_existing_file(tmp_path):
     cli = fake_cli(tmp_path)
     ctx, _ = make_ctx()
@@ -222,7 +219,6 @@ def test_render_chat_does_not_overwrite_an_existing_file(tmp_path):
     assert dest.read_bytes() == b"old" and got.name == "p.chat-overlay (2).mov" and got.read_bytes() == b"video"
 
 
-@posix_only
 def test_render_chat_failure_reports_the_reason_and_removes_the_file(tmp_path):
     cli = fake_cli(tmp_path, chatrender=(
         "open(out, 'wb').write(b'half')\n"
@@ -236,7 +232,6 @@ def test_render_chat_failure_reports_the_reason_and_removes_the_file(tmp_path):
     assert not dest.exists()
 
 
-@posix_only
 def test_render_chat_empty_output_is_an_error(tmp_path):
     cli = fake_cli(tmp_path, chatrender="open(out, 'wb').close()")
     ctx, _ = make_ctx()
@@ -245,7 +240,6 @@ def test_render_chat_empty_output_is_an_error(tmp_path):
     assert not (tmp_path / "p.mov").exists()
 
 
-@posix_only
 def test_render_chat_cancel_stops_the_process_and_removes_the_file(tmp_path):
     cli = fake_cli(tmp_path, chatrender=(
         "open(out, 'wb').write(b'half')\n"
@@ -281,7 +275,6 @@ def names(dest: Path) -> list[str]:
     return sorted(p.name for p in dest.parent.iterdir())
 
 
-@posix_only
 def test_with_the_json_chat_the_chat_is_downloaded_once_and_used_for_the_overlay(tmp_path):
     cli = fake_cli(tmp_path)
     dest, logs = run_part(tmp_path, cli, chat=True, chat_render=True)
@@ -292,7 +285,6 @@ def test_with_the_json_chat_the_chat_is_downloaded_once_and_used_for_the_overlay
     assert any(m.startswith("✔ Streamer - part1.chat-overlay.mov") and "400x1080, 30 fps" in m for m in logs)
 
 
-@posix_only
 def test_overlay_only_downloads_a_temporary_chat_and_removes_it(tmp_path):
     cli = fake_cli(tmp_path)
     dest, _ = run_part(tmp_path, cli, chat=False, chat_render=True)
@@ -301,7 +293,6 @@ def test_overlay_only_downloads_a_temporary_chat_and_removes_it(tmp_path):
     assert not list((tmp_path / "work").rglob("*.json"))
 
 
-@posix_only
 def test_with_an_html_chat_the_overlay_gets_its_own_json(tmp_path):
     cli = fake_cli(tmp_path)
     dest, _ = run_part(tmp_path, cli, chat=True, chat_format="html", chat_render=True)
@@ -311,7 +302,6 @@ def test_with_an_html_chat_the_overlay_gets_its_own_json(tmp_path):
     assert names(dest) == ["Streamer - part1.chat-overlay.mov", "Streamer - part1.chat.html", "Streamer - part1.mp4"]
 
 
-@posix_only
 def test_chat_only_does_not_render_anything(tmp_path):
     cli = fake_cli(tmp_path)
     dest, _ = run_part(tmp_path, cli, chat=True)
@@ -319,14 +309,12 @@ def test_chat_only_does_not_render_anything(tmp_path):
     assert names(dest) == ["Streamer - part1.chat.json", "Streamer - part1.mp4"]
 
 
-@posix_only
 def test_the_black_background_overlay_is_an_mp4(tmp_path):
     cli = fake_cli(tmp_path)
     dest, _ = run_part(tmp_path, cli, chat_render=True, chat_render_mode="compact")
     assert "Streamer - part1.chat-overlay.mp4" in names(dest)
 
 
-@posix_only
 def test_unknown_values_fall_back_to_the_defaults(tmp_path):
     cli = fake_cli(tmp_path)
     dest, _ = run_part(tmp_path, cli, chat_render=True, chat_render_mode="nonsense", chat_render_look="nonsense")
@@ -335,7 +323,6 @@ def test_unknown_values_fall_back_to_the_defaults(tmp_path):
     assert "Streamer - part1.chat-overlay.mov" in names(dest)
 
 
-@posix_only
 def test_the_overlay_is_lined_up_with_a_part_that_starts_between_two_seconds(tmp_path):
     cli = fake_cli(tmp_path)
     run_part(tmp_path, cli, real_start=3600.4, real_end=3720.0, chat_render=True)
@@ -349,14 +336,12 @@ def value_of_equals(cmd, flag):
     return next(a for a in cmd if a.startswith(flag + "="))[len(flag) + 1:]
 
 
-@posix_only
 def test_a_part_that_starts_on_a_whole_second_needs_no_trim(tmp_path):
     cli = fake_cli(tmp_path)
     run_part(tmp_path, cli, real_start=3600.0, real_end=3720.0, chat_render=True)
     assert "-ss" not in value_of_equals(calls(tmp_path)[-1], "--output-args")
 
 
-@posix_only
 def test_size_and_frame_rate_follow_the_video(tmp_path, monkeypatch):
     monkeypatch.setattr(eng, "probe_video", lambda p: (60.0, 2560, 1440))
     cli = fake_cli(tmp_path)
@@ -365,7 +350,6 @@ def test_size_and_frame_rate_follow_the_video(tmp_path, monkeypatch):
     assert (value(render, "--chat-width"), value(render, "--chat-height"), value(render, "--framerate")) == ("400", "1440", "60")
 
 
-@posix_only
 def test_settings_that_were_chosen_win_over_the_video(tmp_path, monkeypatch):
     monkeypatch.setattr(eng, "probe_video", lambda p: (60.0, 2560, 1440))
     cli = fake_cli(tmp_path)
@@ -377,7 +361,6 @@ def test_settings_that_were_chosen_win_over_the_video(tmp_path, monkeypatch):
     assert value(render, "--background-color") == "#B3000000"
 
 
-@posix_only
 def test_if_the_chat_cannot_be_downloaded_the_overlay_is_skipped_and_the_video_is_fine(tmp_path):
     cli = fake_cli(tmp_path, chatdownload="print('[ERROR] - Invalid VOD'); sys.exit(1)")
     dest, logs = run_part(tmp_path, cli, chat=True, chat_render=True)
@@ -386,7 +369,6 @@ def test_if_the_chat_cannot_be_downloaded_the_overlay_is_skipped_and_the_video_i
     assert any("Chat for part 1 failed" in m for m in logs) and any("overlay for part 1 skipped" in m for m in logs)
 
 
-@posix_only
 def test_overlay_only_with_a_chat_that_cannot_be_downloaded_is_a_logged_failure(tmp_path):
     cli = fake_cli(tmp_path, chatdownload="print('[ERROR] - Invalid VOD'); sys.exit(1)")
     dest, logs = run_part(tmp_path, cli, chat_render=True)
@@ -394,7 +376,6 @@ def test_overlay_only_with_a_chat_that_cannot_be_downloaded_is_a_logged_failure(
     assert any("Chat overlay for part 1 failed (the video is fine)" in m for m in logs)
 
 
-@posix_only
 def test_a_failed_render_keeps_the_saved_chat_and_the_temporary_file_goes_away(tmp_path):
     cli = fake_cli(tmp_path, chatrender="print('[ERROR] - no space left'); sys.exit(1)")
     dest, logs = run_part(tmp_path, cli, chat=True, chat_format="txt", chat_render=True)
@@ -403,7 +384,6 @@ def test_a_failed_render_keeps_the_saved_chat_and_the_temporary_file_goes_away(t
     assert any("Chat overlay for part 1 failed (the video is fine)" in m and "no space left" in m for m in logs)
 
 
-@posix_only
 def test_cancelling_during_the_render_propagates_and_cleans_up(tmp_path):
     cli = fake_cli(tmp_path, chatrender="open(out, 'wb').write(b'half'); time.sleep(60)")
     ctx, _ = make_ctx()
@@ -416,7 +396,6 @@ def test_cancelling_during_the_render_propagates_and_cleans_up(tmp_path):
     assert not list((tmp_path / "work").rglob("*.json"))
 
 
-@posix_only
 def test_progress_stays_inside_the_share_of_the_part(tmp_path):
     cli = fake_cli(tmp_path, chatrender=(
         "print('[STATUS] - Rendering Video 50% (0h0m1s Elapsed | 0h0m1s Remaining)', flush=True)\n"
@@ -566,7 +545,6 @@ def test_a_markers_file_of_another_part_is_ignored(tmp_path):
     assert chat_lead_from_markers(chat, info) == 0.0
 
 
-@posix_only
 def test_render_existing_chat_draws_from_the_file_and_downloads_nothing(tmp_path):
     cli = fake_cli(tmp_path)
     chat = chat_file(tmp_path)
@@ -579,7 +557,6 @@ def test_render_existing_chat_draws_from_the_file_and_downloads_nothing(tmp_path
     assert any(m.startswith("✔ Streamer - part1.chat-overlay.mov") and "400x1080, 30 fps" in m for m in logs)
 
 
-@posix_only
 def test_render_existing_chat_lines_up_with_the_markers_file(tmp_path):
     cli = fake_cli(tmp_path)
     chat = chat_file(tmp_path)
@@ -589,7 +566,6 @@ def test_render_existing_chat_lines_up_with_the_markers_file(tmp_path):
     assert chat_render_output_args("transparent", 0.4) in value_of_equals(calls(tmp_path)[0], "--output-args")
 
 
-@posix_only
 def test_render_existing_chat_follows_the_video_next_to_it(tmp_path, monkeypatch):
     seen = []
     monkeypatch.setattr(eng, "probe_video", lambda p: seen.append(p) or (60.0, 2560, 1440))
@@ -604,7 +580,6 @@ def test_render_existing_chat_follows_the_video_next_to_it(tmp_path, monkeypatch
     assert (value(render, "--chat-width"), value(render, "--chat-height"), value(render, "--framerate")) == ("400", "1440", "60")
 
 
-@posix_only
 def test_render_existing_chat_uses_the_chosen_type_look_and_text_size(tmp_path):
     cli = fake_cli(tmp_path)
     chat = chat_file(tmp_path)
@@ -618,7 +593,6 @@ def test_render_existing_chat_uses_the_chosen_type_look_and_text_size(tmp_path):
     assert value(render, "--background-color") == "#000000"
 
 
-@posix_only
 def test_render_existing_chat_never_overwrites_an_earlier_overlay(tmp_path):
     cli = fake_cli(tmp_path)
     chat = chat_file(tmp_path)
@@ -637,7 +611,6 @@ def test_render_existing_chat_with_a_file_that_is_not_a_chat_fails_before_runnin
         render_existing_chat(ctx, "never-run", bad, JobOptions(cut_text="", out_dir=str(tmp_path)), tmp_path / "cache")
 
 
-@posix_only
 def test_a_failed_render_of_a_saved_chat_leaves_the_chat_alone_and_no_half_file(tmp_path):
     cli = fake_cli(tmp_path, chatrender="print('[ERROR] - boom', flush=True); open(out, 'wb').write(b'half'); sys.exit(1)")
     chat = chat_file(tmp_path)

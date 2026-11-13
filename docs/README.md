@@ -16,7 +16,10 @@ This directory contains specifications, architectural plans, and upgrade roadmap
 | Document | Type | Status | Description |
 |---|---|---|---|
 | [`PLAN_00_MASTER_INDEX.md`](PLAN_00_MASTER_INDEX.md) | Master Plan | Active | Master execution index and progress tracker across 7 release phases. |
-| [`REVIEW_2026_11.md`](REVIEW_2026_11.md) | Audit & Review | Active | Comprehensive 2026 codebase audit covering pipeline, UI, security, and tests. |
+| [`REVIEW_2026_11.md`](REVIEW_2026_11.md) | Audit & Review | Done | Comprehensive 2026 codebase audit covering pipeline, UI, security, and tests. |
+| [`REVIEW_2026_11_V2.md`](REVIEW_2026_11_V2.md) | Audit & Review | Active | Second-pass codebase audit covering CLI/Colab, UI/Queue, CEP, i18n, CI, and hygiene. |
+| [`UPGRADES_AND_QOL_2026_11.md`](UPGRADES_AND_QOL_2026_11.md) | Roadmap | Active | Phased UX, CLI, privacy, CEP, and developer-ergonomics upgrades. |
+| [`GOOGLE_COLAB.md`](GOOGLE_COLAB.md) | Guide | Active | Step-by-step guide and scripts (`tools/colab/`) for running headless CLI & Whisper on Google Colab. |
 | [`link-format.md`](link-format.md) | Specification | Active (v1) | URL scheme contract for `luckydownloader://open` and `luckytwitch://open` deep links. |
 | [`markers-format.md`](markers-format.md) | Specification | Active (v1) | JSON marker exchange format contract between the app and the Premiere CEP panel. |
 | [`i18n-glossary-es.md`](i18n-glossary-es.md) | Style guide | Active | Spanish style rules and glossary; enforced by `python tools/i18n.py check`. |
@@ -33,6 +36,6 @@ This directory contains specifications, architectural plans, and upgrade roadmap
 | [`TITLE_CLEANING_AND_NAMING_PLAN.md`](TITLE_CLEANING_AND_NAMING_PLAN.md) | Plan | Done in v2.1.1 | Bot command stripping, title editing in Plan tab, and single-part naming cleanup. |
 | [`UPDATE_DETECTION_PLAN.md`](UPDATE_DETECTION_PLAN.md) | Plan | Done in v2.3.0 | Automated GitHub update detection, update dialog, and Windows silent in-place updater. |
 | [`VERIFICATION_CHECKLIST.md`](VERIFICATION_CHECKLIST.md) | Checklist | In progress | Real-hardware verification matrix across Windows, macOS, and Adobe Premiere Pro (Phase V). |
-| [`I18N_SPANISH_PLAN.md`](I18N_SPANISH_PLAN.md) | Plan | In progress (I0 done) | Finish and harden the Spanish localization (coverage, live switching, engine messages, installer, panel). |
-| [`PROJECT_AUDIT_2026_10.md`](PROJECT_AUDIT_2026_10.md) | Audit + Plan | Pending | Full project audit of v2.9.0 with findings and a remediation plan (R1 to R5). |
-| [`UPGRADE_REVIEW_2026_10.md`](UPGRADE_REVIEW_2026_10.md) | Review + Plan | Pending | Progress review of the upgrade plan, what was missed, and new feature ideas. |
+| [`I18N_SPANISH_PLAN.md`](I18N_SPANISH_PLAN.md) | Plan | Done | Finish and harden the Spanish localization (coverage, live switching, engine messages, installer, panel). |
+| [`PROJECT_AUDIT_2026_10.md`](PROJECT_AUDIT_2026_10.md) | Audit + Plan | Done | Full project audit of v2.9.0 with findings and a remediation plan (R1 to R5). |
+| [`UPGRADE_REVIEW_2026_10.md`](UPGRADE_REVIEW_2026_10.md) | Review + Plan | Done | Progress review of the upgrade plan, what was missed, and new feature ideas. |

@@ -1,4 +1,5 @@
 -r requirements.txt
+-r requirements-cli.txt
 pytest>=8.0.0,<10.0.0
 pytest-qt>=4.4.0,<5.0.0
 babel>=2.14.0,<3.0.0

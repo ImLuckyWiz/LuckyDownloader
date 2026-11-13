@@ -14,7 +14,7 @@ if python3 -m pip install --help 2>&1 | grep -q -- '--break-system-packages'; th
 fi
 
 python3 -m pip install --upgrade pip $PIP_FLAGS || true
-python3 -m pip install -r requirements-cli.txt $PIP_FLAGS
+python3 -m pip install -r requirements-cli.txt -r requirements-build.txt $PIP_FLAGS
 
 mkdir -p build
 printf '%s\n' "$VER" > build/version.txt
@@ -25,14 +25,13 @@ python3 -m nuitka --mode=standalone \
   --output-dir=dist \
   --output-folder-name=LuckyDownloader-CLI \
   --output-filename=LuckyDownloader-CLI \
-  --include-data-dir=assets=assets \
   --include-data-dir=locale=locale \
   --include-data-files=build/version.txt=version.txt \
   --include-package=core \
   --include-package=requests \
-  --include-module=luckytwitch_engine \
   --nofollow-import-to=PySide6 \
   --nofollow-import-to=qt_ui \
+  --nofollow-import-to=PIL \
   --nofollow-import-to=tkinter \
   --nofollow-import-to=_tkinter \
   --nofollow-import-to=pytest \

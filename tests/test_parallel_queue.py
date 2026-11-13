@@ -260,18 +260,21 @@ def test_parallel_worker_progress_aggregation_and_rate_limit_split(qtbot):
     runner = QueueRunner(bridge, max_concurrent=2)
     model = QueueModel()
     bridge.item.connect(model.set_status)
+    bridge.item_progress.connect(model.set_progress)
 
     both_started = threading.Barrier(2, timeout=3.0)
     first_reported = threading.Event()
     second_reported = threading.Event()
     allow_finish = threading.Event()
     emitted_progress = []
+    seen_rate_limits = {}
     bridge.progress.connect(lambda f, t: emitted_progress.append((f, t)))
 
     j1 = types.SimpleNamespace(id=1, opts=types.SimpleNamespace(rate_limit="10M"))
     j2 = types.SimpleNamespace(id=2, opts=types.SimpleNamespace(rate_limit="10M"))
 
     def fake_run(job, ctx):
+        seen_rate_limits[job.id] = job.opts.rate_limit
         both_started.wait()
         if job.id == 1:
             ctx._progress(0.8, "Job 1 progress")
@@ -293,12 +296,12 @@ def test_parallel_worker_progress_aggregation_and_rate_limit_split(qtbot):
         runner.start(model.items, model=model, max_concurrent=2)
         assert second_reported.wait(timeout=3.0)
 
-        # Each row keeps its individual progress
-        assert it1.progress == pytest.approx(0.8)
-        assert it2.progress == pytest.approx(0.2)
-        # Rate limit was divided across the 2 workers
-        assert j1.opts.rate_limit == "5M"
-        assert j2.opts.rate_limit == "5M"
+        # Each row keeps its individual progress (marshalled via bridge.item_progress onto GUI thread)
+        qtbot.waitUntil(lambda: it1.progress == pytest.approx(0.8) and it2.progress == pytest.approx(0.2), timeout=2000)
+        # Rate limit was divided across the 2 workers without mutating the original job opts (A-07)
+        assert seen_rate_limits == {1: "5M", 2: "5M"}
+        assert j1.opts.rate_limit == "10M"
+        assert j2.opts.rate_limit == "10M"
 
         allow_finish.set()
         with qtbot.waitSignal(bridge.queue_done, timeout=5000):
@@ -308,6 +311,83 @@ def test_parallel_worker_progress_aggregation_and_rate_limit_split(qtbot):
         fracs = [round(f, 2) for f, _ in emitted_progress]
         assert 0.4 in fracs
         assert 0.5 in fracs
+    finally:
+        qr_mod.run_job = orig_run
+
+
+def test_queue_tab_start_queue_no_double_rate_limit_split(qtbot, tmp_path):
+    """D-01 & A-07: QueueTab.start_queue + QueueRunner must divide toolbar rate_limit only once and not mutate JobOptions."""
+    import qt_ui.queue_runner as qr_mod
+    from qt_ui.tabs.queue import QueueTab
+
+    tab = QueueTab()
+    qtbot.addWidget(tab)
+
+    seen_limits = []
+
+    def fake_run(job, ctx):
+        seen_limits.append(job.opts.rate_limit)
+        return [tmp_path / "out.mp4"]
+
+    orig_run = qr_mod.run_job
+    qr_mod.run_job = fake_run
+    try:
+        src = SourceInfo(url="https://twitch.tv/videos/1", id="1", title="V1", uploader="u", duration=60.0, date="2026-11-01")
+        j1 = Job(source=src, opts=JobOptions(cut_text="0-10", out_dir=str(tmp_path), rate_limit=""))
+        j2 = Job(source=src, opts=JobOptions(cut_text="0-10", out_dir=str(tmp_path), rate_limit=""))
+        tab.enqueue(j1, "Job 1", 1, "auto")
+        tab.enqueue(j2, "Job 2", 1, "auto")
+
+        tab.max_concurrent_jobs = 2
+        tab.rate_limit = "10M"
+
+        with qtbot.waitSignal(tab.bridge.queue_done, timeout=5000):
+            tab.start_queue()
+
+        assert seen_limits == ["5M", "5M"]
+        assert j1.opts.rate_limit == ""
+        assert j2.opts.rate_limit == ""
+    finally:
+        qr_mod.run_job = orig_run
+
+
+def test_item_progress_signal_marshals_to_gui_thread(qtbot):
+    """D-02: Bridge.item_progress delivers QueueModel.dataChanged on the GUI thread."""
+    from PySide6.QtCore import QThread
+
+    bridge = Bridge()
+    runner = QueueRunner(bridge, max_concurrent=1)
+    model = QueueModel()
+    bridge.item.connect(model.set_status)
+    bridge.item_progress.connect(model.set_progress)
+
+    gui_thread = QThread.currentThread()
+    signal_threads = []
+    seen_progress = []
+
+    def on_data_changed(*_args):
+        signal_threads.append(QThread.currentThread())
+        if model.items:
+            seen_progress.append(model.items[0].progress)
+
+    model.dataChanged.connect(on_data_changed)
+
+    import qt_ui.queue_runner as qr_mod
+    orig_run = qr_mod.run_job
+
+    def fake_run(job, ctx):
+        ctx._progress(0.5, "halfway")
+        return [Path("out.mp4")]
+
+    qr_mod.run_job = fake_run
+    try:
+        model.add("j1", "Job 1", 1, "auto")
+        with qtbot.waitSignal(bridge.queue_done, timeout=5000):
+            runner.start(model.items, model=model, max_concurrent=1)
+
+        assert 0.5 in seen_progress
+        assert signal_threads
+        assert all(th is gui_thread for th in signal_threads)
     finally:
         qr_mod.run_job = orig_run
 

@@ -277,6 +277,8 @@ def test_blocked_host_encodings():
     assert wl._blocked_host("0x7f.1")
     assert wl._blocked_host("10.1")
     assert wl._blocked_host("localhost")
+    assert wl._blocked_host("[::ffff:127.0.0.1]")
+    assert wl._blocked_host("[::ffff:169.254.169.254]")
     assert not wl._blocked_host("example.com")
     assert not wl._blocked_host("twitch.tv")
     assert not wl._blocked_host("youtube.com")

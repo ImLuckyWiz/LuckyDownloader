@@ -11,6 +11,8 @@ with a fake (nothing is downloaded).
 
 from __future__ import annotations
 
+import copy
+import dataclasses
 import re
 import threading
 from typing import Sequence
@@ -68,6 +70,7 @@ class QueueRunner(QObject):
         items: Sequence[QueueItem],
         model: QueueModel | None = None,
         max_concurrent: int | None = None,
+        rate_limit: str = "",
     ) -> None:
         """Run ``items`` (or pull dynamically from ``model`` in current row order). Returns at once."""
         if self.is_running():
@@ -115,7 +118,7 @@ class QueueRunner(QObject):
                     overall_frac = float(frac)
             bridge.progress.emit(overall_frac, text)
             if model is not None:
-                model.set_progress(iid, frac, text)
+                bridge.item_progress.emit(iid, float(frac), text)
 
         def worker_loop():
             while not self._cancel_all_event.is_set():
@@ -137,16 +140,36 @@ class QueueRunner(QObject):
                     self._worker_progress[it.iid] = 0.0
                     self.ctx = ctx
 
-                opts = getattr(it.job, "opts", None)
-                if opts is not None and getattr(opts, "rate_limit", ""):
-                    base_limit = getattr(opts, "_base_rate_limit", None) or opts.rate_limit
-                    opts._base_rate_limit = base_limit
-                    opts.rate_limit = split_rate_limit(base_limit, concurrency)
+                job_to_run = it.job
+                opts = getattr(job_to_run, "opts", None)
+                effective_limit = (rate_limit or "").strip() or (
+                    getattr(opts, "rate_limit", "") if opts is not None else ""
+                )
+                if opts is not None and effective_limit:
+                    per_worker = split_rate_limit(effective_limit, concurrency)
+                    if dataclasses.is_dataclass(job_to_run) and dataclasses.is_dataclass(opts):
+                        job_to_run = dataclasses.replace(
+                            job_to_run,
+                            opts=dataclasses.replace(opts, rate_limit=per_worker),
+                        )
+                    elif dataclasses.is_dataclass(opts):
+                        job_to_run = copy.copy(job_to_run)
+                        job_to_run.opts = dataclasses.replace(opts, rate_limit=per_worker)
+                    else:
+                        job_to_run = copy.copy(job_to_run)
+                        new_opts = copy.copy(opts)
+                        new_opts.rate_limit = per_worker
+                        job_to_run.opts = new_opts
                 bridge.job.emit(cur_n, total)
                 bridge.item.emit(it.iid, N_("running…"))
                 try:
-                    results = run_job(it.job, ctx)
-                    it.files = [str(p) for p in results]
+                    results = run_job(job_to_run, ctx)
+                    files_list = [str(p) for p in results]
+                    if model is not None:
+                        with model._lock:
+                            it.files = files_list
+                    else:
+                        it.files = files_list
                     bridge.item.emit(it.iid, N_("done ({} files)").format(len(results)))
                 except Cancelled:
                     bridge.item.emit(it.iid, "cancelled")
@@ -156,7 +179,7 @@ class QueueRunner(QObject):
                         break
                 except Exception as e:  # noqa: BLE001
                     bridge.item.emit(it.iid, "failed")
-                    bridge.log.emit(t("ERROR: {error}").format(error=e))
+                    bridge.log.emit(t("ERROR: {error}", error=e))
                 finally:
                     with self._lock:
                         self.active_contexts.pop(it.iid, None)

@@ -212,7 +212,7 @@ class UpdateDownloadRunner:
             from core import updates
             error = ""
             try:
-                ctx.stage(0.0, 1.0, t("Downloading {tag}").format(tag=info.tag))
+                ctx.stage(0.0, 1.0, t("Downloading {tag}", tag=info.tag))
                 updates.download_installer(ctx, info, dest)
                 if not updates.verify_download(dest, info.asset_size, info.sha256):
                     try:

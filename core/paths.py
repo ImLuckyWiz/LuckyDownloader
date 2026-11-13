@@ -95,7 +95,7 @@ def migrate_from_legacy(src: Path | None = None, dest: Path | None = None) -> li
         "config.json",
         "luckytwitch_settings.json",
         "luckytwitch_recent.json",
-        "luckytwitch_recent_searches.json",
+        "recent_searches.json",
         "luckytwitch_history.json",
         "luckytwitch_watchlist.json",
         "luckytwitch_ui.json",
@@ -112,6 +112,8 @@ def migrate_from_legacy(src: Path | None = None, dest: Path | None = None) -> li
         if src_file.is_file() and not dest_file.exists():
             try:
                 shutil.copy2(src_file, dest_file)
+                if name == "config.json" and os.name == "posix":
+                    os.chmod(dest_file, 0o600)
                 migrated.append(name)
             except OSError:
                 pass
@@ -359,4 +361,10 @@ def ensure_data_dir() -> None:
         pass
     if FROZEN:
         migrate_from_legacy()
-        uninstall_legacy_app()
+        uninst_sentinel = DATA_DIR / ".legacy_uninstalled"
+        if not uninst_sentinel.exists():
+            uninstall_legacy_app()
+            try:
+                uninst_sentinel.write_text("1\n", encoding="utf-8")
+            except OSError:
+                pass

@@ -51,20 +51,26 @@
     var sel = $("limitChapter");
     if (sel && r.file && r.file.parsed && sel.options) {
       var chapters = window.LTCore.chapterList(r.file.parsed);
-      var currentVal = sel.value;
-      if (sel.options.length !== chapters.length + 1) {
+      var sig = chapters.map(function (ch) { return ch.index + ":" + ch.name + ":" + ch.start + "-" + ch.end; }).join("|");
+      var prevSig = sel.dataset ? (sel.dataset.chaptersSig || "") : (sel._chaptersSig || "");
+      if (prevSig !== sig || sel.options.length !== chapters.length + 1) {
+        var currentVal = sel.value;
         sel.textContent = "";
         var allOpt = document.createElement("option");
         allOpt.value = "";
         allOpt.textContent = "All chapters (whole file)";
         sel.appendChild(allOpt);
+        var hasCurrent = false;
         chapters.forEach(function (ch) {
           var opt = document.createElement("option");
           opt.value = ch.index;
           opt.textContent = ch.name;
           sel.appendChild(opt);
+          if (String(ch.index) === String(currentVal)) hasCurrent = true;
         });
-        sel.value = currentVal;
+        sel.value = hasCurrent ? currentVal : "";
+        if (sel.dataset) sel.dataset.chaptersSig = sig;
+        else sel._chaptersSig = sig;
       }
     }
     // markers file

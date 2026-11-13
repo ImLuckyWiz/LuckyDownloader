@@ -9,7 +9,7 @@ set VER=%1
 if "%VER%"=="" set VER=1.0
 
 python -m pip install --upgrade pip || goto :err
-python -m pip install -r requirements-cli.txt || goto :err
+python -m pip install -r requirements-cli.txt -r requirements-build.txt || goto :err
 
 if not exist build mkdir build
 > build\version.txt echo %VER%
@@ -32,14 +32,13 @@ python -m nuitka --mode=standalone ^
   --output-dir=dist ^
   --output-folder-name=LuckyDownloader-CLI ^
   --output-filename=LuckyDownloader-CLI.exe ^
-  --include-data-dir=assets=assets ^
   --include-data-dir=locale=locale ^
   --include-data-files=build\version.txt=version.txt ^
   --include-package=core ^
   --include-package=requests ^
-  --include-module=luckytwitch_engine ^
   --nofollow-import-to=PySide6 ^
   --nofollow-import-to=qt_ui ^
+  --nofollow-import-to=PIL ^
   --nofollow-import-to=tkinter ^
   --nofollow-import-to=_tkinter ^
   --nofollow-import-to=pytest ^
@@ -52,7 +51,7 @@ if exist dist\LuckyDownloader-CLI.dist (
 )
 
 echo Packaging CLI zip archive...
-powershell -NoProfile -Command "Compress-Archive -Path dist\LuckyDownloader-CLI\* -DestinationPath dist\LuckyDownloader-CLI-windows.zip -Force" || goto :err
+powershell -NoProfile -Command "Compress-Archive -Path dist\LuckyDownloader-CLI -DestinationPath dist\LuckyDownloader-CLI-windows.zip -Force" || goto :err
 
 echo Done! Output in dist\LuckyDownloader-CLI and dist\LuckyDownloader-CLI-windows.zip
 exit /b 0

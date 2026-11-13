@@ -111,7 +111,7 @@ test("no test or probe code is left in the panel (old test buttons, probe script
   for (const f of ["bInfo", "bSel", "bRazor", "bRelink", "bTc", "bTcRazor", "bRmV", "bRmVA", "bScale", "bStop", "mAll", "mInfo", "mRead", "mPickC", "mPickD", "mPickE", "mImport", "mDel", "mkFile"]) assert.ok(!html.includes(`id="${f}"`), `index.html still has the test control #${f}`);
   assert.ok(!/js\/(main|probe)\.js/.test(html), "index.html still loads main.js / probe.js");
   const defined = [...host.matchAll(/^function (LT_[A-Za-z0-9_]+)\(/gm)].map((x) => x[1]).sort();
-  assert.deepEqual(defined, ["LT_c_cut", "LT_c_snap", "LT_d_del", "LT_g_scan", "LT_l_count", "LT_l_link", "LT_l_verify", "LT_r_mkChunk", "LT_r_mkInit", "LT_r_mkRemove", "LT_r_mkVerify"], "host.jsx must export exactly the functions the runner calls");
+  assert.deepEqual(defined, ["LT_b_clone", "LT_c_cut", "LT_c_snap", "LT_d_del", "LT_g_scan", "LT_l_count", "LT_l_link", "LT_l_verify", "LT_r_mkChunk", "LT_r_mkInit", "LT_r_mkRemove", "LT_r_mkVerify"], "host.jsx must export exactly the functions the runner calls");
   // the log buttons used to be wired by main.js: the runner must wire them now
   const js = read(path.join(panel, "js", "runner.js"));
   assert.ok(js.includes('bind("bCopy"') && js.includes('bind("bClear"'), "Copy log / Clear are not wired");
@@ -158,4 +158,13 @@ test("the shared file the page loads for the planning layer is the one in src/ (
   const html = read(path.join(panel, "index.html"));
   assert.ok(html.includes('src="shared/markers-core.js"'));
   assert.ok(fs.readdirSync(path.join(root, "src")).sort().join() === "guard.js,markers-core.js,progress.js,timecode.js", "src/ must hold exactly the four runtime files (the release zip ships all of src/)");
+});
+
+test("host.jsx stays ES3 and ASCII-clean so ExtendScript can load it", () => {
+  const jsx = read(path.join(panel, "jsx/host.jsx"));
+  assert.ok(!/[^\x00-\x7f]/.test(jsx), "host.jsx must be pure ASCII");
+  assert.ok(!/\b(const|let)\s+[A-Za-z_$]/.test(jsx), "host.jsx must not use ES6 const/let");
+  assert.ok(!/=>/.test(jsx), "host.jsx must not use ES6 arrow functions");
+  assert.ok(!/`/.test(jsx), "host.jsx must not use ES6 template literals");
+  assert.ok(jsx.includes("function LT_b_clone("), "host.jsx must define LT_b_clone()");
 });

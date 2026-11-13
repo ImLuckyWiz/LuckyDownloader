@@ -121,13 +121,13 @@ def device_login_start(client_id: str = TWITCH_CLIENT_ID) -> dict:
         try:
             r = requests.post(DEVICE_URL, data={"client_id": client_id, "scopes": scopes}, timeout=20)
         except requests.RequestException as e:
-            raise EngineError(t("Could not reach Twitch:\n{error}").format(error=e)) from e
+            raise EngineError(t("Could not reach Twitch:\n{error}", error=e)) from e
         if r.ok:
             data = r.json()
             data["scopes"] = scopes
             return data
         last = r.text[:300]
-    raise EngineError(t("Twitch refused the sign-in request:\n{last}").format(last=last))
+    raise EngineError(t("Twitch refused the sign-in request:\n{last}", last=last))
 
 
 def device_login_poll(start: dict, client_id: str = TWITCH_CLIENT_ID,
@@ -165,7 +165,7 @@ def device_login_poll(start: dict, client_id: str = TWITCH_CLIENT_ID,
         if "slow" in msg.lower():
             interval += 5
             continue
-        raise EngineError(t("Twitch sign-in failed: {error}").format(error=msg or r.status_code))
+        raise EngineError(t("Twitch sign-in failed: {error}", error=msg or r.status_code))
     raise EngineError(t("The sign-in code expired. Start again."))
 
 

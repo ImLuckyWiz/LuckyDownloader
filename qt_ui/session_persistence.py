@@ -181,6 +181,8 @@ class SessionPersistenceMixin:
         except Exception:  # noqa: BLE001
             restored = []
         if restored:
+            for it in restored:
+                self.tab_queue._ensure_thumbnail(it)
             self.tab_queue.refresh_summary()
             self._sync_queue_badge()
             waiting_count = sum(1 for it in restored if it.status == "queued")
@@ -195,21 +197,30 @@ class SessionPersistenceMixin:
     def _save_ui_state(self) -> None:
         idx = self.tabs.currentIndex()
         active_name = TAB_NAMES[idx] if 0 <= idx < len(TAB_NAMES) else "Plan"
-        has_onboard = self._ui_state.has_completed_onboarding if hasattr(self, "_ui_state") else False
+        state = load_ui_state()
+        has_onboard = (
+            self._ui_state.has_completed_onboarding
+            if hasattr(self, "_ui_state")
+            else state.has_completed_onboarding
+        )
         is_max = self.isMaximized()
         geom = self.normalGeometry() if is_max else self.geometry()
-        state = UIState(
-            window_x=geom.x(),
-            window_y=geom.y(),
-            window_w=geom.width(),
-            window_h=geom.height(),
-            window_maximized=is_max,
-            active_tab=active_name,
-            rail_expanded=self.rail.expanded,
-            has_completed_onboarding=has_onboard,
-            custom_titlebar=self.use_custom_titlebar,
-            language=i18n_qt.current_setting(),
-        )
+        state.window_x = geom.x()
+        state.window_y = geom.y()
+        state.window_w = geom.width()
+        state.window_h = geom.height()
+        state.window_maximized = is_max
+        state.active_tab = active_name
+        state.rail_expanded = self.rail.expanded
+        state.has_completed_onboarding = has_onboard
+        state.custom_titlebar = self.use_custom_titlebar
+        state.language = i18n_qt.current_setting()
+        q_tab = getattr(self, "tab_queue", None) or getattr(self, "queue_tab", None)
+        if q_tab is not None:
+            if hasattr(q_tab, "max_concurrent_jobs"):
+                state.max_concurrent_jobs = int(q_tab.max_concurrent_jobs)
+            if hasattr(q_tab, "rate_limit"):
+                state.rate_limit = str(q_tab.rate_limit or "")
         save_ui_state(state)
 
     # ---------------------------- drag & drop / clipboard ---------------------------- #
@@ -347,6 +358,6 @@ class SessionPersistenceMixin:
         self.tab_options.refresh_name_examples()
         self.log(f"Link: {req.url}" + (f" ({req.label})" if req.label else "") + (f", cut points: {req.cuts}" if req.cuts else ""))
         self._link_pending = req.label
-        from core.providers.detect import detect_provider
-        if detect_provider(req.url).site != "generic":
-            self.on_get_info()
+        info_btn = getattr(self, "info_btn", None)
+        if info_btn is not None:
+            info_btn.setFocus()

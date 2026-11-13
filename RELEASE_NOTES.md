@@ -1,3 +1,16 @@
+## v2.17.0
+
+LuckyDownloader **v2.17.0** brings headless CLI feature parity, parameterized Google Colab tooling, batch queue ergonomics, privacy controls, Premiere Pro CEP sequence backup, and Windows/security/CI hardening:
+
+- **Headless CLI Parity & Local Cutting (`cli.py`):** Added `cut-local` / `--local-file` splitting (`split_copy` / `cut_exact --exact`), `--batch` JSON/text manifests, playlist/channel expansion (`--items`), `--download-archive`, `--premiere-xml`, `--premiere-json`, `--game-markers`, `--muted-markers`, `--chat-render`, `--no-update-tools`, and Twitch API client wiring for `--chapters` and marker exports.
+- **Generalized Google Colab Pipeline (`tools/colab/`):** Replaced root Colab scripts with parameterized `colab_job.sh`, `cut_colab.py` / `cut_colab.sh`, and `transcribe.py` / `transcribe.sh` supporting `--source-dir`, `--target-dir`, `--cuts`, `--lang`, `--format`, isolated per-video chunk caches, atomic `.part` outputs, and safe cleanup.
+- **Batch Queue UX & Responsive Layout:** Enabled multi-row selection (`ExtendedSelection`) for batch Retry/Move/Remove/Cancel and URL drag-and-drop onto `QueueTab`, plus responsive `_FlowLayout` wrapping for the Queue and Log toolbars at narrower window widths.
+- **Privacy Controls & Diagnostics:** Added the `save_history` setting (skipping download history and recent searches when disabled), a **Clear Private Data…** action, and an **About & Diagnostics…** dialog (`NavRail` + `Options`) with redacted diagnostics bundle export.
+- **Premiere Pro CEP Backup & Hardening:** Added `LT_b_clone()` sequence backup before destructive Cuts/Deletes phases, persisted `#recipeSelect` and phase toggles (`recipeDeleteGaps`, `recipeRelink`, `backupSeq`), verified cached `ZXPSignCmd` SHA-256 checksums, and hardened ES3/ASCII checks.
+- **Windows Native, Persistence, Security & CI:** Prioritized unmaximized top/top-corner resize borders over caption buttons, switched multi-monitor auto-hide taskbar detection to `ABM_GETAUTOHIDEBAREX`, added explicit `ctypes.windll` `argtypes`/`restype`, rotated `.corrupt.<timestamp>` JSON backups (up to 3), hardened `#EXT-X-MAP` `BYTERANGE` and IPv4-mapped SSRF checks, fixed `ExtractExePath` in `installer.iss`, slimmed `requirements-cli.txt`, and made GitHub Release publishing atomic after `SHA256SUMS.txt` generation.
+
+---
+
 ## v2.16.1
 
 LuckyDownloader **v2.16.1** enhances progress visibility, live metrics, and logging across long fragment merges and FFmpeg cutting passes in both the desktop app and the headless CLI:

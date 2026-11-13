@@ -112,6 +112,9 @@ def _blocked_host(host: str) -> bool:
         ip = ipaddress.ip_address(h)
     except ValueError:
         return False
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None:
+        return not mapped.is_global
     return not ip.is_global
 
 

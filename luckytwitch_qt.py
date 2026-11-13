@@ -74,8 +74,8 @@ def i18n_selftest() -> int:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv if argv is None else argv
     if "--help" in argv or "-h" in argv:
-        print("LuckyTwitch Downloader - Twitch VOD Downloader & Video Cutter")
-        print("Usage: LuckyTwitch [options] [luckytwitch://...]")
+        print("LuckyDownloader - VOD & Video Downloader & Cutter")
+        print("Usage: LuckyDownloader [options] [luckytwitch://...]")
         print("Options:")
         print("  --help, -h       Show this help message and exit")
         print("  --version        Show version and exit")
@@ -84,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if "--version" in argv:
         ver = paths.BUNDLED_VERSION or "dev build"
-        print(f"LuckyTwitch {ver}")
+        print(f"LuckyDownloader {ver}")
         return 0
 
     paths.ensure_data_dir()
@@ -99,8 +99,8 @@ def main(argv: list[str] | None = None) -> int:
         idx = argv.index("--lang")
         if idx + 1 < len(argv):
             _lang_setting = argv[idx + 1]
-    elif os.environ.get("LUCKYTWITCH_LANG"):
-        _lang_setting = os.environ.get("LUCKYTWITCH_LANG", "").strip()
+    elif os.environ.get("LUCKYDOWNLOADER_LANG") or os.environ.get("LUCKYTWITCH_LANG"):
+        _lang_setting = (os.environ.get("LUCKYDOWNLOADER_LANG") or os.environ.get("LUCKYTWITCH_LANG") or "").strip()
     set_language(resolve_language(_lang_setting, i18n_qt.system_language()))  # early: messages before the window exists
     if "--i18n-selftest" in argv:
         return i18n_selftest()

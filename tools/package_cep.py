@@ -65,14 +65,19 @@ def find_or_download_zxpsigncmd(cache_dir: Path) -> Path | None:
             f"{ZXPSIGN_BASE_URL}/4.1.3/macOS/ZXPSignCmd",
         ]
     else:
-        # Linux fallback
-        exe_path = cache_dir / "ZXPSignCmd"
-        urls = [
-            f"{ZXPSIGN_BASE_URL}/4.1.3/x64/ZXPSignCmd.exe",
-        ]
+        return None
 
     if exe_path.exists() and exe_path.stat().st_size > 0:
-        return exe_path
+        expected_hashes = {ZXPSIGN_SHA256.get(u) for u in urls if ZXPSIGN_SHA256.get(u)}
+        if expected_hashes:
+            actual_hash = hashlib.sha256(exe_path.read_bytes()).hexdigest().lower()
+            if actual_hash not in expected_hashes:
+                print(f"Warning: cached ZXPSignCmd SHA-256 mismatch ({actual_hash}); removing and re-downloading.")
+                exe_path.unlink(missing_ok=True)
+            else:
+                return exe_path
+        else:
+            return exe_path
 
     cache_dir.mkdir(parents=True, exist_ok=True)
     for url in urls:
@@ -229,9 +234,8 @@ def build_zxp_package(
     verify_cmd = [str(zxpsign), "-verify", str(out_zxp)]
     v_res = subprocess.run(verify_cmd, capture_output=True, text=True)
     if v_res.returncode != 0:
-        print(f"Warning: verification reported: {v_res.stderr or v_res.stdout.strip()}")
-    else:
-        print("ZXP signature verified successfully.")
+        raise RuntimeError(f"ZXP verification failed: {v_res.stderr or v_res.stdout.strip()}")
+    print("ZXP signature verified successfully.")
 
     print(f"Created ZXP: {out_zxp} ({out_zxp.stat().st_size:,} bytes)")
 

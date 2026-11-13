@@ -75,9 +75,17 @@ def hit_test(
     if x < 0 or y < 0 or x >= width or y >= height:
         return Region.NOWHERE
 
-    # Check interactive titlebar controls (maximize button, client widgets) first
-    # so top-edge Fitts's Law clicks on Minimize/Maximize/Close buttons are never swallowed
-    # by the top resize border or top corners.
+    # When unmaximized, top-edge and top-corner resize borders (y < border) take
+    # priority over caption buttons so users can always resize from the top edge.
+    if not maximized and y < border:
+        if x < corner_size:
+            return Region.TOPLEFT
+        if x >= width - corner_size:
+            return Region.TOPRIGHT
+        return Region.TOP
+
+    # Check interactive titlebar controls (maximize button, client widgets) next
+    # so top-edge Fitts's Law clicks on Minimize/Maximize/Close buttons work when maximized.
     if y < bar_height:
         if max_button_rect:
             mx, my, mw, mh = max_button_rect
@@ -397,6 +405,17 @@ class NativeFrame:
             return (False, False, False, False)
         try:
             shell32 = ctypes.windll.shell32
+            if rc_monitor is not None:
+                abm_getautohidebarex = 0x0000000B
+                edges: list[bool] = []
+                for edge in (ABE_LEFT, ABE_TOP, ABE_RIGHT, ABE_BOTTOM):
+                    abd = APPBARDATA()
+                    abd.cbSize = ctypes.sizeof(APPBARDATA)
+                    abd.uEdge = edge
+                    abd.rc = rc_monitor
+                    edges.append(bool(shell32.SHAppBarMessage(abm_getautohidebarex, ctypes.byref(abd))))
+                return (edges[0], edges[1], edges[2], edges[3])
+
             abd = APPBARDATA()
             abd.cbSize = ctypes.sizeof(APPBARDATA)
             state = shell32.SHAppBarMessage(ABM_GETSTATE, ctypes.byref(abd))
@@ -405,19 +424,7 @@ class NativeFrame:
             # Check primary taskbar position via ABM_GETTASKBARPOS
             if has_autohide and shell32.SHAppBarMessage(ABM_GETTASKBARPOS, ctypes.byref(abd)):
                 edge = abd.uEdge
-                # If target monitor is specified and intersects taskbar, or if primary monitor
-                if rc_monitor is None or (
-                    abd.rc.left < rc_monitor.right and abd.rc.right > rc_monitor.left and
-                    abd.rc.top < rc_monitor.bottom and abd.rc.bottom > rc_monitor.top
-                ):
-                    return (edge == ABE_LEFT, edge == ABE_TOP, edge == ABE_RIGHT, edge == ABE_BOTTOM)
-
-            # Secondary monitor check: when rc_work == rc_monitor on a maximized monitor with global autohide,
-            # apply 1px bottom inset to avoid Windows DWM blanking out the autohide taskbar
-            if has_autohide and rc_monitor is not None and rc_work is not None:
-                if (rc_monitor.left == rc_work.left and rc_monitor.top == rc_work.top and
-                    rc_monitor.right == rc_work.right and rc_monitor.bottom == rc_work.bottom):
-                    return (False, False, False, True)
+                return (edge == ABE_LEFT, edge == ABE_TOP, edge == ABE_RIGHT, edge == ABE_BOTTOM)
         except Exception:
             pass
         return (False, False, False, False)

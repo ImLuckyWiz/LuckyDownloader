@@ -20,7 +20,8 @@ from PySide6.QtCore import QEvent, QItemSelectionModel, QModelIndex, QObject, QR
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap, QTextCharFormat, QTextCursor, QTextOption
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPlainTextEdit,
-    QProgressBar, QPushButton, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QTableView, QVBoxLayout, QWidget,
+    QProgressBar, QPushButton, QSizePolicy, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QTableView, QVBoxLayout,
+    QWidget,
 )
 
 from core.files import open_in_file_manager
@@ -386,6 +387,7 @@ class QueueTab(QWidget):
     status_message = Signal(str)
     plan_requested = Signal()
     show_requested = Signal()
+    urls_dropped = Signal(list)
 
     def __init__(self, bridge: Bridge | None = None, parent: QWidget | None = None):
         super().__init__(parent)
@@ -408,12 +410,14 @@ class QueueTab(QWidget):
 
         self.bridge.log.connect(self.log)
         self.bridge.item.connect(self.set_item_status)
+        self.bridge.item_progress.connect(self.model.set_progress)
         self.bridge.progress.connect(self._on_progress)
         self.bridge.queue_done.connect(self.on_queue_done)
         self._thumb_fetcher = QueueThumbFetcher(self)
         self._thumb_fetcher.thumb_ready.connect(self._on_thumb_ready)
         self.refresh_summary()
         language_bus().changed.connect(self.refresh_language)
+        self.setAcceptDrops(True)
 
     # ---------------------------- building ---------------------------- #
     def _build_queue_card(self) -> None:
@@ -472,9 +476,12 @@ class QueueTab(QWidget):
         self.queue_card.body_layout.setStretchFactor(self.table, 1)
 
         # F2 & F4 Grouped action buttons: primary execution vs secondary queue management
-        buttons = QHBoxLayout()
+        from qt_ui.timeline_preview import _FlowLayout
+
+        buttons_box = QWidget(self.queue_card)
+        buttons_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        buttons = _FlowLayout(buttons_box, hspacing=6, vspacing=6)
         buttons.setContentsMargins(0, 10, 0, 0)
-        buttons.setSpacing(6)
 
         # Primary group: Start queue / Cancel current
         self.start_btn = QPushButton(t("Start queue"))
@@ -491,9 +498,7 @@ class QueueTab(QWidget):
         sep = QFrame()
         sep.setObjectName("divider")
         sep.setFixedSize(1, 22)
-        buttons.addSpacing(4)
         buttons.addWidget(sep)
-        buttons.addSpacing(4)
 
         # Secondary group: Retry / Move up / Move down / Remove selected / Clear finished
         self.retry_btn = QPushButton(t("Retry"))
@@ -574,21 +579,23 @@ class QueueTab(QWidget):
         self.speed_limit_combo.currentIndexChanged.connect(_on_speed_changed)
         buttons.addWidget(self.speed_limit_combo)
 
-        buttons.addStretch(1)
         self.folder_btn = QPushButton(t("Open folder"))
         self.folder_btn.setIcon(icon("folder-open", 15))
         self.folder_btn.clicked.connect(self.open_queue_folder)
         buttons.addWidget(self.folder_btn)
-        self.queue_card.body_layout.addLayout(buttons)
+        self.queue_card.add_widget(buttons_box)
 
     def _build_log_card(self) -> None:
         self.log_card = Card(t("Log"))
         self.scroll.body_layout.addWidget(self.log_card, 1)
 
         # Integrated console toolbar: filters & search on left, autoscroll & actions on right
-        toolbar = QHBoxLayout()
+        from qt_ui.timeline_preview import _FlowLayout
+
+        toolbar_box = QWidget(self.log_card)
+        toolbar_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        toolbar = _FlowLayout(toolbar_box, hspacing=6, vspacing=6)
         toolbar.setContentsMargins(0, 0, 0, 8)
-        toolbar.setSpacing(6)
 
         self.filter_buttons: dict[str, QPushButton] = {}
         for key, label in (("all", "All"), ("warn", "Warnings"), ("err", "Errors")):
@@ -604,11 +611,10 @@ class QueueTab(QWidget):
         self.log_search_entry = QLineEdit()
         self.log_search_entry.setPlaceholderText(t("Filter log lines…"))
         self.log_search_entry.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-        self.log_search_entry.setMaximumWidth(240)
+        self.log_search_entry.setMinimumWidth(140)
+        self.log_search_entry.setMaximumWidth(220)
         self.log_search_entry.textChanged.connect(self._on_log_search)
         toolbar.addWidget(self.log_search_entry)
-
-        toolbar.addStretch(1)
 
         self.autoscroll_btn = QPushButton(t("Pause autoscroll"))
         self.autoscroll_btn.setProperty("variant", "chip")
@@ -632,7 +638,7 @@ class QueueTab(QWidget):
         self.clear_log_btn.clicked.connect(self.clear_log)
         toolbar.addWidget(self.clear_log_btn)
 
-        self.log_card.body_layout.addLayout(toolbar)
+        self.log_card.add_widget(toolbar_box)
 
         # Embedded console terminal
         self.log_view = LogView()
@@ -773,14 +779,25 @@ class QueueTab(QWidget):
             self.table.setCurrentIndex(self.model.index(row, 0))
 
     def move_selected(self, delta: int) -> bool:
-        """Move the selected waiting («queued») item up (``delta = -1``) or down (``delta = 1``) (F4)."""
-        iid = self.selected_iid()
-        if iid is None:
+        """Move selected waiting («queued») item(s) up (``delta = -1``) or down (``delta = 1``)."""
+        iids = self.selected_iids()
+        if not iids:
             return False
-        ok = self.model.move_item(iid, delta)
-        if ok:
-            self.select_item(iid)
-        return ok
+        ordered = iids if delta < 0 else list(reversed(iids))
+        moved: list[str] = []
+        for iid in ordered:
+            if self.model.move_item(iid, delta):
+                moved.append(iid)
+        if moved and self.table.selectionModel():
+            self.table.selectionModel().clearSelection()
+            for iid in moved:
+                row = self.model.row_of(iid)
+                if row >= 0:
+                    self.table.selectionModel().select(
+                        self.model.index(row, 0),
+                        QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows,
+                    )
+        return bool(moved)
 
     def retry_item(self, iid: str) -> QueueItem | None:
         """Reset a single failed or cancelled item to «queued» at the end of the queue (F4)."""
@@ -791,14 +808,15 @@ class QueueTab(QWidget):
         return item
 
     def retry_failed_or_selected(self) -> list[QueueItem]:
-        """If the selected item is failed/cancelled, retry it; otherwise retry all failed/cancelled items (F4)."""
-        sel = self.selected_iid()
-        if sel is not None:
-            it = self.model.find(sel)
-            if it is not None and it.status in ("failed", "cancelled"):
-                retried = self.retry_item(sel)
-                return [retried] if retried else []
-        target_iids = [it.iid for it in self.items if it.status in ("failed", "cancelled")]
+        """Retry selected failed/cancelled items, or all failed/cancelled items if none selected."""
+        sels = self.selected_iids()
+        selected_retryable = [
+            iid for iid in sels
+            if (it := self.model.find(iid)) is not None and it.status in ("failed", "cancelled")
+        ]
+        target_iids = selected_retryable or [
+            it.iid for it in self.items if it.status in ("failed", "cancelled")
+        ]
         out: list[QueueItem] = []
         for iid in target_iids:
             r = self.retry_item(iid)
@@ -874,13 +892,7 @@ class QueueTab(QWidget):
         self.set_running(True)
         max_c = getattr(self, "max_concurrent_jobs", 1)
         r_lim = getattr(self, "rate_limit", "")
-        if r_lim:
-            for it in todo:
-                if hasattr(it.job, "opts") and not getattr(it.job.opts, "rate_limit", ""):
-                    from qt_ui.queue_runner import split_rate_limit
-                    it.job.opts._base_rate_limit = r_lim
-                    it.job.opts.rate_limit = split_rate_limit(r_lim, max_c)
-        self.runner.start(todo, model=self.model, max_concurrent=max_c)
+        self.runner.start(todo, model=self.model, max_concurrent=max_c, rate_limit=r_lim)
 
     def cancel_current(self) -> None:
         sel_idx = self.table.selectionModel().currentIndex() if self.table.selectionModel() else None
@@ -956,6 +968,8 @@ class QueueTab(QWidget):
         self.move_down_btn.setToolTip(t("Move selected waiting job down"))
         self.remove_btn.setText(t("Remove selected"))
         self.clear_btn.setText(t("Clear finished"))
+        self.clear_all_btn.setText(t("Clear queue"))
+        self.clear_all_btn.setToolTip(t("Clear all jobs from the queue"))
         self.folder_btn.setText(t("Open folder"))
         self.copy_btn.setText(t("Copy log"))
         self.save_log_btn.setText(t("Save log…"))
@@ -990,3 +1004,34 @@ class QueueTab(QWidget):
             self.model.refresh_language()
         self.refresh_summary()
         self.table.viewport().update()
+
+    @staticmethod
+    def _extract_dropped_urls(mime) -> list[str]:
+        urls: list[str] = []
+        if mime is None:
+            return urls
+        if mime.hasUrls():
+            for qurl in mime.urls():
+                s = qurl.toString().strip()
+                if s.startswith(("http://", "https://")) and s not in urls:
+                    urls.append(s)
+        if mime.hasText():
+            for token in mime.text().split():
+                s = token.strip()
+                if s.startswith(("http://", "https://")) and s not in urls:
+                    urls.append(s)
+        return urls
+
+    def dragEnterEvent(self, event) -> None:  # noqa: N802
+        if self._extract_dropped_urls(event.mimeData()):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dropEvent(self, event) -> None:  # noqa: N802
+        urls = self._extract_dropped_urls(event.mimeData())
+        if urls:
+            event.acceptProposedAction()
+            self.urls_dropped.emit(urls)
+        else:
+            super().dropEvent(event)

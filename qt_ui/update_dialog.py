@@ -60,7 +60,7 @@ class UpdateDialog(QDialog):
         title_lbl = QLabel(t("Update available"))
         title_lbl.setStyleSheet("font-size: 16px; font-weight: bold;")
         current_ver = paths.BUNDLED_VERSION or t("dev build")
-        sub_lbl = QLabel(t("LuckyDownloader {tag}   (you have {cur})").format(tag=info.tag, cur=current_ver))
+        sub_lbl = QLabel(t("LuckyDownloader {tag}   (you have {cur})", tag=info.tag, cur=current_ver))
         sub_lbl.setProperty("role", "muted")
         head_box.addWidget(title_lbl)
         head_box.addWidget(sub_lbl)
@@ -126,7 +126,7 @@ class UpdateDialog(QDialog):
 
         btn_row.addStretch(1)
 
-        self.btn_skip = QPushButton(t("Skip {tag}").format(tag=info.tag))
+        self.btn_skip = QPushButton(t("Skip {tag}", tag=info.tag))
         self.btn_skip.clicked.connect(self.on_skip)
         btn_row.addWidget(self.btn_skip)
 
@@ -165,7 +165,7 @@ class UpdateDialog(QDialog):
         dest = updates.get_update_temp_dir() / f"LuckyDownloader-Setup-{safe_tag}{ext}"
         self.progress_container.setVisible(True)
         self.progress_bar.setValue(0)
-        self.progress_label.setText(t("Downloading LuckyDownloader {tag}...").format(tag=self.info.tag))
+        self.progress_label.setText(t("Downloading LuckyDownloader {tag}...", tag=self.info.tag))
         self.btn_update.setEnabled(False)
         self.btn_skip.setEnabled(False)
         self.btn_later.setText(t("Cancel"))
@@ -217,21 +217,22 @@ class UpdateDialog(QDialog):
         self._install_and_restart(dest_str)
 
     def _install_and_restart(self, dest_str: str) -> None:
-        # Re-verify download digest/size before saving state or launching installer (C-02 TOCTOU defense)
-        if getattr(self.info, "sha256", "") or getattr(self.info, "asset_size", 0) > 0:
-            if not updates.verify_download(Path(dest_str), getattr(self.info, "asset_size", 0), getattr(self.info, "sha256", "")):
-                try:
-                    Path(dest_str).unlink(missing_ok=True)
-                except OSError:
-                    pass
-                self.progress_label.setText(t("Update verification failed."))
-                return
+        # Re-verify download digest/size before saving state or launching installer (C-02 / C-05 TOCTOU defense)
+        sha256 = str(getattr(self.info, "sha256", "") or "").strip()
+        asset_size = int(getattr(self.info, "asset_size", 0) or 0)
+        if not sha256 or not updates.verify_download(Path(dest_str), asset_size, sha256):
+            try:
+                Path(dest_str).unlink(missing_ok=True)
+            except OSError:
+                pass
+            self.progress_label.setText(t("Update verification failed."))
+            return
 
         state = updates.load_state()
         state["installer_path"] = dest_str
         updates.save_state(state)
 
-        ok = updates.launch_installer(dest_str)
+        ok = updates.launch_installer(dest_str, expected_sha256=sha256, expected_size=asset_size)
         if not ok:
             self.progress_label.setText(t("Could not start the installer."))
             self.btn_update.setText(t("Open release page"))

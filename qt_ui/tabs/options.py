@@ -72,6 +72,7 @@ class OptionsTab(QWidget):
     update_tools_requested = Signal()
     saved_chat_requested = Signal()
     check_app_updates_requested = Signal()
+    about_requested = Signal()
     status_message = Signal(str)
 
     def __init__(self, settings: dict | None = None, parent: QWidget | None = None):
@@ -290,7 +291,7 @@ class OptionsTab(QWidget):
     def refresh_name_examples(self) -> None:
         """Redraw every «Example:» line (also called when a VOD is loaded, to use its real name)."""
         for key, label in self.example_labels.items():
-            label.setText("Example:  " + self.example_for(key))
+            label.setText(t("Example:") + "  " + self.example_for(key))
         self._refresh_save_preview()
 
     def _refresh_save_preview(self) -> None:
@@ -316,7 +317,7 @@ class OptionsTab(QWidget):
             if target_dir.exists():
                 free_bytes = shutil.disk_usage(target_dir).free
                 free_gb = free_bytes / (1024 ** 3)
-                self.disk_space_label.setText(t("Drive free space: {space} GB").format(space=i18n_qt.format_number(free_gb, 1)))
+                self.disk_space_label.setText(t("Drive free space: {space} GB", space=i18n_qt.format_number(free_gb, 1)))
             else:
                 self.disk_space_label.setText(t("Destination folder will be created on first download"))
         except Exception:
@@ -357,6 +358,8 @@ class OptionsTab(QWidget):
             for item in self.searchable_rows:
                 item["row"].setVisible(True)
                 item["card"].setVisible(True)
+            for card, _t, _s in self.registered_cards:
+                card.setVisible(True)
             self.show_section(self.nav.current or "output")
             return
 
@@ -379,6 +382,8 @@ class OptionsTab(QWidget):
 
         for item in self.searchable_rows:
             item["card"].setVisible(item["card"] in cards_with_matches)
+        for card, _t, _s in self.registered_cards:
+            card.setVisible(card in cards_with_matches)
 
         self.match_counter.setText(tn("{n} match", "{n} matches", matched))
         self.match_counter.setVisible(True)
@@ -431,6 +436,10 @@ class OptionsTab(QWidget):
         # G3: Files will be saved as preview card
         self.save_preview_card = self._card(f, N_("Files will be saved as"), N_("Full destination path of your next download."))
         self.save_preview_card_row = self.save_preview_card.add_row(t("Destination preview"), "")
+        self._register_setting(
+            self.save_preview_card_row, "_preview_dest", "output", self.save_preview_card,
+            raw_title="Destination preview", raw_hint="Full destination path of your next download.",
+        )
         self.save_preview_path = WrapLabel("")
         self.save_preview_path.setProperty("role", "accent")
         self.save_preview_path.setMaximumWidth(640)
@@ -527,6 +536,10 @@ class OptionsTab(QWidget):
         p_lay.addWidget(self.provider_dir_browse)
         p_lay.addWidget(self.provider_dir_clear)
         p_row.add_control(p_box)
+        self._register_setting(
+            p_row, "_naming_preview", "naming", card, adv,
+            raw_title="Preview", raw_hint="How filenames look with the current settings.",
+        )
         self._sync_provider_dir_display()
 
         qcard = self._card(f, N_("Quality"), N_("What to download when a VOD offers several qualities (Twitch VODs)."))
@@ -605,8 +618,8 @@ class OptionsTab(QWidget):
         card = self._card(f)
 
         row = self._add_setting_row(
-            card, "premiere_plugin", N_("LuckyTwitch Premiere plugin"), N_("Saves a .markers.json with colors and clip details."), "premiere", card,
-            info=N_("One .markers.json next to each part, for the LuckyTwitch Premiere plugin. "
+            card, "premiere_plugin", N_("LuckyDownloader Premiere plugin"), N_("Saves a .markers.json with colors and clip details."), "premiere", card,
+            info=N_("One .markers.json next to each part, for the LuckyDownloader Premiere plugin. "
                  "It works even if chapters are off."))
         self._switch(row, "premiere_plugin", refresh_clips=True)
 
@@ -666,6 +679,11 @@ class OptionsTab(QWidget):
                  "and frame rate; if «name.markers.json» is there too, it is lined up to the fraction of "
                  "a second. The result is saved next to the chat as «name.chat-overlay.mov» (or .mp4)."))
         self.saved_chat_row = row
+        self._register_setting(
+            self.saved_chat_row, "_saved_chat_render", "chat", card,
+            raw_title="Draw the overlay from a saved chat",
+            raw_hint="Pick a «.chat.json» you already have. Nothing is downloaded.",
+        )
         self.saved_chat_btn = QPushButton(t("Choose chat file…"))
         self.saved_chat_btn.clicked.connect(self.saved_chat_requested)
         row.add_control(self.saved_chat_btn)
@@ -758,6 +776,7 @@ class OptionsTab(QWidget):
         # G5 Dedicated tools status card
         tools_status_card = self._card(f, N_("Download & processing tools"))
         self.ytdlp_row = tools_status_card.add_row("yt-dlp", t("Twitch stream downloader engine"))
+        self._register_setting(self.ytdlp_row, "_tool_ytdlp", "tools", tools_status_card, raw_title="yt-dlp", raw_hint="Twitch stream downloader engine")
         self.ytdlp_status_label = QLabel(t("Checking…"))
         self.ytdlp_status_label.setProperty("role", "muted")
         self.ytdlp_status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -765,6 +784,7 @@ class OptionsTab(QWidget):
         self.ytdlp_row.add_control(self.ytdlp_status_label)
 
         self.ffmpeg_row = tools_status_card.add_row("ffmpeg", t("Audio/video muxing, cutting, and stitching"), divider=False)
+        self._register_setting(self.ffmpeg_row, "_tool_ffmpeg", "tools", tools_status_card, raw_title="ffmpeg", raw_hint="Audio/video muxing, cutting, and stitching")
         self.ffmpeg_status_label = QLabel(t("Checking…"))
         self.ffmpeg_status_label.setProperty("role", "muted")
         self.ffmpeg_status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -774,6 +794,7 @@ class OptionsTab(QWidget):
         card = self._card(f)
 
         self.tools_info_row = card.add_row(t("Installed tools"), "")
+        self._register_setting(self.tools_info_row, "_tools_info", "tools", card, raw_title="Installed tools", raw_hint="")
         self.tools_info_label = WrapLabel(t("Checking…"))
         self.tools_info_label.setProperty("role", "muted")
         self.tools_info_label.setMaximumWidth(640)
@@ -804,37 +825,60 @@ class OptionsTab(QWidget):
         row_scope.add_control(self._combo("cookies_scope", COOKIES_SCOPE_NAMES, 26))
 
         self.update_row = card.add_row(t("Update yt-dlp"), t("Download the latest version now."))
+        self._register_setting(self.update_row, "_update_ytdlp", "tools", card, raw_title="Update yt-dlp", raw_hint="Download the latest version now.")
         self.update_btn = QPushButton(t("Update yt-dlp now"))
         self.update_btn.clicked.connect(self.update_tools_requested)
         self.update_row.add_control(self.update_btn)
 
         self.tools_folder_row = card.add_row(t("Tools folder"), t("Where yt-dlp, ffmpeg and TwitchDownloaderCLI are kept."))
+        self._register_setting(self.tools_folder_row, "_tools_folder", "tools", card, raw_title="Tools folder", raw_hint="Where yt-dlp, ffmpeg and TwitchDownloaderCLI are kept.")
         self.tools_folder_btn = QPushButton(t("Open tools folder"))
         self.tools_folder_btn.clicked.connect(self.open_tools_folder)
         self.tools_folder_row.add_control(self.tools_folder_btn)
 
         self.clean_temp_row = card.add_row(t("Temporary files"), t("Remove incomplete temporary download directories from the output folder."), divider=False)
+        self._register_setting(self.clean_temp_row, "_clean_temp", "tools", card, raw_title="Temporary files", raw_hint="Remove incomplete temporary download directories from the output folder.")
         self.clean_temp_btn = QPushButton(t("Clean temporary files"))
         self.clean_temp_btn.clicked.connect(self.clean_temp_files)
         self.clean_temp_row.add_control(self.clean_temp_btn)
 
-        app_update_card = self._card(f, N_("LuckyTwitch updates"), N_("Check for new versions of LuckyTwitch Downloader."))
+        privacy_card = self._card(f, N_("Privacy & Data"), N_("Control local history and clear stored URLs or searches."))
+        row_hist = self._add_setting_row(
+            privacy_card, "save_history", N_("Save download history & recent URLs"),
+            N_("Record downloaded VODs, recent channels, and search queries locally."), "tools", privacy_card,
+        )
+        self._switch(row_hist, "save_history")
+        self.clear_data_row = privacy_card.add_row(t("Private data"), t("Clear download history, recent channels, searches, and finished queue items."), divider=False)
+        self._register_setting(self.clear_data_row, "_clear_private_data", "tools", privacy_card, raw_title="Private data", raw_hint="Clear download history, recent channels, searches, and finished queue items.")
+        self.clear_data_btn = QPushButton(t("Clear Private Data…"))
+        self.clear_data_btn.clicked.connect(self.clear_private_data)
+        self.clear_data_row.add_control(self.clear_data_btn)
+
+        app_update_card = self._card(f, N_("LuckyDownloader updates"), N_("Check for new versions of LuckyDownloader."))
         row = self._add_setting_row(
-            app_update_card, "check_app_updates", N_("Check for new versions of LuckyTwitch"),
+            app_update_card, "check_app_updates", N_("Check for new versions of LuckyDownloader"),
             N_("Notifies you when a new release is available on GitHub."), "tools", app_update_card)
         self._switch(row, "check_app_updates")
 
         self.app_version_row = app_update_card.add_row(t("Version"), "")
+        self._register_setting(self.app_version_row, "_app_version", "tools", app_update_card, raw_title="Version", raw_hint="")
         self.app_version_label = QLabel()
         self.app_version_label.setProperty("role", "muted")
         self.app_version_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.app_version_label.setMaximumWidth(280)
         self.app_version_row.add_control(self.app_version_label)
 
-        self.check_now_row = app_update_card.add_row(t("Check now"), t("Check GitHub releases for updates now."), divider=False)
+        self.check_now_row = app_update_card.add_row(t("Check now"), t("Check GitHub releases for updates now."))
+        self._register_setting(self.check_now_row, "_check_now", "tools", app_update_card, raw_title="Check now", raw_hint="Check GitHub releases for updates now.")
         self.check_app_updates_btn = QPushButton(t("Check now"))
         self.check_app_updates_btn.clicked.connect(self.check_app_updates_requested.emit)
         self.check_now_row.add_control(self.check_app_updates_btn)
+
+        self.about_row = app_update_card.add_row(t("About & Diagnostics"), t("View version info or export a redacted diagnostics bundle."), divider=False)
+        self._register_setting(self.about_row, "_about_diag", "tools", app_update_card, raw_title="About & Diagnostics", raw_hint="View version info or export a redacted diagnostics bundle.")
+        self.about_btn = QPushButton(t("About & Diagnostics…"))
+        self.about_btn.clicked.connect(self.about_requested.emit)
+        self.about_row.add_control(self.about_btn)
         self.refresh_app_update_state()
 
         link_card = self._card(
@@ -842,6 +886,7 @@ class OptionsTab(QWidget):
             N_("A page can offer a luckytwitch:// link that opens a VOD here with the cut points already "
             "filled in. A link only fills in the Plan tab: it never starts a download."))
         self.link_row = link_card.add_row(t("Open luckytwitch:// links"), "", divider=False)
+        self._register_setting(self.link_row, "_web_links", "tools", link_card, raw_title="Open luckytwitch:// links", raw_hint="")
         self.link_info_label = WrapLabel("")
         self.link_info_label.setProperty("role", "muted")
         self.link_info_label.setMaximumWidth(640)
@@ -873,8 +918,8 @@ class OptionsTab(QWidget):
                 last_str = last
         else:
             last_str = t("never")
-        self.app_version_label.setText(t("{ver} · checked: {last}").format(ver=ver, last=last_str))
-        self.app_version_label.setToolTip(t("Installed: {ver}\nLast checked: {last}").format(ver=ver, last=last_str))
+        self.app_version_label.setText(t("{ver} · checked: {last}", ver=ver, last=last_str))
+        self.app_version_label.setToolTip(t("Installed: {ver}\nLast checked: {last}", ver=ver, last=last_str))
 
     # ------------------------------------------------------------------ actions of the tab
     def pick_folder(self) -> None:
@@ -905,6 +950,28 @@ class OptionsTab(QWidget):
                 pass
         return False
 
+    def clear_private_data(self) -> bool:
+        if not dialogs.ask_yes_no(
+            self,
+            t("Clear Private Data"),
+            t("Clear download history, recent channels, recent searches, and finished queue items?"),
+        ):
+            return False
+        from core import history, recent
+        history.save_history([])
+        recent.save_recent([])
+        recent.save_recent_searches([])
+        win = self.window()
+        if win is not None and hasattr(win, "tab_queue") and hasattr(win.tab_queue, "clear_finished"):
+            win.tab_queue.clear_finished()
+        if win is not None and hasattr(win, "tab_browse"):
+            win.tab_browse.recent = []
+            win.tab_browse.recent_yt = []
+            if hasattr(win.tab_browse, "refresh_recent"):
+                win.tab_browse.refresh_recent()
+        self.status_message.emit(t("Private data cleared."))
+        return True
+
     def clean_temp_files(self) -> int:
         from core.finalize import cleanup_stale_workdirs
         if self.is_queue_active():
@@ -912,7 +979,7 @@ class OptionsTab(QWidget):
             return 0
         out_dir = str(self.binder.get("out_dir") or DEFAULTS.get("out_dir") or APP_DIR)
         removed = cleanup_stale_workdirs(out_dir, max_age_hours=0.0)
-        self.status_message.emit(t("Cleaned {count} temporary folder(s).").format(count=removed))
+        self.status_message.emit(t("Cleaned {count} temporary folder(s).", count=removed))
         return removed
 
     def refresh_link_state(self) -> None:
@@ -923,7 +990,7 @@ class OptionsTab(QWidget):
             if sys.platform == "darwin":
                 self.link_info_label.setText(
                     t("macOS sends these links to the app by itself once it is in Applications. If a link "
-                      "does nothing, open LuckyTwitch from Applications once and try again."))
+                      "does nothing, open LuckyDownloader from Applications once and try again."))
             else:
                 self.link_info_label.setText(t("Links are not supported on this system."))
         elif st.state == "ok":
@@ -933,7 +1000,7 @@ class OptionsTab(QWidget):
         elif st.state == "other":
             self.link_btn.setVisible(True)
             self.link_info_label.setText(
-                t("These links currently open another copy of LuckyTwitch. Press the button to use this one."))
+                t("These links currently open another copy of LuckyDownloader. Press the button to use this one."))
             self.link_btn.setText(t("Use this copy"))
         else:
             self.link_btn.setVisible(True)
@@ -944,7 +1011,7 @@ class OptionsTab(QWidget):
         try:
             weblink.register()
         except OSError as e:
-            dialogs.error(self, t("Links"), t("Windows did not accept the setting:\n{error}").format(error=e))
+            dialogs.error(self, t("Links"), t("Windows did not accept the setting:\n{error}", error=e))
             return
         self.refresh_link_state()
         self.status_message.emit(t("Links are set up: luckytwitch:// links now open this app."))

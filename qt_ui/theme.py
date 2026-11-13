@@ -292,8 +292,12 @@ def set_app_icon(app: QApplication) -> bool:
     if sys.platform == "win32":
         try:  # own taskbar identity, so Windows shows our icon instead of python.exe's
             import ctypes
+            from ctypes import wintypes
 
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+            fn = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID
+            fn.argtypes = [wintypes.LPCWSTR]
+            fn.restype = ctypes.c_long
+            fn(APP_ID)
         except Exception:  # noqa: BLE001
             pass
     names = ("icon.ico", "icon.png") if sys.platform == "win32" else ("icon.png",)
@@ -315,10 +319,14 @@ def dark_titlebar(window: QWidget) -> None:
         return
     try:
         import ctypes
+        from ctypes import wintypes
 
         hwnd = int(window.winId())
         value = ctypes.c_int(1)
+        fn = ctypes.windll.dwmapi.DwmSetWindowAttribute
+        fn.argtypes = [wintypes.HWND, wintypes.DWORD, wintypes.LPCVOID, wintypes.DWORD]
+        fn.restype = ctypes.c_long
         for attr in (20, 19):
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(value), ctypes.sizeof(value))
+            fn(hwnd, attr, ctypes.byref(value), ctypes.sizeof(value))
     except Exception:  # noqa: BLE001
         pass

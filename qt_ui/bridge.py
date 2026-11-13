@@ -49,6 +49,8 @@ class Bridge(QObject):
     frames = Signal(object, object)
     # progress of a job or of the tools setup: (fraction 0..1, or a negative number for «unknown»; text)
     progress = Signal(float, str)
+    # per-item progress for QueueModel on the GUI thread: (row id, fraction, text)
+    item_progress = Signal(str, float, str)
     # a queue job starts: (number, how many in this run)
     job = Signal(int, int)
     # a queue item changed: (row id, status text, e.g. "running…", "done (3 files)")

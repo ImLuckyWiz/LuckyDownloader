@@ -56,15 +56,15 @@ def test_resource_path_points_into_the_project():
 # ------------------------------------------------------------------ settings
 def test_defaults_are_the_42_documented_keys_with_the_documented_types():
     d = settings.DEFAULTS
-    assert len(d) == 47
-    assert sum(isinstance(v, bool) for v in d.values()) == 17
-    assert sum(isinstance(v, str) for v in d.values()) == 29
+    assert len(d) == 49
+    assert sum(isinstance(v, bool) for v in d.values()) == 18
+    assert sum(isinstance(v, str) for v in d.values()) == 30
     assert sum(isinstance(v, dict) for v in d.values()) == 1
     expected_bools = {
         "exact", "keep_full", "chapters", "sidecar", "premiere_xml",
         "premiere_plugin", "game_markers", "muted_markers", "chat",
         "chat_embed", "chat_render", "chat_render_smooth", "subfolders", "auto_update", "clean_title",
-        "check_app_updates", "provider_subfolders",
+        "check_app_updates", "provider_subfolders", "save_history",
     }
     assert {k for k, v in d.items() if isinstance(v, bool)} == expected_bools
     for k, v in d.items():
@@ -373,7 +373,7 @@ def test_settings_corrupt_file_backup(tmp_path, monkeypatch):
     test_file.write_text("NOT VALID JSON {{{", encoding="utf-8")
     loaded = settings.load_settings()
     assert loaded["container"] == settings.DEFAULTS["container"]
-    assert (tmp_path / "settings.json.corrupt").exists()
+    assert list(tmp_path.glob("settings.json.corrupt*"))
 
 def test_corrupt_files_backed_up_across_all_storage(tmp_path, monkeypatch):
     import core.history as history
@@ -386,26 +386,26 @@ def test_corrupt_files_backed_up_across_all_storage(tmp_path, monkeypatch):
     hist_file = tmp_path / "hist.json"
     hist_file.write_text("CORRUPT JSON", encoding="utf-8")
     assert history.load_history(hist_file) == []
-    assert (tmp_path / "hist.json.corrupt").exists()
+    assert list(tmp_path.glob("hist.json.corrupt*"))
 
     # Watchlist
     watch_file = tmp_path / "watch.json"
     watch_file.write_text("CORRUPT JSON", encoding="utf-8")
     assert watchlist.load_watchlist(watch_file) == []
-    assert (tmp_path / "watch.json.corrupt").exists()
+    assert list(tmp_path.glob("watch.json.corrupt*"))
 
     # UI state
     ui_file = tmp_path / "ui.json"
     ui_file.write_text("CORRUPT JSON", encoding="utf-8")
     assert ui_state.load_ui_state(ui_file) == ui_state.UIState()
-    assert (tmp_path / "ui.json.corrupt").exists()
+    assert list(tmp_path.glob("ui.json.corrupt*"))
 
     # Config
     cfg_file = tmp_path / "config.json"
     cfg_file.write_text("CORRUPT JSON", encoding="utf-8")
     monkeypatch.setattr(paths, "CONFIG_PATH", cfg_file)
     assert config.read_config() == {}
-    assert (tmp_path / "config.json.corrupt").exists()
+    assert list(tmp_path.glob("config.json.corrupt*"))
 
     # Tools versions.json
     tools_dir = tmp_path / "tools"
@@ -414,7 +414,7 @@ def test_corrupt_files_backed_up_across_all_storage(tmp_path, monkeypatch):
     ver_file.write_text("CORRUPT JSON", encoding="utf-8")
     monkeypatch.setattr(tools, "TOOLS_DIR", tools_dir)
     assert tools._read_versions() == {}
-    assert (tools_dir / "versions.json.corrupt").exists()
+    assert list(tools_dir.glob("versions.json.corrupt*"))
 
 
 
@@ -424,7 +424,7 @@ def test_settings_list_json_backup(tmp_path, monkeypatch):
     test_file.write_text("[]", encoding="utf-8")
     loaded = settings.load_settings()
     assert loaded["container"] == settings.DEFAULTS["container"]
-    assert (tmp_path / "settings.json.corrupt").exists()
+    assert list(tmp_path.glob("settings.json.corrupt*"))
 
 
 def test_migration_sentinel_prevents_re_migration(tmp_path):

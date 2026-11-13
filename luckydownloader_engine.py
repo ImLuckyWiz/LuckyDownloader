@@ -6,4 +6,7 @@ Re-exports all symbols from `luckytwitch_engine` and `core/` for the modern Luck
 
 from __future__ import annotations
 
-from luckytwitch_engine import *
+import sys as _sys
+import luckytwitch_engine as _eng
+
+_sys.modules[__name__] = _eng

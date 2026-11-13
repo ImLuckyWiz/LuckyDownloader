@@ -506,7 +506,7 @@ def _key_for(name: str) -> str:
         return key
     if name not in _warned:
         _warned.add(name)
-        _log.warning(t("unknown icon {name!r} (available: {avail})").format(name=name, avail=", ".join(available_icons())))
+        _log.warning(t("unknown icon {name!r} (available: {avail})", name=name, avail=", ".join(available_icons())))
     return _MISSING
 
 

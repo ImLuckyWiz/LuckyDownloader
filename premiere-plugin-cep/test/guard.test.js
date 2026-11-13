@@ -199,3 +199,23 @@ test("evaluateDeletes: the source going backwards or a changed speed is refused"
   const slow = PCS.map((p, i) => (i === 2 ? Object.assign({}, p, { outPoint: p.inPoint + 1 }) : p));
   assert.ok(G.evaluateDeletes(delFacts(slow)).hard.some((h) => /changed speed/.test(h)));
 });
+
+test("F-03: head-trimmed V1 clip (inPoint > frame) is refused by evaluate", () => {
+  const f = good({ v1: [clip({ start: 0, end: 3590, inPoint: 10, outPoint: 3600 })], a1: [clip({ start: 0, end: 3590, inPoint: 10, outPoint: 3600 })] });
+  const r = G.evaluate(f);
+  assert.equal(r.ok, false);
+  assert.ok(r.hard.some((h) => /trimmed at the head/i.test(h)));
+});
+
+test("F-04: unreadable QE timecode (tcValid === false) is refused in evaluate, evaluateCuts, and evaluateDeletes", () => {
+  const f = good({ seq: { ok: true, fps: 60, dropFrame: false, tcValid: false } });
+  const r = G.evaluate(f);
+  assert.equal(r.ok, false);
+  assert.ok(r.hard.some((h) => /playhead timecode/i.test(h)));
+
+  const fc = cutFacts([0, E0], { seq: { ok: true, fps: 60, dropFrame: false, tcValid: false } });
+  assert.equal(G.evaluateCuts(fc).ok, false);
+
+  const fd = delFacts(PCS, { seq: { fps: 60, dropFrame: false, tcValid: false } });
+  assert.equal(G.evaluateDeletes(fd).ok, false);
+});

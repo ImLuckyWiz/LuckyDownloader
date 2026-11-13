@@ -146,7 +146,7 @@ class TwitchDialog(QDialog):
         holder.addWidget(adv)
         box.addLayout(holder)
 
-        self.path_label = QLabel(t("Saved in: {path}").format(path=paths.CONFIG_PATH))
+        self.path_label = QLabel(t("Saved in: {path}", path=paths.CONFIG_PATH))
         self.path_label.setProperty("role", "muted")
         self.path_label.setContentsMargins(0, 10, 0, 0)
         box.addWidget(self.path_label)
@@ -281,7 +281,10 @@ class TwitchDialog(QDialog):
         if not cid or not sec:
             dialogs.warning(self, t("Missing data"), t("Fill in both fields."))
             return
+        self.state["busy"] = True
         self.save_btn.setEnabled(False)
+        self.login_btn.setEnabled(False)
+        self.logout_btn.setEnabled(False)
         test = TwitchClient(cid, sec)
         signals = self.signals
 
@@ -309,7 +312,10 @@ class TwitchDialog(QDialog):
     def _finish_save_own_app(self, cid: str, sec: str, client: object) -> None:
         if self.closed:
             return
+        self.state["busy"] = False
         self.save_btn.setEnabled(True)
+        self.login_btn.setEnabled(True)
+        self.logout_btn.setEnabled(True)
         save_login_tokens(None, None)  # own app replaces a signed-in account
         save_credentials(cid, sec)
         self.host.client = client
@@ -319,7 +325,11 @@ class TwitchDialog(QDialog):
     def _fail_save_own_app(self, kind: str, msg: str) -> None:
         if self.closed:
             return
+        self.state["busy"] = False
         self.save_btn.setEnabled(True)
+        self.login_btn.setEnabled(True)
+        self.logout_btn.setEnabled(True)
+        self.refresh_status()
         title = t("Network error") if kind == "network" else t("Error")
         dialogs.error(self, title, msg)
 

@@ -191,6 +191,54 @@ def test_markers_json_includes_preferences_when_provided():
     data = json.loads(text)
     assert data.get("preferences") == prefs
 
+
+def test_run_job_markers_json_avoids_double_padding(monkeypatch, tmp_path):
+    """F-02: run_job() bakes pad_before/pad_after into markers[] and writes 0.0 in preferences."""
+    from core.finalize import PipelineDeps, run_job
+    from core.job import ClipFilter, Job, JobOptions
+    from core.runtime import Ctx
+    from core.source_info import SourceInfo
+
+    monkeypatch.setattr("core.finalize.check_disk_space", lambda *a, **kw: None)
+    dummy_in = tmp_path / "in.mp4"
+    dummy_in.write_bytes(b"0" * 1024)
+
+    def fake_fin(ctx, src_file, dest_stem, container, chs, tags, total, copy=False):
+        dest = dest_stem.with_suffix(f".{container}")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"1" * 1024)
+        return dest
+
+    deps = PipelineDeps(
+        find_tool=lambda name: "ffmpeg",
+        download_full=lambda *a, **kw: dummy_in,
+        finalize_part=fake_fin,
+        load_muted=lambda ctx, job: [],
+    )
+    src = SourceInfo(
+        url="https://twitch.tv/videos/4242",
+        id="4242",
+        title="Padded Stream",
+        date="2026-01-01",
+        duration=120.0,
+        uploader="Tester",
+    )
+    clips = [{"title": "Clip1", "vod_offset": 30.0, "duration": 10.0, "view_count": 50}]
+    opts = JobOptions(
+        cut_text="",
+        out_dir=str(tmp_path),
+        strategy="full",
+        chapters=True,
+        premiere_plugin=True,
+        clip_filter=ClipFilter(pad_before=3.0, pad_after=4.0),
+    )
+    res = run_job(Job(source=src, opts=opts, clips=clips), Ctx(log=lambda m: None), deps=deps)
+    mj = res[0].with_suffix(".markers.json")
+    data = json.loads(mj.read_text(encoding="utf-8"))
+    assert data["markers"][0]["start"] == pytest.approx(17.0)
+    assert data["markers"][0]["end"] == pytest.approx(34.0)
+    assert data["preferences"] == {"pad_before": 0.0, "pad_after": 0.0}
+
 if __name__ == "__main__":
     SAMPLE.write_text(_sample_text(), encoding="utf-8")
     print("wrote", SAMPLE)

@@ -104,11 +104,17 @@ begin
   end
   else
   begin
-    P := Pos(' ', S);
+    P := Pos('.exe', LowerCase(S));
     if P > 0 then
-      Result := Copy(S, 1, P - 1)
+      Result := Copy(S, 1, P + 3)
     else
-      Result := S;
+    begin
+      P := Pos(' ', S);
+      if P > 0 then
+        Result := Copy(S, 1, P - 1)
+      else
+        Result := S;
+    end;
   end;
   Result := RemoveQuotes(Trim(Result));
 end;

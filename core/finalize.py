@@ -119,7 +119,44 @@ def check_disk_space(out_dir: str | Path, required_bytes: int = 200 * 1024 * 102
         )
 
 
-def compute_job_workdir(src: SourceInfo, opts: JobOptions, fmt: VideoFormat | None = None, out_dir: Path | None = None) -> Path:
+def _is_pid_alive(pid: int) -> bool:
+    """Return True if a process with ``pid`` appears to be running."""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not handle:
+                return False
+            try:
+                exit_code = ctypes.c_ulong()
+                if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                    return exit_code.value == 259  # STILL_ACTIVE
+                return False
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:  # noqa: BLE001
+            return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def compute_job_workdir(
+    src: SourceInfo,
+    opts: JobOptions,
+    fmt: VideoFormat | None = None,
+    out_dir: Path | None = None,
+    single_clip: bool = False,
+) -> Path:
     """Return a deterministic temporary work directory for a job so interrupted downloads can resume."""
     base = Path(out_dir) if out_dir is not None else Path(opts.out_dir)
     id_slug = re.sub(r"[^A-Za-z0-9_-]", "_", str(src.twitch_vod_id or src.id or "unknown"))[:64] or "unknown"
@@ -127,7 +164,7 @@ def compute_job_workdir(src: SourceInfo, opts: JobOptions, fmt: VideoFormat | No
     key = (
         f"{src.url}|{fmt_slug}|{opts.cut_text}|{opts.strategy}|{opts.quality}|"
         f"{opts.container}|{opts.exact}|{getattr(opts, 'keyframe_align', False)}|"
-        f"{getattr(opts, 'reencode', False)}|{opts.audio_format}|{opts.keep_full}"
+        f"{getattr(opts, 'reencode', False)}|{opts.audio_format}|{opts.keep_full}|{bool(single_clip)}"
     )
     job_hash = hashlib.sha256(key.encode("utf-8")).hexdigest()[:8]
     return base / f".luckytwitch_{id_slug}{fmt_slug}_{job_hash}"
@@ -150,8 +187,14 @@ def cleanup_stale_workdirs(out_dir: str | Path, max_age_hours: float = 48.0) -> 
                 continue
             if not (entry.name.startswith(".luckytwitch_") or entry.name.startswith(".luckydownloader_work_")):
                 continue
-            if (entry / ".running").exists():
-                continue
+            running_file = entry / ".running"
+            if running_file.exists() and max_age_hours > 0:
+                try:
+                    pid_str = running_file.read_text(encoding="utf-8").strip()
+                    if pid_str.isdigit() and _is_pid_alive(int(pid_str)):
+                        continue
+                except OSError:
+                    continue
             if max_age_hours <= 0 or entry.stat().st_mtime <= cutoff:
                 shutil.rmtree(entry, ignore_errors=True)
                 if not entry.exists():
@@ -276,6 +319,7 @@ def part_stem(src: SourceInfo, opts: JobOptions, part: Part, total: int, clip: d
     game = dominant_game(getattr(src, "segments", None), part.start, part.end)
     duration_str = tag(max(0.0, part.end - part.start))
     site = getattr(src, "site", "twitch") or "twitch"
+    eff_title = clean_title(src.title) if getattr(opts, "clean_title", False) else src.title
 
     data = _SafeDict(
         streamer=src.uploader or "vod",
@@ -293,7 +337,7 @@ def part_stem(src: SourceInfo, opts: JobOptions, part: Part, total: int, clip: d
         game=game,
         category=game,
         id=src.twitch_vod_id or src.id,
-        title=src.title,
+        title=eff_title,
         duration=duration_str,
         n=part.index,
         total=total,
@@ -359,6 +403,7 @@ def stream_dir(src: SourceInfo, opts: JobOptions) -> Path:
     duration_val = getattr(src, "duration", 0.0) or 0.0
     game = dominant_game(getattr(src, "segments", None), 0.0, duration_val)
     duration_str = format_duration_tag(duration_val)
+    eff_title = clean_title(src.title) if getattr(opts, "clean_title", False) else src.title
 
     data = _SafeDict(
         streamer=src.uploader or "vod",
@@ -376,7 +421,7 @@ def stream_dir(src: SourceInfo, opts: JobOptions) -> Path:
         game=game,
         category=game,
         id=src.twitch_vod_id or src.id,
-        title=src.title,
+        title=eff_title,
         duration=duration_str,
         quality=q_tag,
         resolution=q_tag,
@@ -507,13 +552,14 @@ def split_copy(
     """
     _run_ff = getattr(deps, "run_ffmpeg", None) or resolve_dep("run_ffmpeg", _ORIG_RUN_FFMPEG, run_ffmpeg)
 
-    boundaries = sorted({0.0} | {p.start for p in parts} | {p.end for p in parts if p.end < duration - 0.5})
+    end_points = {p.end for p in parts if (not duration or duration <= 0 or p.end < duration - 0.5)}
+    boundaries = sorted({0.0} | {p.start for p in parts} | end_points)
     inner = boundaries[1:]
 
     if not inner:  # whole video is a single part
         return {parts[0].index: (full, 0.0, duration)}
 
-    ctx.log(t("Splitting into {count} part(s) using stream copy…").format(count=len(parts)))
+    ctx.log(t("Splitting into {count} part(s) using stream copy…", count=len(parts)))
     seg_dir = workdir / "segments"
     if seg_dir.exists():
         shutil.rmtree(seg_dir)
@@ -543,7 +589,7 @@ def split_copy(
     for p in parts:
         i = boundaries.index(p.start)
         if i >= len(rows):
-            raise EngineError(t("Cut point {point} is past the end of the downloaded video.").format(point=fmt_hms(p.start)))
+            raise EngineError(t("Cut point {point} is past the end of the downloaded video.", point=fmt_hms(p.start)))
         name, s, e = rows[i][0], float(rows[i][1]), float(rows[i][2])
         result[p.index] = (seg_dir / Path(name).name, s, e)
     return result
@@ -599,7 +645,7 @@ def _load_chapters(ctx: Ctx, job: Job, *, deps: PipelineDeps | None = None) -> l
         clips = fetch_clips_for_vod(job.client, job.source.twitch_vod_id)
     _make_ch = getattr(deps, "make_chapters", None) or resolve_dep("make_chapters", _ORIG_MAKE_CHAPTERS, make_chapters)
     chapters = _make_ch(clips, job.opts.clip_filter)
-    ctx.log(t("Chapters: {chapters} (from {clips} clips found)").format(chapters=len(chapters), clips=len(clips)))
+    ctx.log(t("Chapters: {chapters} (from {clips} clips found)", chapters=len(chapters), clips=len(clips)))
     return chapters
 
 
@@ -618,7 +664,12 @@ def _load_muted(ctx: Ctx, job: Job, *, deps: PipelineDeps | None = None) -> list
 
     if ranges is None and src.twitch_vod_id:  # it could not be read then (or the VOD came from elsewhere): try once more
         try:
-            ranges = _muted_pl(_get_pl(ctx, src.url), src.duration)
+            import inspect
+            kw = {}
+            cb = getattr(opts, "cookies_browser", "") or ""
+            if cb and "cookies_browser" in inspect.signature(_get_pl).parameters:
+                kw["cookies_browser"] = cb
+            ranges = _muted_pl(_get_pl(ctx, src.url, **kw), src.duration)
         except Cancelled:
             raise
         except EngineError:
@@ -637,7 +688,7 @@ def _load_muted(ctx: Ctx, job: Job, *, deps: PipelineDeps | None = None) -> list
             if hasattr(r, "start") and hasattr(r, "end"):
                 return float(r.end) - float(r.start)
             return 0.0
-        ctx.log(t("Muted audio: {count} stretch(es), {total} in total").format(count=len(ranges), total=fmt_hms(sum(_dur(r) for r in ranges))))
+        ctx.log(t("Muted audio: {count} stretch(es), {total} in total", count=len(ranges), total=fmt_hms(sum(_dur(r) for r in ranges))))
     return muted_chapters(ranges)
 
 
@@ -686,10 +737,8 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
             plan = Plan(parts=[Part(index=1, start=0.0, end=dur)], strategy="full", coverage=1.0, duration=src.duration or 0.0)
     else:
         plan = make_plan(opts.cut_text, src.duration, opts.strategy, opts.full_threshold)
-    ctx.log(
-        f"{len(plan.parts)} part(s), coverage {plan.coverage * 100:.0f}% → "
-        + ("download full VOD, then split" if plan.strategy == "full" else "download only the parts")
-    )
+    _mode = t("download full VOD, then split") if plan.strategy == "full" else t("download only the parts")
+    ctx.log(t("{count} part(s), coverage {pct}% → {mode}", count=len(plan.parts), pct=f"{plan.coverage * 100:.0f}", mode=_mode))
     fmt = resolve_format(src.formats, opts.quality)
     if not src.has_capability(Capability.TIMELINE):
         from core.source_info import build_generic_format_string
@@ -709,200 +758,230 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
         opts, skipped = audio_only_options(opts)
         job = replace(job, opts=opts)  # _load_chapters reads job.opts
         if skipped:
-            ctx.log("Audio only: skipped " + ", ".join(skipped) + " (they need a video track).")
-    chapters_all = _load_ch(ctx, job)
+            ctx.log(t("Audio only: skipped {items} (they need a video track).", items=", ".join(skipped)))
+    import inspect
+    _ch_kw = {"deps": deps} if (deps is not None and "deps" in inspect.signature(_load_ch).parameters) else {}
+    _mut_kw = {"deps": deps} if (deps is not None and "deps" in inspect.signature(_load_mut).parameters) else {}
+    chapters_all = _load_ch(ctx, job, **_ch_kw)
     games_all = game_chapters(src.segments) if opts.game_markers and not job.single_clip and src.has_capability(Capability.SEGMENTS) else []
-    muted_all = _load_mut(ctx, job)
+    muted_all = _load_mut(ctx, job, **_mut_kw)
     chat_tool: str | None = None
     if (opts.chat or opts.chat_render) and not job.single_clip:
         what = "Chat download" if opts.chat else "Chat overlay"
         if not src.has_capability(Capability.CHAT) or not src.twitch_vod_id:
-            ctx.log(t("{what} skipped: it only works for Twitch VODs.").format(what=what))
+            ctx.log(t("{what} skipped: it only works for Twitch VODs.", what=what))
         else:
             try:
                 chat_tool = _ensure_tdcli(ctx)
             except Cancelled:
                 raise
             except EngineError as e:
-                ctx.log(t("{what} skipped (the video is still downloaded): {error}").format(what=what, error=e))
+                ctx.log(t("{what} skipped (the video is still downloaded): {error}", what=what, error=e))
+
+    from core.source_info import estimate_bytes
 
     out_dir = Path(opts.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    filesize = getattr(fmt, "filesize", 0) or 0
-    if filesize > 0:
-        required_bytes = int(filesize * (2.1 if len(plan.parts) > 1 else 1.1))
-    else:
-        required_bytes = 200 * 1024 * 1024
-    check_disk_space(out_dir, required_bytes)
     final_dir = stream_dir(src, opts)
-    workdir = compute_job_workdir(src, opts, fmt=fmt, out_dir=out_dir)
-    if (workdir / ".running").exists():
-        import uuid
-        workdir = workdir.with_name(f"{workdir.name}_{os.getpid()}_{uuid.uuid4().hex[:6]}")
+    dl_seconds = (src.duration or 0.0) if plan.strategy == "full" else sum(p.duration for p in plan.parts)
+    filesize = getattr(fmt, "filesize", 0) or 0
+    if filesize > 0 and plan.strategy != "full" and src.duration and src.duration > 0:
+        filesize = int(filesize * min(1.0, dl_seconds / src.duration))
+    if filesize <= 0:
+        filesize = estimate_bytes(fmt, dl_seconds)
+    multiplier = 2.1 if (plan.strategy == "full" and (len(plan.parts) > 1 or opts.exact)) else 1.1
+    required_bytes = int(filesize * multiplier) if filesize > 0 else 200 * 1024 * 1024
+    check_disk_space(out_dir, required_bytes)
+    if final_dir != out_dir:
+        check_target = final_dir if final_dir.exists() else final_dir.parent
+        while not check_target.exists() and check_target != check_target.parent:
+            check_target = check_target.parent
+        if check_target.exists() and check_target.resolve() != out_dir.resolve():
+            check_disk_space(check_target, required_bytes)
+    workdir = compute_job_workdir(src, opts, fmt=fmt, out_dir=out_dir, single_clip=job.single_clip)
+    if not workdir.resolve().is_relative_to(out_dir.resolve()):
+        raise EngineError(t("Unsafe work directory path"))
     workdir.mkdir(parents=True, exist_ok=True)
     lock_file = workdir / ".running"
     try:
-        lock_file.write_text(str(os.getpid()), encoding="utf-8")
-    except OSError:
-        pass
-    if not workdir.resolve().is_relative_to(out_dir.resolve()):
-        raise EngineError(t("Unsafe work directory path"))
-    tags = {
-        "title": src.title,
-        "artist": src.uploader,
-        "comment": src.url,
-        "date": src.date,
-    }
-    total_parts = len(plan.parts)
-    results: list[Path] = []
-
-    def finish(part: Part, file: Path, real_start: float, real_end: float, copy: bool = False) -> None:
-        clip_chs = chapters_for_part(chapters_all, real_start, real_end)
-        n_clip_chapters = len(clip_chs) if opts.chapters else 0
-        chs = fill_gaps(clip_chs, real_end - real_start, opts.clip_filter.gap_title) if opts.chapters else []
-        stem = final_dir / part_stem(src, opts, part, total_parts, job.single_clip)
-        media_tags = dict(tags)
-        if job.single_clip:
-            media_tags["title"] = job.single_clip.get("title") or src.title
-            media_tags["comment"] = job.single_clip.get("url") or src.url
-        elif total_parts > 1:
-            media_tags["title"] = f"{src.title} (part {part.index}/{total_parts})".strip()
-        else:
-            media_tags["title"] = src.title.strip()
-        finalize_fn = _fin_audio if audio_only else _fin_part
-        dest_filename = f"{stem.name}.{out_container}"
-        ctx.log(t("Saving {name}…").format(name=dest_filename))
-        dest = finalize_fn(ctx, file, stem, out_container, chs, media_tags, real_end - real_start, copy)
-        if opts.sidecar and n_clip_chapters:
-            _write_sidecar(dest, [c for c in chs if c.clips])
-        ctx.log(f"✔ {dest.name}" + (f"  ({n_clip_chapters} clip chapters)" if n_clip_chapters else ""))
-        game_chs = chapters_for_part(games_all, real_start, real_end)
-        muted_chs = chapters_for_part(muted_all, real_start, real_end)
-        # Two separate outputs. The XML is the plain import (no colors). The JSON is for the plugin. Game markers
-        # alone still give the XML, as before, unless the plugin file is on (then they go there).
-        xml_clips = clip_chs if opts.premiere_xml else []
-        json_clips = clip_chs if opts.premiere_plugin else []
-        want_xml = opts.premiere_xml or (opts.game_markers and not opts.premiere_plugin)
-        if (want_xml and (xml_clips or game_chs)) or (opts.premiere_plugin and (json_clips or game_chs or muted_chs)):
-            probe = _probe(dest)
-            if probe is None:
-                ctx.log(t("Could not read the frame rate with ffprobe; assuming 30 fps for the Premiere markers."))
-            fps, w, h = probe or (30.0, 1920, 1080)
-
-            def marker_bits(clips: list[Chapter], muted: list[Chapter] | None = None) -> str:
-                return " + ".join(([f"{len(clips)} clip markers"] if clips else [])
-                                  + ([f"{len(game_chs)} game markers"] if game_chs else [])
-                                  + ([f"{len(muted)} muted markers"] if muted else []))
-
-            if want_xml and (xml_clips or game_chs):
-                markers = sorted(xml_clips + game_chs, key=lambda c: (c.start, c.kind))
-                xml = _write_xml(dest, markers, real_end - real_start, fps, w, h)
-                ctx.log(t("✔ {name}  ({markers} for Premiere Pro, {fps:g} fps)").format(name=xml.name, markers=marker_bits(xml_clips), fps=fps))
-            if opts.premiere_plugin and (json_clips or game_chs or muted_chs):
-                markers = sorted(json_clips + game_chs + muted_chs, key=lambda c: (c.start, c.kind))
-                prefs = {
-                    "pad_before": float(getattr(opts.clip_filter, "pad_before", 0) or 0),
-                    "pad_after": float(getattr(opts.clip_filter, "pad_after", 0) or 0),
-                }
-                mj = _write_json(dest, markers, real_end - real_start, fps, src, real_start, real_end, preferences=prefs)
-                ctx.log(t("✔ {name}  ({markers} for the Premiere plugin, {fps:g} fps)").format(name=mj.name, markers=marker_bits(json_clips, muted_chs), fps=fps))
-        if chat_tool:
-            chat_files_for_part(ctx, chat_tool, src, opts, part, total_parts, dest, real_start, real_end, workdir)
-        results.append(dest)
-
-    rate_limit = getattr(opts, "rate_limit", "")
-    rate_kw = {"rate_limit": rate_limit} if rate_limit else {}
-    cookies_browser = getattr(opts, "cookies_browser", None)
-    cookies_kw = {"cookies_browser": cookies_browser} if cookies_browser else {}
-    download_archive = str(getattr(opts, "download_archive", "") or "").strip()
-
-    def _supports_kw(fn, key: str) -> bool:
+        fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         try:
-            params = inspect.signature(fn).parameters.values()
-            return any(p.kind == inspect.Parameter.VAR_KEYWORD or p.name == key for p in params)
-        except (ValueError, TypeError):
-            return True
-
-    full_archive_kw = {"download_archive": download_archive} if (download_archive and _supports_kw(_dl_full, "download_archive")) else {}
-    sec_archive_kw = {"download_archive": download_archive} if (download_archive and _supports_kw(_dl_sec, "download_archive")) else {}
-    full_age_kw = {"is_age_restricted": getattr(src, "is_age_restricted", False)} if _supports_kw(_dl_full, "is_age_restricted") else {}
-    sec_age_kw = {"is_age_restricted": getattr(src, "is_age_restricted", False)} if _supports_kw(_dl_sec, "is_age_restricted") else {}
-
-    if plan.strategy == "full":
-        ctx.stage(0.0, 0.85, t("Downloading VOD"))
-        ctx.log(t("Downloading full video…"))
+            os.write(fd, str(os.getpid()).encode("utf-8"))
+        finally:
+            os.close(fd)
+    except FileExistsError:
+        import uuid
+        workdir = workdir.with_name(f"{workdir.name}_{os.getpid()}_{uuid.uuid4().hex[:6]}")
+        workdir.mkdir(parents=True, exist_ok=True)
+        lock_file = workdir / ".running"
         try:
-            full = _dl_full(ctx, src.url, workdir, opts.threads, **fmt_kw, **rate_kw, **cookies_kw, **full_archive_kw, **full_age_kw)
-        except ArchiveSkippedError as e:
-            ctx.log(str(e))
-            shutil.rmtree(workdir, ignore_errors=True)
-            ctx.stage(1.0, 1.0, "Done")
-            return results
-        ctx.stage(0.85, 1.0, t("Cutting"))
-        ctx.log(t("Cutting video into parts with ffmpeg…"))
-        if opts.exact:
-            for i, p in enumerate(plan.parts):
-                ctx.stage(0.85 + 0.15 * i / total_parts, 0.85 + 0.15 * (i + 1) / total_parts, t("Re-encoding part {part}/{total}").format(part=p.index, total=total_parts))
-                cut = _cut(ctx, full, p, opts.container, workdir)
-                finish(p, cut, p.start, p.end)
-        else:
-            split_container = "m4a" if audio_only else opts.container
-            split_kw = {"audio_only": True} if audio_only else {}
-            segs = _split(ctx, full, plan.parts, src.duration, split_container, workdir, **split_kw)
-            only_full = len(plan.parts) == 1 and segs[plan.parts[0].index][0] == full
-            for i, p in enumerate(plan.parts):
-                f, s, e = segs[p.index]
-                ctx.stage(0.85 + 0.15 * i / total_parts, 0.85 + 0.15 * (i + 1) / total_parts, t("Finishing part {part}/{total}").format(part=p.index, total=total_parts))
-                finish(p, f, s, e, copy=only_full and opts.keep_full)
-        if opts.keep_full and full.exists():
-            final_dir.mkdir(parents=True, exist_ok=True)
-            stem = final_dir / safe_name(f"{src.uploader} - {src.date} - {src.twitch_vod_id or src.id} - FULL")
-            full_suffix = ".m4a" if (audio_only and full.suffix.lower() == ".mp4") else full.suffix
-            kept = _uniq(stem.parent / f"{stem.name}{full_suffix}")
-            shutil.move(str(full), str(kept))
-            ctx.log(t("Kept full VOD: {name}").format(name=kept.name))
-    else:
-        for i, p in enumerate(plan.parts):
-            ctx.check_cancel()
-            lo, hi = i / total_parts, (i + 1) / total_parts
-            ctx.stage(lo, lo + (hi - lo) * 0.9, t("Downloading part {part}/{total}").format(part=p.index, total=total_parts))
-            use_aligned = (
-                getattr(src, "site", "twitch") == "twitch"
-                and getattr(src, "twitch_vod_id", None)
-                and src.has_capability(Capability.TIMELINE)
-            )
-            aligned = _dl_align(ctx, src.url, p, workdir, **dl_kw) if use_aligned else None
-            if aligned:
-                f, real_start, real_end = aligned
-                early = p.start - real_start
-                ctx.log(
-                    f"Part {p.index} starts at {fmt_hms(real_start)} (asked {fmt_hms(p.start)}"
-                    + (f", {early:.0f} s early" if early >= 0.5 else "")
-                    + f") and ends at {fmt_hms(real_end)}"
-                )
-                if opts.exact:
-                    ctx.stage(lo + (hi - lo) * 0.9, hi, f"Re-encoding part {p.index}/{total_parts}")
-                    f = _cut(ctx, f, p, opts.container, workdir, offset=max(0.0, p.start - real_start))
-                    real_start, real_end = p.start, p.end
-            else:
-                try:
-                    f = _dl_sec(ctx, src.url, p, workdir, opts.threads, opts.exact, **fmt_kw, **rate_kw, **cookies_kw, **sec_archive_kw, **sec_age_kw)
-                except ArchiveSkippedError as e:
-                    ctx.log(str(e))
-                    continue
-                real_start, real_end = p.start, p.end
-            ctx.stage(lo + (hi - lo) * 0.9, hi, f"Finishing part {p.index}/{total_parts}")
-            finish(p, f, real_start, real_end)
-
-    shutil.rmtree(workdir, ignore_errors=True)
+            lock_file.write_text(str(os.getpid()), encoding="utf-8")
+        except OSError:
+            pass
     try:
-        if lock_file.exists():
-            lock_file.unlink()
-    except OSError:
-        pass
-    ctx.stage(1.0, 1.0, "Done")
+        eff_title = clean_title(src.title) if getattr(opts, "clean_title", False) else src.title
+        tags = {
+            "title": eff_title,
+            "artist": src.uploader,
+            "comment": src.url,
+            "date": src.date,
+        }
+        total_parts = len(plan.parts)
+        results: list[Path] = []
+
+        def finish(part: Part, file: Path, real_start: float, real_end: float, copy: bool = False) -> None:
+            clip_chs = chapters_for_part(chapters_all, real_start, real_end)
+            n_clip_chapters = len(clip_chs) if opts.chapters else 0
+            chs = fill_gaps(clip_chs, real_end - real_start, opts.clip_filter.gap_title) if opts.chapters else []
+            stem = final_dir / part_stem(src, opts, part, total_parts, job.single_clip)
+            media_tags = dict(tags)
+            if job.single_clip:
+                media_tags["title"] = job.single_clip.get("title") or eff_title
+                media_tags["comment"] = job.single_clip.get("url") or src.url
+            elif total_parts > 1:
+                media_tags["title"] = f"{eff_title} (part {part.index}/{total_parts})".strip()
+            else:
+                media_tags["title"] = eff_title.strip()
+            finalize_fn = _fin_audio if audio_only else _fin_part
+            dest_filename = f"{stem.name}.{out_container}"
+            ctx.log(t("Saving {name}…", name=dest_filename))
+            _fin_kw = {"deps": deps} if (deps is not None and "deps" in inspect.signature(finalize_fn).parameters) else {}
+            dest = finalize_fn(ctx, file, stem, out_container, chs, media_tags, real_end - real_start, copy, **_fin_kw)
+            if opts.sidecar and n_clip_chapters:
+                _write_sidecar(dest, [c for c in chs if c.clips])
+            ctx.log(f"✔ {dest.name}" + (f"  ({n_clip_chapters} clip chapters)" if n_clip_chapters else ""))
+            game_chs = chapters_for_part(games_all, real_start, real_end)
+            muted_chs = chapters_for_part(muted_all, real_start, real_end)
+            # Two separate outputs. The XML is the plain import (no colors). The JSON is for the plugin. Game markers
+            # alone still give the XML, as before, unless the plugin file is on (then they go there).
+            xml_clips = clip_chs if opts.premiere_xml else []
+            json_clips = clip_chs if opts.premiere_plugin else []
+            want_xml = opts.premiere_xml or (opts.game_markers and not opts.premiere_plugin)
+            if (want_xml and (xml_clips or game_chs)) or (opts.premiere_plugin and (json_clips or game_chs or muted_chs)):
+                probe = _probe(dest)
+                if probe is None:
+                    ctx.log(t("Could not read the frame rate with ffprobe; assuming 30 fps for the Premiere markers."))
+                fps, w, h = probe or (30.0, 1920, 1080)
+
+                def marker_bits(clips: list[Chapter], muted: list[Chapter] | None = None) -> str:
+                    return " + ".join(([f"{len(clips)} clip markers"] if clips else [])
+                                      + ([f"{len(game_chs)} game markers"] if game_chs else [])
+                                      + ([f"{len(muted)} muted markers"] if muted else []))
+
+                if want_xml and (xml_clips or game_chs):
+                    markers = sorted(xml_clips + game_chs, key=lambda c: (c.start, c.kind))
+                    xml = _write_xml(dest, markers, real_end - real_start, fps, w, h)
+                    ctx.log(t("✔ {name}  ({markers} for Premiere Pro, {fps:g} fps)", name=xml.name, markers=marker_bits(xml_clips), fps=fps))
+                if opts.premiere_plugin and (json_clips or game_chs or muted_chs):
+                    markers = sorted(json_clips + game_chs + muted_chs, key=lambda c: (c.start, c.kind))
+                    prefs = {
+                        "pad_before": 0.0,
+                        "pad_after": 0.0,
+                    }
+                    mj = _write_json(dest, markers, real_end - real_start, fps, src, real_start, real_end, preferences=prefs)
+                    ctx.log(t("✔ {name}  ({markers} for the Premiere plugin, {fps:g} fps)", name=mj.name, markers=marker_bits(json_clips, muted_chs), fps=fps))
+            if chat_tool:
+                chat_files_for_part(ctx, chat_tool, src, opts, part, total_parts, dest, real_start, real_end, workdir)
+            results.append(dest)
+
+        rate_limit = getattr(opts, "rate_limit", "")
+        rate_kw = {"rate_limit": rate_limit} if rate_limit else {}
+        from core.cookie_scope import resolve_cookies_for_request
+        cookies_browser = resolve_cookies_for_request(
+            src.url,
+            getattr(opts, "cookies_browser", None) if opts else None,
+            scope_mode=getattr(opts, "cookies_scope", "known_only") if opts else "known_only",
+            explicit_enabled=getattr(opts, "cookies_explicit", None) if opts else None,
+        )
+        cookies_kw = {"cookies_browser": cookies_browser} if cookies_browser else {}
+        download_archive = str(getattr(opts, "download_archive", "") or "").strip()
+
+        def _supports_kw(fn, key: str) -> bool:
+            try:
+                params = inspect.signature(fn).parameters.values()
+                return any(p.kind == inspect.Parameter.VAR_KEYWORD or p.name == key for p in params)
+            except (ValueError, TypeError):
+                return True
+
+        full_archive_kw = {"download_archive": download_archive} if (download_archive and _supports_kw(_dl_full, "download_archive")) else {}
+        sec_archive_kw = {"download_archive": download_archive} if (download_archive and len(plan.parts) == 1 and _supports_kw(_dl_sec, "download_archive")) else {}
+        full_age_kw = {"is_age_restricted": getattr(src, "is_age_restricted", False)} if _supports_kw(_dl_full, "is_age_restricted") else {}
+        sec_age_kw = {"is_age_restricted": getattr(src, "is_age_restricted", False)} if _supports_kw(_dl_sec, "is_age_restricted") else {}
+
+        if plan.strategy == "full":
+            ctx.stage(0.0, 0.85, t("Downloading VOD"))
+            ctx.log(t("Downloading full video…"))
+            try:
+                full = _dl_full(ctx, src.url, workdir, opts.threads, **fmt_kw, **rate_kw, **cookies_kw, **full_archive_kw, **full_age_kw)
+            except ArchiveSkippedError as e:
+                ctx.log(str(e))
+                shutil.rmtree(workdir, ignore_errors=True)
+                ctx.stage(1.0, 1.0, t("Done"))
+                return results
+            ctx.stage(0.85, 1.0, t("Cutting"))
+            ctx.log(t("Cutting video into parts with ffmpeg…"))
+            if opts.exact:
+                for i, p in enumerate(plan.parts):
+                    ctx.stage(0.85 + 0.15 * i / total_parts, 0.85 + 0.15 * (i + 1) / total_parts, t("Re-encoding part {part}/{total}", part=p.index, total=total_parts))
+                    cut = _cut(ctx, full, p, opts.container, workdir)
+                    finish(p, cut, p.start, p.end)
+            else:
+                split_container = "m4a" if audio_only else opts.container
+                split_kw = {"audio_only": True} if audio_only else {}
+                segs = _split(ctx, full, plan.parts, src.duration, split_container, workdir, **split_kw)
+                only_full = len(plan.parts) == 1 and segs[plan.parts[0].index][0] == full
+                for i, p in enumerate(plan.parts):
+                    f, s, e = segs[p.index]
+                    ctx.stage(0.85 + 0.15 * i / total_parts, 0.85 + 0.15 * (i + 1) / total_parts, t("Finishing part {part}/{total}", part=p.index, total=total_parts))
+                    finish(p, f, s, e, copy=only_full and opts.keep_full)
+            if opts.keep_full and full.exists():
+                final_dir.mkdir(parents=True, exist_ok=True)
+                stem = final_dir / safe_name(f"{src.uploader} - {src.date} - {src.twitch_vod_id or src.id} - FULL")
+                full_suffix = ".m4a" if (audio_only and full.suffix.lower() == ".mp4") else full.suffix
+                kept = _uniq(stem.parent / f"{stem.name}{full_suffix}")
+                shutil.move(str(full), str(kept))
+                ctx.log(t("Kept full VOD: {name}", name=kept.name))
+        else:
+            for i, p in enumerate(plan.parts):
+                ctx.check_cancel()
+                lo, hi = i / total_parts, (i + 1) / total_parts
+                ctx.stage(lo, lo + (hi - lo) * 0.9, t("Downloading part {part}/{total}", part=p.index, total=total_parts))
+                use_aligned = (
+                    getattr(src, "site", "twitch") == "twitch"
+                    and getattr(src, "twitch_vod_id", None)
+                    and src.has_capability(Capability.TIMELINE)
+                )
+                aligned = _dl_align(ctx, src.url, p, workdir, **dl_kw) if use_aligned else None
+                if aligned:
+                    f, real_start, real_end = aligned
+                    early = p.start - real_start
+                    _early = t(", {s} s early", s=f"{early:.0f}") if early >= 0.5 else ""
+                    ctx.log(t("Part {part} starts at {start} (asked {asked}{early}) and ends at {end}", part=p.index, start=fmt_hms(real_start), asked=fmt_hms(p.start), early=_early, end=fmt_hms(real_end)))
+                    if opts.exact:
+                        ctx.stage(lo + (hi - lo) * 0.9, hi, t("Re-encoding part {part}/{total}", part=p.index, total=total_parts))
+                        f = _cut(ctx, f, p, opts.container, workdir, offset=max(0.0, p.start - real_start))
+                        real_start, real_end = p.start, p.end
+                else:
+                    try:
+                        f = _dl_sec(ctx, src.url, p, workdir, opts.threads, opts.exact, **fmt_kw, **rate_kw, **cookies_kw, **sec_archive_kw, **sec_age_kw)
+                    except ArchiveSkippedError as e:
+                        ctx.log(str(e))
+                        continue
+                    real_start, real_end = p.start, p.end
+                ctx.stage(lo + (hi - lo) * 0.9, hi, t("Finishing part {part}/{total}", part=p.index, total=total_parts))
+                finish(p, f, real_start, real_end)
+
+        shutil.rmtree(workdir, ignore_errors=True)
+    finally:
+        try:
+            lock_file.unlink(missing_ok=True)
+        except OSError:
+            pass
+    ctx.stage(1.0, 1.0, t("Done"))
     try:
         from core import history
+        from core.settings import load_settings
+        save_hist = bool(load_settings().get("save_history", True))
         vod_id = src.twitch_vod_id or src.id
         if vod_id and results:
             history.record_download({
@@ -915,7 +994,8 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
                 "quality": getattr(opts, "quality", "") or "Best available",
                 "site": getattr(src, "site", "twitch") or "twitch",
                 "url": getattr(src, "url", "") or "",
-            })
-    except Exception:
-        pass
+            }, enabled=save_hist)
+    except Exception as exc:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning("Failed to record download: %s", exc)
     return results

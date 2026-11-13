@@ -10,7 +10,7 @@ ARCH="$(uname -m)"
 echo "Building LuckyDownloader CLI macOS standalone ($VER, $ARCH)..."
 
 python3 -m pip install --upgrade pip
-python3 -m pip install -r requirements-cli.txt
+python3 -m pip install -r requirements-cli.txt -r requirements-build.txt
 
 mkdir -p build
 printf '%s\n' "$VER" > build/version.txt
@@ -21,14 +21,13 @@ python3 -m nuitka --mode=standalone \
   --output-dir=dist \
   --output-folder-name=LuckyDownloader-CLI \
   --output-filename=LuckyDownloader-CLI \
-  --include-data-dir=assets=assets \
   --include-data-dir=locale=locale \
   --include-data-files=build/version.txt=version.txt \
   --include-package=core \
   --include-package=requests \
-  --include-module=luckytwitch_engine \
   --nofollow-import-to=PySide6 \
   --nofollow-import-to=qt_ui \
+  --nofollow-import-to=PIL \
   --nofollow-import-to=tkinter \
   --nofollow-import-to=_tkinter \
   --nofollow-import-to=pytest \

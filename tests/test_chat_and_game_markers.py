@@ -122,7 +122,6 @@ def test_chat_command_embed_flag(tmp_path):
 
 
 # --------------------------------------------------------------------------- running it (fake CLI)
-posix_only = pytest.mark.skipif(False, reason="")
 
 
 def fake_cli(tmp_path: Path, body: str) -> str:
@@ -155,7 +154,6 @@ def make_ctx():
     return ctx, reports, logs
 
 
-@posix_only
 def test_download_chat_success(tmp_path):
     cli = fake_cli(tmp_path, (
         "print('[STATUS] - Downloading 50%', flush=True)\n"
@@ -171,7 +169,6 @@ def test_download_chat_success(tmp_path):
     assert max(fracs) == pytest.approx(0.98)
 
 
-@posix_only
 def test_download_chat_does_not_overwrite_an_existing_file(tmp_path):
     cli = fake_cli(tmp_path, "open(out, 'w').write('new')")
     ctx, _, _ = make_ctx()
@@ -181,7 +178,6 @@ def test_download_chat_does_not_overwrite_an_existing_file(tmp_path):
     assert dest.read_text() == "old" and got.name == "part1.chat (2).json" and got.read_text() == "new"
 
 
-@posix_only
 def test_download_chat_failure_reports_the_reason_and_removes_the_file(tmp_path):
     cli = fake_cli(tmp_path, (
         "open(out, 'w').close()\n"  # like the real tool: a 0-byte file appears before it fails
@@ -197,7 +193,6 @@ def test_download_chat_failure_reports_the_reason_and_removes_the_file(tmp_path)
     assert not dest.exists()
 
 
-@posix_only
 def test_download_chat_empty_output_is_an_error(tmp_path):
     cli = fake_cli(tmp_path, "open(out, 'w').close()")
     ctx, _, _ = make_ctx()
@@ -206,7 +201,6 @@ def test_download_chat_empty_output_is_an_error(tmp_path):
     assert not (tmp_path / "p.chat.json").exists()
 
 
-@posix_only
 def test_download_chat_cancel_stops_the_process_and_removes_the_file(tmp_path):
     cli = fake_cli(tmp_path, (
         "open(out, 'w').close()\n"

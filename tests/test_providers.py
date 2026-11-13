@@ -215,7 +215,7 @@ def test_youtube_channel_provider_detection():
     assert detect_provider("https://youtube.com/channel/UC1234567890") is YOUTUBE_PROVIDER
     assert detect_provider("https://www.youtube.com/c/CustomChannel/videos") is YOUTUBE_PROVIDER
     assert detect_provider("https://www.youtube.com/watch?v=dQw4w9WgXcQ").name == "youtube"
-    assert detect_provider("https://www.youtube.com/watch?v=dQw4w9WgXcQ") is not YOUTUBE_PROVIDER
+    assert detect_provider("https://www.youtube.com/watch?v=dQw4w9WgXcQ") is YOUTUBE_PROVIDER
 
 
 def test_source_info_has_capability():

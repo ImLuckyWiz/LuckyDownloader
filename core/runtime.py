@@ -142,6 +142,8 @@ class Ctx:
 
     # -- logging / progress -- #
     def log(self, msg: str) -> None:
+        import logging
+        logging.getLogger("luckydownloader").info("%s", msg)
         self._log(msg)
 
     def stage(self, lo: float, hi: float, label: str) -> None:

@@ -400,7 +400,7 @@ class AboutDialog(QDialog):
 
         from core.paths import BUNDLED_VERSION, read_bundled_version
         ver = BUNDLED_VERSION or read_bundled_version() or "dev"
-        ver_lbl = QLabel(t("Version {ver}").format(ver=ver), self)
+        ver_lbl = QLabel(t("Version {ver}", ver=ver), self)
         ver_lbl.setProperty("role", "muted")
         title_lay.addWidget(ver_lbl)
 
@@ -420,9 +420,7 @@ class AboutDialog(QDialog):
         import platform
         import sys
         sys_info_lbl = QLabel(
-            t("Python {py} · {os} {release}").format(
-                py=sys.version.split()[0], os=platform.system(), release=platform.release()
-            ),
+            t("Python {py} · {os} {release}", py=sys.version.split()[0], os=platform.system(), release=platform.release()),
             self,
         )
         sys_info_lbl.setProperty("role", "muted")
@@ -461,7 +459,7 @@ class AboutDialog(QDialog):
             return
         try:
             export_diagnostics_zip(Path(path))
-            info(self, t("Diagnostics Exported"), t("Diagnostics bundle successfully saved to:\n{path}").format(path=path))
+            info(self, t("Diagnostics Exported"), t("Diagnostics bundle successfully saved to:\n{path}", path=path))
         except Exception as e:
-            error(self, t("Export Failed"), t("Could not export diagnostics bundle: {error}").format(error=e))
+            error(self, t("Export Failed"), t("Could not export diagnostics bundle: {error}", error=e))
 

@@ -302,7 +302,12 @@ def load_state() -> dict:
         data = json.loads(text)
         if isinstance(data, dict):
             return data
-    except (OSError, json.JSONDecodeError):
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(paths.UPDATE_STATE_PATH)
+    except json.JSONDecodeError:
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(paths.UPDATE_STATE_PATH)
+    except OSError:
         pass
     return {
         "last_check": "",
@@ -328,7 +333,7 @@ def download_installer(ctx, info: UpdateInfo, dest: Path) -> Path:
     Validates destination URL against allow-list before downloading.
     """
     if not is_safe_asset_url(info.asset_url):
-        raise ValueError(t("Asset URL is not on the GitHub releases allow-list: {url}").format(url=info.asset_url))
+        raise ValueError(t("Asset URL is not on the GitHub releases allow-list: {url}", url=info.asset_url))
     dl_fn = resolve_dep("_download_file", _ORIG_DOWNLOAD_FILE, _download_file)
     dl_fn(ctx, info.asset_url, dest)
     return dest

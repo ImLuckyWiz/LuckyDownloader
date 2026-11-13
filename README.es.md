@@ -94,13 +94,35 @@ Consulta [docs/GOOGLE_COLAB.md](docs/GOOGLE_COLAB.md) para una guía paso a paso
 
 | Atajo | Acción |
 | --- | --- |
-| `Ctrl+V` | Pegar enlace en la barra de URL |
-| `Ctrl+Enter` | Obtener información del VOD |
-| `Ctrl+Z` | Deshacer corte en la línea de tiempo |
-| `Ctrl+Y` / `Ctrl+Shift+Z` | Rehacer corte |
-| `Ctrl+S` | Iniciar descarga / Añadir a la cola |
-| `Ctrl+L` | Alternar registro de la cola |
-| `Esc` | Cerrar diálogos o cancelar búsqueda |
+| `Ctrl+L` | Enfocar la barra de URL |
+| `Ctrl+1` – `Ctrl+4` | Cambiar entre pestañas (Buscar, Plan, Cola, Recientes) |
+| `Ctrl+,` | Abrir Opciones |
+| `Ctrl+Enter` | Añadir a la cola e iniciar descarga (en Plan) |
+| `Ctrl+Shift+Enter` | Añadir a la cola sin iniciar (en Plan) |
+| `F1` | Mostrar atajos de teclado |
+| `F2` | Mostrar guía de bienvenida |
+
+---
+
+## Funciones principales y almacenamiento
+
+- **Capítulos de clips y marcadores de juego:** Guarda archivos `.chapters.txt` y marcadores de juegos/audio silenciado en `.markers.json` junto a cada parte.
+- **Panel CEP de Premiere Pro:** Importa marcadores, corta y elimina silencios/huecos directamente en la línea de tiempo (`premiere-plugin-cep/`).
+- **Descarga y superposición de chat:** Descarga el chat (`.chat.json` / `.chat.txt`) y renderiza superposiciones transparentes con `TwitchDownloaderCLI`.
+- **Enlaces profundos:** Soporta enlaces `luckydownloader://open` y `luckytwitch://open`.
+- **Carpeta de descargas por defecto:** `Videos\LuckyDownloader` (Windows) o `~/Videos/LuckyDownloader` (macOS/Linux).
+- **Datos y herramientas:** `%LOCALAPPDATA%\LuckyDownloader` (Windows), `~/Library/Application Support/LuckyDownloader` (macOS) o `~/.local/share/LuckyDownloader` (Linux).
+
+---
+
+## Ejecutar y compilar desde el código fuente
+
+```bash
+pip install -r requirements-dev.txt
+python luckydownloader_qt.py
+```
+
+Para ejecutar las pruebas: `python -m pytest` (y `cd premiere-plugin-cep && npm test` para el panel CEP). Para compilar: `build_windows.bat`, `build_mac.sh` (Apple Silicon e Intel `x86_64`) o `build_linux.sh`.
 
 ---
 

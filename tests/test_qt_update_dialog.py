@@ -122,10 +122,16 @@ def test_update_dialog_download_and_install_flow(qtbot, monkeypatch, tmp_path):
     host.tools_busy = False
     host.saved_chat_busy = False
 
+    import hashlib
+    payload = b"setup-installer-bytes"
+    fake_dest_path = tmp_path / "LuckyTwitch-Setup-v2.3.0.exe"
+    fake_dest_path.write_bytes(payload)
     info = updates.UpdateInfo(
         tag="v2.3.0",
         asset_name="LuckyTwitch-Setup.exe",
         asset_url="https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/v2.3.0/LuckyTwitch-Setup.exe",
+        asset_size=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
     )
     dlg = UpdateDialog(info, host=host)
     qtbot.addWidget(dlg)
@@ -148,13 +154,15 @@ def test_update_dialog_download_and_install_flow(qtbot, monkeypatch, tmp_path):
     from qt_ui import dialogs
     monkeypatch.setattr(dialogs, "ask_yes_no", lambda parent, title, text: True)
     launched = []
-    monkeypatch.setattr(updates, "launch_installer", lambda path: launched.append(path) or True)
+    monkeypatch.setattr(updates, "launch_installer", lambda path, **kw: launched.append((path, kw)) or True)
 
-    fake_dest = str(tmp_path / "LuckyTwitch-Setup-v2.3.0.exe")
+    fake_dest = str(fake_dest_path)
     dlg._on_download_done(fake_dest, "")
 
     assert len(launched) == 1
-    assert launched[0] == fake_dest
+    assert launched[0][0] == fake_dest
+    assert launched[0][1]["expected_sha256"] == info.sha256
+    assert launched[0][1]["expected_size"] == info.asset_size
     host.close.assert_called_once()
     saved = updates.load_state()
     assert saved.get("installer_path") == fake_dest
@@ -215,7 +223,30 @@ def test_update_dialog_re_verifies_sha256_before_launch(qtbot, monkeypatch, tmp_
     qtbot.addWidget(dlg)
 
     launched = []
-    monkeypatch.setattr(updates, "launch_installer", lambda p: launched.append(p) or True)
+    monkeypatch.setattr(updates, "launch_installer", lambda p, **kw: launched.append(p) or True)
+
+    dlg._install_and_restart(str(installer_path))
+    assert launched == []
+    assert not installer_path.exists()
+    assert "verification failed" in dlg.progress_label.text().lower()
+
+
+def test_update_dialog_rejects_missing_sha256(qtbot, monkeypatch, tmp_path):
+    """C-05: _install_and_restart refuses to launch an installer without a non-empty sha256."""
+    installer_path = tmp_path / "LuckyDownloader-Setup-v2.3.0.exe"
+    installer_path.write_bytes(b"some payload")
+    info = updates.UpdateInfo(
+        tag="v2.3.0",
+        asset_name="LuckyDownloader-Setup.exe",
+        asset_url="https://github.com/ImLuckyWiz/LuckyTwitchDownloader/releases/download/v2.3.0/LuckyDownloader-Setup.exe",
+        asset_size=12,
+        sha256="",
+    )
+    dlg = UpdateDialog(info)
+    qtbot.addWidget(dlg)
+
+    launched = []
+    monkeypatch.setattr(updates, "launch_installer", lambda p, **kw: launched.append(p) or True)
 
     dlg._install_and_restart(str(installer_path))
     assert launched == []

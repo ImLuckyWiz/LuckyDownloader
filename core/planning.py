@@ -67,24 +67,24 @@ def parse_cut_points(text: str, duration: float | None = None) -> list[Part]:
                 points.append(parse_time(tok))  # type: ignore[arg-type]
         if len(points) < 2:
             raise PlanError(
-                t("«{group}»: a group needs at least two points (use 0 and end).").format(group=' '.join(g))
+                t("«{group}»: a group needs at least two points (use 0 and end).", group=' '.join(g))
             )
         for a, b in zip(points, points[1:]):
             if duration is not None and duration > 0:
                 if a >= duration:
-                    raise PlanError(t("{point} is beyond the end of the VOD ({duration}).").format(point=fmt_hms(a), duration=fmt_hms(duration)))
+                    raise PlanError(t("{point} is beyond the end of the VOD ({duration}).", point=fmt_hms(a), duration=fmt_hms(duration)))
                 if b > duration + 2:
-                    raise PlanError(t("{point} is beyond the end of the VOD ({duration}).").format(point=fmt_hms(b), duration=fmt_hms(duration)))
+                    raise PlanError(t("{point} is beyond the end of the VOD ({duration}).", point=fmt_hms(b), duration=fmt_hms(duration)))
                 b = min(b, duration)
             if b <= a:
-                raise PlanError(t("Cut points must increase: {start} → {end}.").format(start=fmt_hms(a), end=fmt_hms(b)))
+                raise PlanError(t("Cut points must increase: {start} → {end}.", start=fmt_hms(a), end=fmt_hms(b)))
             parts.append((a, b))
 
     parts.sort()
     for (a1, b1), (a2, b2) in zip(parts, parts[1:]):
         if a2 < b1:
             raise PlanError(
-                t("Parts overlap: {p1} and {p2}.").format(p1=f"{fmt_hms(a1)}–{fmt_hms(b1)}", p2=f"{fmt_hms(a2)}–{fmt_hms(b2)}")
+                t("Parts overlap: {p1} and {p2}.", p1=f"{fmt_hms(a1)}–{fmt_hms(b1)}", p2=f"{fmt_hms(a2)}–{fmt_hms(b2)}")
             )
     return [Part(i, a, b) for i, (a, b) in enumerate(parts, 1)]
 
@@ -93,7 +93,9 @@ def choose_strategy(
     parts: list[Part], duration: float | None, mode: str = "auto", threshold: float = 0.6
 ) -> tuple[str, float]:
     """Return (strategy, coverage). mode: auto | full | sections."""
-    coverage = (sum(p.duration for p in parts) / duration) if duration else 1.0
+    if not duration or duration <= 0:
+        return (mode if mode in ("full", "sections") else "sections"), 1.0
+    coverage = sum(p.duration for p in parts) / duration
     if mode in ("full", "sections"):
         return mode, coverage
     return ("full" if coverage >= threshold else "sections"), coverage

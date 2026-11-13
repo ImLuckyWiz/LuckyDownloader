@@ -521,12 +521,18 @@ class SearchTab(QWidget):
         self.refresh_search_empty_states()
 
     def add_recent(self, ch: dict) -> None:
+        from core.settings import load_settings
+        if not load_settings().get("save_history", True):
+            return
         entry = {"id": ch["id"], "login": ch.get("login", ""), "name": ch.get("name") or ch.get("login", "")}
         self.recent = ([entry] + [c for c in self.recent if c["id"] != entry["id"]])[:MAX_RECENT]
         save_recent(self.recent)
         self.refresh_recent()
 
     def add_recent_yt(self, query: str) -> None:
+        from core.settings import load_settings
+        if not load_settings().get("save_history", True):
+            return
         entry = {"id": query, "login": query, "name": query}
         self.recent_yt = ([entry] + [c for c in self.recent_yt if c["id"] != entry["id"]])[:MAX_RECENT]
         save_recent_searches(self.recent_yt)

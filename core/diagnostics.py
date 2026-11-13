@@ -8,6 +8,7 @@ from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 import zipfile
@@ -40,7 +41,10 @@ def setup_file_logging() -> Path:
             logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
         )
         root.addHandler(handler)
-        root.setLevel(logging.DEBUG)
+        root.setLevel(logging.INFO)
+        logging.getLogger("luckydownloader").setLevel(logging.INFO)
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("PIL").setLevel(logging.WARNING)
     return log_file
 
 
@@ -65,6 +69,25 @@ def _get_tool_version(name: str, flag: str) -> str:
         return f"error: {e}"
 
 
+_SENSITIVE_PARAM_RE = re.compile(
+    r"([?&](?:token|sig|key|Policy|X-Amz-Signature)=)[^&\s\"']+",
+    re.IGNORECASE,
+)
+
+
+def _scrub_text(text: str) -> str:
+    """Scrub user home directory paths and sensitive URL query parameters from text."""
+    if not text:
+        return text
+    home_str = str(Path.home())
+    if home_str:
+        text = text.replace(home_str, "~")
+        home_fwd = home_str.replace("\\", "/")
+        if home_fwd != home_str:
+            text = text.replace(home_fwd, "~")
+    return _SENSITIVE_PARAM_RE.sub(r"\1[REDACTED]", text)
+
+
 def redact_settings(settings: dict) -> dict:
     """Return a deep copy of settings with sensitive authentication / tokens / cookies redacted."""
     redacted = {}
@@ -74,6 +97,8 @@ def redact_settings(settings: dict) -> dict:
             redacted[k] = "[REDACTED]"
         elif isinstance(v, dict):
             redacted[k] = redact_settings(v)
+        elif isinstance(v, str):
+            redacted[k] = _scrub_text(v)
         else:
             redacted[k] = v
     return redacted
@@ -104,9 +129,12 @@ def export_diagnostics_zip(dest_zip: Path | str) -> Path:
     with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("system_info.json", json.dumps(system_info, indent=2))
         zf.writestr("settings_redacted.json", json.dumps(redacted_settings, indent=2))
+        corrupt_files = sorted(p.name for p in paths.DATA_DIR.glob("*.corrupt*"))
+        zf.writestr("persistence_health.json", json.dumps({"corrupt_backups": corrupt_files}, indent=2))
         if log_file.is_file():
             try:
-                zf.write(log_file, arcname="logs/luckydownloader.log")
+                log_text = _scrub_text(log_file.read_text(encoding="utf-8", errors="replace"))
+                zf.writestr("logs/luckydownloader.log", log_text)
             except OSError:
                 pass
 

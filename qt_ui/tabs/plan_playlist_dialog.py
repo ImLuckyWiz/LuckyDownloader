@@ -90,17 +90,17 @@ class PlanPlaylistMixin:
         opts_grid.setHorizontalSpacing(10)
         opts_grid.setVerticalSpacing(8)
 
-        q_lbl = QLabel(t("Quality:"))
-        q_lbl.setProperty("role", "muted")
-        opts_grid.addWidget(q_lbl, 0, 0)
+        self._generic_q_lbl = QLabel(t("Quality:"))
+        self._generic_q_lbl.setProperty("role", "muted")
+        opts_grid.addWidget(self._generic_q_lbl, 0, 0)
 
         self.generic_quality_combo = ComboBox()
         self.generic_quality_combo.activated.connect(self._on_generic_quality_activated)
         opts_grid.addWidget(self.generic_quality_combo, 0, 1)
 
-        c_lbl = QLabel(t("Format:"))
-        c_lbl.setProperty("role", "muted")
-        opts_grid.addWidget(c_lbl, 0, 2)
+        self._generic_c_lbl = QLabel(t("Format:"))
+        self._generic_c_lbl.setProperty("role", "muted")
+        opts_grid.addWidget(self._generic_c_lbl, 0, 2)
 
         self.generic_container_combo = ComboBox()
         for c in ("mp4", "mkv", "mp3", "m4a"):
@@ -113,7 +113,8 @@ class PlanPlaylistMixin:
         ab_lay = QHBoxLayout(audio_box)
         ab_lay.setContentsMargins(0, 0, 0, 0)
         ab_lay.setSpacing(6)
-        ab_lay.addWidget(QLabel(t("Audio only")))
+        self._generic_audio_lbl = QLabel(t("Audio only"))
+        ab_lay.addWidget(self._generic_audio_lbl)
         ab_lay.addWidget(self.generic_audio_toggle)
         opts_grid.addWidget(audio_box, 0, 4)
 
@@ -127,9 +128,9 @@ class PlanPlaylistMixin:
         cb_lay.addWidget(self.generic_cookies_toggle)
         opts_grid.addWidget(self.generic_cookies_box, 0, 5)
 
-        f_lbl = QLabel(t("Folder:"))
-        f_lbl.setProperty("role", "muted")
-        opts_grid.addWidget(f_lbl, 1, 0)
+        self._generic_f_lbl = QLabel(t("Folder:"))
+        self._generic_f_lbl.setProperty("role", "muted")
+        opts_grid.addWidget(self._generic_f_lbl, 1, 0)
 
         self.generic_folder_entry = QLineEdit()
         self.generic_folder_entry.setText(str(self.settings.get("out_dir", getattr(paths, "DOWNLOADS_DIR", ""))))
@@ -143,6 +144,28 @@ class PlanPlaylistMixin:
         r_lay.addLayout(opts_grid)
         c_lay.addWidget(right_col, 1)
         self.generic_card.add_widget(content_row)
+
+    def retranslate_generic_card(self) -> None:
+        if hasattr(self, "generic_card") and self.generic_card.title_label:
+            self.generic_card.title_label.setText(t("Video details"))
+        if hasattr(self, "_generic_q_lbl"):
+            self._generic_q_lbl.setText(t("Quality:"))
+        if hasattr(self, "_generic_c_lbl"):
+            self._generic_c_lbl.setText(t("Format:"))
+        if hasattr(self, "_generic_audio_lbl"):
+            self._generic_audio_lbl.setText(t("Audio only"))
+        if hasattr(self, "_generic_f_lbl"):
+            self._generic_f_lbl.setText(t("Folder:"))
+        if hasattr(self, "generic_browse_btn"):
+            self.generic_browse_btn.setText(t("Browse…"))
+        if hasattr(self, "generic_title_entry"):
+            self.generic_title_entry.setPlaceholderText(t("Video title…"))
+        if hasattr(self, "generic_cookies_label"):
+            browser = str(self.settings.get("cookies_from_browser", "None")).strip()
+            if browser.lower() not in ("none", "disabled", ""):
+                self.generic_cookies_label.setText(t("Cookies ({browser})", browser=browser))
+            else:
+                self.generic_cookies_label.setText(t("Cookies"))
 
     def _on_generic_title_edited(self, text: str) -> None:
         clean = text.strip()
@@ -207,6 +230,8 @@ class PlanPlaylistMixin:
         thumb_url = getattr(source, "thumbnail", "")
         if thumb_url:
             self._fetch_generic_thumbnail(thumb_url)
+        else:
+            self._expected_thumb_url = ""
 
         browser = str(self.settings.get("cookies_from_browser", "None")).strip()
         has_browser = browser.lower() not in ("none", "disabled", "")

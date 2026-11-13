@@ -36,11 +36,11 @@ OPTIONS_KEYS = {
     "chat_embed", "auto_update", "check_app_updates",
     "chat_render", "chat_render_mode", "chat_render_look", "chat_render_width", "chat_render_height",
     "chat_render_font_size", "chat_render_fps", "chat_render_smooth",
-    "default_quality", "audio_format", "cookies_from_browser", "cookies_scope",
+    "default_quality", "audio_format", "cookies_from_browser", "cookies_scope", "save_history",
 }
 PLAN_KEYS = {"chapters", "min_views", "min_duration", "top_n", "pad_before"}
 SWITCHES = {"exact", "keep_full", "clean_title", "subfolders", "provider_subfolders", "premiere_plugin", "game_markers", "muted_markers", "premiere_xml",
-            "sidecar", "chat", "chat_embed", "chat_render", "chat_render_smooth", "auto_update", "check_app_updates"}
+            "sidecar", "chat", "chat_embed", "chat_render", "chat_render_smooth", "auto_update", "check_app_updates", "save_history"}
 
 
 # ------------------------------------------------------------------ fixtures and helpers
@@ -149,7 +149,7 @@ def test_arrow_keys_move_through_the_sidebar(tab):
 def test_every_old_setting_has_a_control_bound_to_it(tab):
     assert set(tab.binder.controls) == OPTIONS_KEYS
     assert not (PLAN_KEYS & set(tab.binder.controls))  # the Plan tab owns these
-    assert OPTIONS_KEYS | PLAN_KEYS == set(DEFAULTS) - {"generic_name_template", "provider_out_dirs"}  # nothing of the 38 is forgotten
+    assert OPTIONS_KEYS | PLAN_KEYS == set(DEFAULTS) - {"generic_name_template", "provider_out_dirs", "ytdlp_extra_args"}  # nothing is forgotten
     assert tab.tools_info_label is not None and tab.update_btn is not None
 
 

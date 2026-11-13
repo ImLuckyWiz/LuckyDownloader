@@ -70,6 +70,9 @@ class PseudoTranslations(gettext.NullTranslations):
         msg = singular if n == 1 else plural
         return pseudo_localize(msg)
 
+    def pgettext(self, context: str, message: str) -> str:
+        return pseudo_localize(message)
+
 SUPPORTED_LANGUAGES = {
     LANG_EN: "English",
     LANG_ES: "Español",

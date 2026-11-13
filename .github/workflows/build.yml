@@ -59,12 +59,12 @@ jobs:
             found { print }
             END { if (!found) exit 1 }
           ' "$notes" > RELEASE_NOTES_FOR_TAG.md
-      - name: Create GitHub Release
+      - name: Create GitHub Release (draft)
         uses: softprops/action-gh-release@v2
         with:
           body_path: RELEASE_NOTES_FOR_TAG.md
+          draft: true
           prerelease: ${{ contains(github.ref_name, '-') }}
-          make_latest: ${{ contains(github.ref_name, '-') && 'false' || 'true' }}
 
   build:
     needs: [test, init-release]
@@ -137,7 +137,7 @@ jobs:
             ~/.cache/Nuitka
             ~/AppData/Local/Nuitka/Nuitka/Cache
             ~/Library/Caches/Nuitka
-          key: ${{ runner.os }}-nuitka-${{ hashFiles('requirements.txt', 'luckytwitch_qt.py') }}
+          key: ${{ runner.os }}-nuitka-${{ hashFiles('requirements.txt', 'luckytwitch_qt.py', 'core/**', 'qt_ui/**') }}
           restore-keys: |
             ${{ runner.os }}-nuitka-
       - name: Build (Windows)
@@ -174,6 +174,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          draft: true
           files: |
             dist/LuckyDownloader-Setup.exe
             dist/LuckyDownloader-*.dmg
@@ -224,6 +225,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          draft: true
           files: |
             dist/LuckyDownloader-Premiere-Plugin-CEP.zip
             dist/LuckyDownloader-Premiere-Plugin-CEP.zxp
@@ -233,10 +235,11 @@ jobs:
 
   build-cli:
     name: Build CLI (${{ matrix.label }})
-    needs: [build]
+    needs: [test, init-release]
     if: |
       !cancelled() &&
-      needs.build.result == 'success'
+      needs.test.result == 'success' &&
+      (needs.init-release.result == 'success' || needs.init-release.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
@@ -262,7 +265,7 @@ jobs:
             ~/.cache/Nuitka
             ~/AppData/Local/Nuitka/Nuitka/Cache
             ~/Library/Caches/Nuitka
-          key: ${{ runner.os }}-nuitka-cli-${{ hashFiles('requirements-cli.txt', 'cli.py') }}
+          key: ${{ runner.os }}-nuitka-cli-${{ hashFiles('requirements-cli.txt', 'requirements-build.txt', 'cli.py', 'core/**') }}
           restore-keys: |
             ${{ runner.os }}-nuitka-cli-
       - name: Build CLI (Windows)
@@ -275,18 +278,24 @@ jobs:
       - name: Build CLI (Linux)
         if: runner.os == 'Linux'
         run: bash build_linux_cli.sh "${{ github.ref_type == 'tag' && github.ref_name || '1.0' }}"
-      - name: Smoke test CLI help (Windows)
+      - name: Smoke test CLI help & version (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $p = Start-Process -FilePath "dist\LuckyDownloader-CLI\LuckyDownloader-CLI.exe" -ArgumentList "--help" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "CLI --help failed with exit code $($p.ExitCode)" }
-      - name: Smoke test CLI help (macOS)
+          $v = Start-Process -FilePath "dist\LuckyDownloader-CLI\LuckyDownloader-CLI.exe" -ArgumentList "--version" -Wait -PassThru
+          if ($v.ExitCode -ne 0) { throw "CLI --version failed with exit code $($v.ExitCode)" }
+      - name: Smoke test CLI help & version (macOS)
         if: runner.os == 'macOS'
-        run: dist/LuckyDownloader-CLI/LuckyDownloader-CLI --help
-      - name: Smoke test CLI help (Linux)
+        run: |
+          dist/LuckyDownloader-CLI/LuckyDownloader-CLI --help
+          dist/LuckyDownloader-CLI/LuckyDownloader-CLI --version
+      - name: Smoke test CLI help & version (Linux)
         if: runner.os == 'Linux'
-        run: dist/LuckyDownloader-CLI/LuckyDownloader-CLI --help
+        run: |
+          dist/LuckyDownloader-CLI/LuckyDownloader-CLI --help
+          dist/LuckyDownloader-CLI/LuckyDownloader-CLI --version
       - uses: actions/upload-artifact@v4
         with:
           name: LuckyDownloader-CLI-${{ matrix.label }}
@@ -298,6 +307,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          draft: true
           files: |
             dist/LuckyDownloader-CLI-windows.zip
             dist/LuckyDownloader-CLI-macos-*.tar.gz
@@ -323,7 +333,10 @@ jobs:
         run: |
           cd release
           sha256sum * > SHA256SUMS.txt
-      - name: Upload SHA256SUMS to Release
+      - name: Upload SHA256SUMS and Publish Release
         uses: softprops/action-gh-release@v2
         with:
           files: release/SHA256SUMS.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ contains(github.ref_name, '-') && 'false' || 'true' }}

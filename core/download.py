@@ -36,15 +36,7 @@ if TYPE_CHECKING:
 
 _FF_PROGRESS_KEYS = {"out_time_us", "out_time_ms", "total_size", "speed", "progress"}
 
-
-def _is_youtube_url(url: str) -> bool:
-    """Check if the given URL points to a YouTube host."""
-    try:
-        host = urlparse(url).hostname or ""
-        host = host.lower()
-        return host in {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"}
-    except Exception:
-        return False
+from core.source_info import _is_youtube_url  # noqa: E402
 
 
 
@@ -197,7 +189,7 @@ def run_ffmpeg(ctx: Ctx, args: list[str], total: float | None = None, *, deps: A
         ctx.attach_proc(None)
     ctx.check_cancel()
     if proc.returncode != 0:
-        raise EngineError("ffmpeg failed:\n" + "\n".join(errors[-8:]))
+        raise EngineError(t("ffmpeg failed:\n{err}", err="\n".join(errors[-8:])))
     return "\n".join(errors)
 
 
@@ -381,6 +373,7 @@ def run_ytdlp(
         "--retries", "10",
         "--fragment-retries", "10",
         "--continue",
+        "--no-playlist",
     ]
     if any(_is_youtube_url(a) for a in args if isinstance(a, str)):
         from core.source_info import youtube_extra_args
@@ -423,7 +416,7 @@ def run_ytdlp(
             start_new_session=sys.platform != "win32",
         )
     except OSError as e:
-        raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
+        raise EngineError(t("Could not run yt-dlp:\n{error}", error=e)) from e
     ctx.attach_proc(proc)
     last_real = [time.monotonic()]
     stop = threading.Event()
@@ -457,7 +450,7 @@ def run_ytdlp(
                 continue
             tail.append(line)
             if line.startswith(("WARNING", "ERROR")):
-                ctx.log(t("yt-dlp: {line}").format(line=line))
+                ctx.log(t("yt-dlp: {line}", line=line))
         proc.wait()
     finally:
         stop.set()
@@ -466,7 +459,7 @@ def run_ytdlp(
         ctx.attach_proc(None)
     ctx.check_cancel()
     if proc.returncode != 0:
-        raise EngineError("Download failed:\n" + "\n".join(tail[-8:]))
+        raise EngineError(t("Download failed:\n{err}", err="\n".join(tail[-8:])))
 
 
 _ORIG_RUN_YTDLP = run_ytdlp
@@ -568,7 +561,7 @@ def download_section(
     if not media and download_archive and str(download_archive).strip():
         raise ArchiveSkippedError(t("Skipped (already recorded in download archive)."))
     if not media or media.stat().st_size < 4096:
-        raise EngineError(t("Part {index} ({start}–{end}) came out empty. Try again, or use strategy «full» to download the whole VOD and split it.").format(index=part.index, start=fmt_hms(part.start), end=fmt_hms(part.end)))
+        raise EngineError(t("Part {index} ({start}–{end}) came out empty. Try again, or use strategy «full» to download the whole VOD and split it.", index=part.index, start=fmt_hms(part.start), end=fmt_hms(part.end)))
     return media
 
 
@@ -716,7 +709,9 @@ def write_local_playlist(segments: list[Segment], dest: Path) -> None:
     for s in segments:
         if s.init and s.init != current_init:
             uri, brange = s.init
-            lines.append(f'#EXT-X-MAP:URI="{uri}"' + (f',BYTERANGE="{brange}"' if brange else ""))
+            safe_uri = uri.replace('"', '\\"')
+            safe_br = brange if (brange and re.fullmatch(r"\d+(?:@\d+)?", brange)) else None
+            lines.append(f'#EXT-X-MAP:URI="{safe_uri}"' + (f',BYTERANGE="{safe_br}"' if safe_br else ""))
             current_init = s.init
         lines.append(f"#EXTINF:{s.duration:.3f},")
         if s.byterange:
@@ -726,7 +721,9 @@ def write_local_playlist(segments: list[Segment], dest: Path) -> None:
     dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def get_playlist_url(ctx: Ctx, url: str, format_id: str | None = None, *, deps: Any = None) -> str:
+def get_playlist_url(
+    ctx: Ctx, url: str, format_id: str | None = None, *, cookies_browser: str | None = None, deps: Any = None
+) -> str:
     """The media playlist (.m3u8) yt-dlp would download, chosen with the same quality flags."""
     _find = getattr(deps, "find_tool", None) or resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
     _subp = getattr(deps, "subprocess", None) or resolve_dep("subprocess", _ORIG_SUBPROCESS, subprocess)
@@ -735,14 +732,18 @@ def get_playlist_url(ctx: Ctx, url: str, format_id: str | None = None, *, deps: 
         raise EngineError(YTDLP_MISSING)
     ctx.check_cancel()
     quality_args = ["-f", format_id] if format_id else ["-S", "res,fps,tbr"]
+    cmd = [ytdlp, "-g", *quality_args, "--no-warnings"]
+    if cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""):
+        cmd += ["--cookies-from-browser", str(cookies_browser).strip().lower()]
+    cmd += ["--", url]
     try:
         proc = _subp.run(
-            [ytdlp, "-g", *quality_args, "--no-warnings", "--", url],
+            cmd,
             stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace",
             env=_tool_env(), creationflags=_NO_WINDOW, timeout=120,
         )
     except (OSError, subprocess.TimeoutExpired) as e:
-        raise EngineError(t("Could not get the playlist address: {error}").format(error=e)) from e
+        raise EngineError(t("Could not get the playlist address: {error}", error=e)) from e
     ctx.check_cancel()
     urls = [ln.strip() for ln in proc.stdout.splitlines() if ln.strip()]
     if proc.returncode != 0 or len(urls) != 1:
@@ -756,7 +757,15 @@ _ORIG_GET_PLAYLIST_URL = get_playlist_url
 
 
 def download_section_aligned(
-    ctx: Ctx, url: str, part: Part, workdir: Path, format_id: str | None = None, audio_only: bool = False, *, deps: Any = None
+    ctx: Ctx,
+    url: str,
+    part: Part,
+    workdir: Path,
+    format_id: str | None = None,
+    audio_only: bool = False,
+    *,
+    cookies_browser: str | None = None,
+    deps: Any = None,
 ) -> tuple[Path, float, float] | None:
     """
     Download [part.start, part.end] as whole HLS segments with a single ffmpeg stream copy and NO -ss.
@@ -766,6 +775,8 @@ def download_section_aligned(
     """
     try:
         kw = {"format_id": format_id} if format_id is not None else {}
+        if cookies_browser:
+            kw["cookies_browser"] = cookies_browser
         _get_pl = getattr(deps, "get_playlist_url", None) or resolve_dep("get_playlist_url", _ORIG_GET_PLAYLIST_URL, get_playlist_url)
         _run_ff = getattr(deps, "run_ffmpeg", None) or resolve_dep("run_ffmpeg", _ORIG_RUN_FFMPEG, run_ffmpeg)
 
@@ -802,6 +813,6 @@ def download_section_aligned(
     except (EngineError, requests.RequestException, ValueError, OSError) as e:
         # Keep every line of the message (ffmpeg's real error comes after the "ffmpeg failed:" header).
         reason = " | ".join(ln.strip() for ln in str(e).splitlines() if ln.strip())[:500] or type(e).__name__
-        ctx.log(t("Could not use the segment download ({reason}); using the old method. Markers may be up to 10 s off.").format(reason=reason))
+        ctx.log(t("Could not use the segment download ({reason}); using the old method. Markers may be up to 10 s off.", reason=reason))
         return None
     return out, real_start, real_end

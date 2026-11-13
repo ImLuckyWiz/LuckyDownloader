@@ -705,9 +705,11 @@ def test_delegate_paints_rich_row_progress_and_inline_open_button(tab, qtbot, mo
     opened = []
     monkeypatch.setattr(queue_tab, "open_in_file_manager", lambda p, select=False: opened.append((p, select)))
 
+    pos = QPointF(btn_rect.center())
     ev = QMouseEvent(
         QEvent.Type.MouseButtonRelease,
-        QPointF(btn_rect.center()),
+        pos,
+        pos,
         Qt.MouseButton.LeftButton,
         Qt.MouseButton.LeftButton,
         Qt.KeyboardModifier.NoModifier,
@@ -999,3 +1001,37 @@ def test_main_window_restores_unfinished_queue_on_startup(qtbot, tmp_path, monke
     assert w.tab_queue.items[0].label == "streamer · Saved VOD"
     assert w.tab_queue.items[0].status == "queued"
     w.close()
+
+
+def test_queue_batch_retry_and_url_drop(tab, qtbot):
+    from PySide6.QtCore import QItemSelectionModel, QMimeData, QPoint, QUrl, Qt
+    from PySide6.QtGui import QDropEvent
+
+    a, b, c = add(tab, 3)
+    tab.set_item_status(a, "failed")
+    tab.set_item_status(b, "cancelled")
+    tab.set_item_status(c, "failed")
+
+    # Select rows 0 and 1 (a and b) and batch-retry only those two
+    sm = tab.table.selectionModel()
+    sm.select(tab.model.index(0, 0), QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows)
+    sm.select(tab.model.index(1, 0), QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
+    retried = tab.retry_failed_or_selected()
+    assert [it.iid for it in retried] == [a, b]
+    assert tab.model.find(c).status == "failed"
+
+    # Drop text/uri-list + text/plain URLs onto QueueTab
+    received = []
+    tab.urls_dropped.connect(received.append)
+    mime = QMimeData()
+    mime.setUrls([QUrl("https://www.twitch.tv/videos/11111")])
+    mime.setText("https://www.youtube.com/watch?v=abc123")
+    ev = QDropEvent(
+        QPoint(10, 10),
+        Qt.DropAction.CopyAction,
+        mime,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    tab.dropEvent(ev)
+    assert received == [["https://www.twitch.tv/videos/11111", "https://www.youtube.com/watch?v=abc123"]]

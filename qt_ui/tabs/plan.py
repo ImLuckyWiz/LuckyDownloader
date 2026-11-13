@@ -220,6 +220,8 @@ class PlanTab(PlanPlaylistMixin, PlanCropControlsMixin, PlanStoryboardMixin, Scr
         """Update PlanTab text labels dynamically when language changes."""
         if hasattr(self, "timeline_card") and self.timeline_card.title_label:
             self.timeline_card.title_label.setText(t("Timeline"))
+        if hasattr(self, "retranslate_generic_card"):
+            self.retranslate_generic_card()
         if hasattr(self, "cuts_card") and self.cuts_card.title_label:
             self.cuts_card.title_label.setText(t("Cut points"))
         if hasattr(self, "clips_card"):

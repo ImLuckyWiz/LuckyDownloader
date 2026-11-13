@@ -28,8 +28,10 @@ var LTGuard = (function () {
     var seq = f.seq, fps = seq && seq.fps > 0 ? seq.fps : 0, frame = fps ? 1 / fps : 0;
     if (!seq || !(fps > 0)) add("hard", false, "No active sequence.", "There is no active sequence. Open the sequence that holds the video and try again.");
     else {
-      add("hard", !seq.dropFrame, "The sequence is " + fps.toFixed(3) + " fps, non-drop timecode.",
-        "The sequence uses drop-frame timecode (the playhead timecode has a \";\"). The cut maths is non-drop only, and a wrong cut is worse than no cut. Switch the sequence's timecode display to non-drop, or use a non-drop sequence.");
+      add("hard", !seq.dropFrame && seq.tcValid !== false, "The sequence is " + fps.toFixed(3) + " fps, non-drop timecode.",
+        seq.tcValid === false
+          ? "Could not read the sequence's playhead timecode from Premiere (QE). Make sure the sequence uses non-drop-frame timecode and try again."
+          : "The sequence uses drop-frame timecode (the playhead timecode has a \";\"). The cut maths is non-drop only, and a wrong cut is worse than no cut. Switch the sequence's timecode display to non-drop, or use a non-drop sequence.");
     }
 
     // ---- nothing else on the timeline ----
@@ -51,8 +53,10 @@ var LTGuard = (function () {
       add("hard", Math.abs(v.start) <= frame, "The clip starts at the start of the sequence.",
         "The video clip starts at " + v.start.toFixed(3) + " s, not at the start of the sequence. Move it to 0 and try again.");
       var span = v.end - v.start, played = v.outPoint - v.inPoint;
-      add("hard", Math.abs(span - played) <= frame, "The clip plays at normal speed, untrimmed on the timeline.",
-        "The clip is " + span.toFixed(3) + " s on the timeline but plays " + played.toFixed(3) + " s of the source: it has a speed change. The cut maths assumes normal speed.");
+      add("hard", Math.abs(span - played) <= frame && Math.abs(v.inPoint) <= frame, "The clip plays at normal speed, untrimmed on the timeline.",
+        Math.abs(v.inPoint) > frame
+          ? "The video clip is trimmed at the head (inPoint " + v.inPoint.toFixed(3) + " s). Set its In point back to 0 so markers and cuts align."
+          : "The clip is " + span.toFixed(3) + " s on the timeline but plays " + played.toFixed(3) + " s of the source: it has a speed change. The cut maths assumes normal speed.");
     }
     if (v && a && frame) {
       var same = Math.abs(v.start - a.start) <= frame && Math.abs(v.end - a.end) <= frame && Math.abs(v.inPoint - a.inPoint) <= frame && Math.abs(v.outPoint - a.outPoint) <= frame;
@@ -117,8 +121,10 @@ var LTGuard = (function () {
     function out() { var r = { ok: hard.length === 0, needsConfirm: false, hard: hard, soft: [], checks: checks }; for (var k in res) r[k] = res[k]; return r; }
 
     if (!fps) { add(false, "", "There is no active sequence, or its frame rate could not be read."); return out(); }
-    add(!seq.dropFrame, "The sequence is " + fps.toFixed(3) + " fps, non-drop timecode.",
-      "The sequence uses drop-frame timecode. The cut maths is non-drop only.");
+    add(!seq.dropFrame && seq.tcValid !== false, "The sequence is " + fps.toFixed(3) + " fps, non-drop timecode.",
+      seq.tcValid === false
+        ? "Could not read the sequence's playhead timecode from Premiere (QE)."
+        : "The sequence uses drop-frame timecode. The cut maths is non-drop only.");
     if (!o || edges.length < 2) { add(false, "", "No cut plan to compare the timeline with."); return out(); }
 
     // nothing else on the timeline
@@ -224,7 +230,10 @@ var LTGuard = (function () {
     var seq = f.seq, fps = seq && seq.fps > 0 ? seq.fps : 0, V = f.v1 || [], A = f.a1 || [], i, d, res = { pieces: V.length, worstPos: 0, endSeconds: 0 };
     function out() { var r = { ok: hard.length === 0, needsConfirm: false, hard: hard, soft: [], checks: checks }; for (var k in res) r[k] = res[k]; return r; }
     if (!fps) { add(false, "", "There is no active sequence, or its frame rate could not be read."); return out(); }
-    add(!seq.dropFrame, "The sequence is " + fps.toFixed(3) + " fps, non-drop timecode.", "The sequence uses drop-frame timecode. The cut maths is non-drop only.");
+    add(!seq.dropFrame && seq.tcValid !== false, "The sequence is " + fps.toFixed(3) + " fps, non-drop timecode.",
+      seq.tcValid === false
+        ? "Could not read the sequence's playhead timecode from Premiere (QE)."
+        : "The sequence uses drop-frame timecode. The cut maths is non-drop only.");
 
     var video = f.video || [], audio = f.audio || [], others = [];
     for (i = 1; i < video.length; i++) if (video[i] > 0) others.push("V" + (i + 1) + " (" + video[i] + ")");

@@ -136,7 +136,7 @@ def test_choose_strategy_auto_at_exactly_the_threshold_is_full():
 
 
 def test_choose_strategy_without_duration_assumes_full_coverage():
-    assert choose_strategy([Part(1, 0, 10)], None, "auto", 0.6) == ("full", 1.0)
+    assert choose_strategy([Part(1, 0, 10)], None, "auto", 0.6) == ("sections", 1.0)
 
 
 def test_make_plan_ties_it_together():

@@ -1,19 +1,19 @@
-# LuckyTwitch Downloader: translation for 'es'.
+# LuckyDownloader: translation for 'es'.
 # Edit with Poedit or by hand, then run `python tools/i18n.py compile`.
 msgid ""
 msgstr ""
-"Project-Id-Version: LuckyTwitch Downloader\n"
+"Project-Id-Version:  LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-10-29 05:17+0000\n"
 "PO-Revision-Date: 2026-10-29 05:17+0000\n"
-"Last-Translator: LuckyTwitch contributors\n"
+"Last-Translator: LuckyDownloader contributors\n"
 "Language: es\n"
 "Language-Team: es\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: tools/i18n.py (Babel)\n"
+"Generated-By: Babel 2.18.0\n"
 
 #: qt_ui/main_window.py qt_ui/session_persistence.py
 msgid "Plan"
@@ -479,18 +479,6 @@ msgid "Where yt-dlp, ffmpeg and TwitchDownloaderCLI are kept."
 msgstr "Dónde se guardan yt-dlp, ffmpeg y TwitchDownloaderCLI."
 
 #: qt_ui/tabs/options.py
-msgid "LuckyTwitch updates"
-msgstr "Actualizaciones de LuckyTwitch"
-
-#: qt_ui/tabs/options.py
-msgid "Check for new versions of LuckyTwitch Downloader."
-msgstr "Comprobar nuevas versiones de LuckyTwitch Downloader."
-
-#: qt_ui/tabs/options.py
-msgid "Check for new versions of LuckyTwitch"
-msgstr "Comprobar nuevas versiones de LuckyTwitch"
-
-#: qt_ui/tabs/options.py
 msgid "Notifies you when a new release is available on GitHub."
 msgstr "Te notifica cuando hay una nueva versión disponible en GitHub."
 
@@ -517,10 +505,6 @@ msgstr "Abrir enlaces luckytwitch://"
 #: qt_ui/tabs/options.py
 msgid "Use this copy"
 msgstr "Usar esta copia"
-
-#: qt_ui/tabs/options.py
-msgid "These links currently open another copy of LuckyTwitch. Press the button to use this one."
-msgstr "Estos enlaces abren actualmente otra copia de LuckyTwitch. Presiona el botón para usar esta."
 
 msgid "These links already open this copy of LuckyTwitch."
 msgstr "Estos enlaces ya abren esta copia de LuckyTwitch."
@@ -2004,10 +1988,6 @@ msgid "Look"
 msgstr "Apariencia"
 
 #: qt_ui/tabs/options.py
-msgid "LuckyTwitch Premiere plugin"
-msgstr "Plugin de LuckyTwitch para Premiere"
-
-#: qt_ui/tabs/options.py
 msgid ""
 "MP4 needs every stretch to have a name, so don't leave this empty for MP4. Empty is fine only for"
 " MKV."
@@ -2048,14 +2028,6 @@ msgstr ""
 "segundos de precisión.\n"
 "Activado: el video se vuelve a codificar para que cada corte sea exacto al fotograma. Eso es "
 "lento y consume mucha CPU."
-
-#: qt_ui/tabs/options.py
-msgid ""
-"One .markers.json next to each part, for the LuckyTwitch Premiere plugin. It works even if "
-"chapters are off."
-msgstr ""
-"Un archivo de marcadores .markers.json junto a cada parte, para el plugin de LuckyTwitch para "
-"Premiere. Funciona incluso si los capítulos están desactivados."
 
 #: qt_ui/tabs/options.py
 msgid "Organize in subfolders"
@@ -2292,14 +2264,6 @@ msgid ""
 msgstr ""
 "m4a mantiene el audio propio de Twitch tal cual (sin recodificar). mp3 lo convierte con ffmpeg "
 "(192 kbit/s) y se reproduce en todas partes."
-
-#: qt_ui/tabs/options.py
-msgid ""
-"macOS sends these links to the app by itself once it is in Applications. If a link does nothing, "
-"open LuckyTwitch from Applications once and try again."
-msgstr ""
-"macOS envía estos enlaces a la aplicación automáticamente una vez que está en Aplicaciones. Si un"
-" enlace no hace nada, abre LuckyTwitch desde Aplicaciones una vez y vuelve a intentarlo."
 
 #: qt_ui/tabs/options.py
 msgid "never"
@@ -3561,7 +3525,7 @@ msgstr "Ruta de directorio de trabajo no segura"
 
 #: qt_ui/update_dialog.py
 msgid "Update verification failed."
-msgstr "Fall? la verificaci?n de la actualizaci?n."
+msgstr "Falló la verificación de la actualización."
 
 #: qt_ui/shell.py
 msgid "Cut at cursor / remove cut / nudge / zoom (on Timeline)"
@@ -3794,4 +3758,222 @@ msgstr "Guardando {name}…"
 #, python-brace-format
 msgid "Splitting into {count} part(s) using stream copy…"
 msgstr "Dividiendo en {count} parte(s) mediante copia directa…"
+
+#: core/chat.py
+#, python-brace-format
+msgid "Warning: chat overlay: {msg}"
+msgstr "Aviso: superposición de chat: {msg}"
+
+#: core/chat.py
+#, python-brace-format
+msgid "{what} failed: {err}"
+msgstr "{what} falló: {err}"
+
+#: core/download.py
+#, python-brace-format
+msgid ""
+"Download failed:\n"
+"{err}"
+msgstr ""
+"Error en la descarga:\n"
+"{err}"
+
+#: core/download.py
+#, python-brace-format
+msgid ""
+"ffmpeg failed:\n"
+"{err}"
+msgstr ""
+"ffmpeg falló:\n"
+"{err}"
+
+#: core/finalize.py
+#, python-brace-format
+msgid ", {s} s early"
+msgstr ", {s} s antes"
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Audio only: skipped {items} (they need a video track)."
+msgstr "Solo audio: se omitió {items} (requiere pista de video)."
+
+#: core/finalize.py
+msgid "Done"
+msgstr "Listo"
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Part {part} starts at {start} (asked {asked}{early}) and ends at {end}"
+msgstr "La parte {part} comienza en {start} (solicitado {asked}{early}) y termina en {end}"
+
+#: core/finalize.py
+msgid "download full VOD, then split"
+msgstr "descargar el VOD completo y luego dividir"
+
+#: core/finalize.py
+msgid "download only the parts"
+msgstr "descargar solo las partes"
+
+#: core/finalize.py
+#, python-brace-format
+msgid "{count} part(s), coverage {pct}% → {mode}"
+msgstr "{count} parte(s), cobertura {pct}% → {mode}"
+
+#: core/tools.py
+#, python-brace-format
+msgid ""
+"Could not download ffmpeg automatically:\n"
+"  {errors}\n"
+"\n"
+"Wait a few minutes and try again, or install it with Homebrew:  brew install ffmpeg\n"
+"(or copy ffmpeg and ffprobe into {tools_dir})"
+msgstr ""
+"No se pudo descargar ffmpeg automáticamente:\n"
+"  {errors}\n"
+"\n"
+"Espera unos minutos e inténtalo de nuevo, o instálalo con Homebrew:  brew install ffmpeg\n"
+"(o copia ffmpeg y ffprobe en {tools_dir})"
+
+#: core/tools.py
+#, python-brace-format
+msgid "Downloading TwitchDownloaderCLI {tag}"
+msgstr "Descargando TwitchDownloaderCLI {tag}"
+
+#: core/tools.py
+msgid "Downloading ffmpeg"
+msgstr "Descargando ffmpeg"
+
+#: core/tools.py
+#, python-brace-format
+msgid "Downloading yt-dlp {tag}"
+msgstr "Descargando yt-dlp {tag}"
+
+#: core/tools.py
+#, python-brace-format
+msgid "Downloading {tool}"
+msgstr "Descargando {tool}"
+
+#: core/tools.py
+msgid "Extracting ffmpeg"
+msgstr "Extrayendo ffmpeg"
+
+#: core/tools.py
+msgid "Verifying ffmpeg"
+msgstr "Verificando ffmpeg"
+
+#: qt_ui/main_window.py
+#, python-brace-format
+msgid "Adding {count} dropped URL(s)…"
+msgstr "Agregando {count} URL(s) soltada(s)…"
+
+#: qt_ui/main_window.py
+#, python-brace-format
+msgid "Drop failed ({url}): {err}"
+msgstr "Error al soltar ({url}): {err}"
+
+#: qt_ui/main_window.py
+msgid "Loading"
+msgstr "Cargando"
+
+#: qt_ui/main_window.py
+msgid "Reading VOD info"
+msgstr "Leyendo información del VOD"
+
+#: qt_ui/shell.py
+msgid "About"
+msgstr "Acerca de"
+
+#: qt_ui/shell.py qt_ui/tabs/options.py
+msgid "About & Diagnostics"
+msgstr "Acerca de y diagnóstico"
+
+#: qt_ui/shell.py qt_ui/tabs/options.py
+msgid "About & Diagnostics…"
+msgstr "Acerca de y diagnóstico…"
+
+#: qt_ui/tabs/options.py
+msgid "Check for new versions of LuckyDownloader"
+msgstr "Buscar nuevas versiones de LuckyDownloader"
+
+#: qt_ui/tabs/options.py
+msgid "Check for new versions of LuckyDownloader."
+msgstr "Busca nuevas versiones de LuckyDownloader."
+
+#: qt_ui/tabs/options.py
+msgid "Clear Private Data"
+msgstr "Borrar datos privados"
+
+#: qt_ui/tabs/options.py
+msgid "Clear Private Data…"
+msgstr "Borrar datos privados…"
+
+#: qt_ui/tabs/options.py
+msgid "Clear download history, recent channels, recent searches, and finished queue items?"
+msgstr ""
+"¿Borrar el historial de descargas, canales recientes, búsquedas recientes y elementos finalizados"
+" de la cola?"
+
+#: qt_ui/tabs/options.py
+msgid "Clear download history, recent channels, searches, and finished queue items."
+msgstr "Borra el historial de descargas, canales recientes, búsquedas y elementos finalizados de la cola."
+
+#: qt_ui/tabs/options.py
+msgid "Control local history and clear stored URLs or searches."
+msgstr "Controla el historial local y borra URLs o búsquedas guardadas."
+
+#: qt_ui/tabs/options.py
+msgid "Example:"
+msgstr "Ejemplo:"
+
+#: qt_ui/tabs/options.py
+msgid "LuckyDownloader Premiere plugin"
+msgstr "Complemento de Premiere de LuckyDownloader"
+
+#: qt_ui/tabs/options.py
+msgid "LuckyDownloader updates"
+msgstr "Actualizaciones de LuckyDownloader"
+
+#: qt_ui/tabs/options.py
+msgid ""
+"One .markers.json next to each part, for the LuckyDownloader Premiere plugin. It works even if "
+"chapters are off."
+msgstr ""
+"Un .markers.json junto a cada parte, para el plugin de marcadores de Premiere de LuckyDownloader."
+" Funciona aunque los capítulos estén desactivados."
+
+#: qt_ui/tabs/options.py
+msgid "Privacy & Data"
+msgstr "Privacidad y datos"
+
+#: qt_ui/tabs/options.py
+msgid "Private data"
+msgstr "Datos privados"
+
+#: qt_ui/tabs/options.py
+msgid "Private data cleared."
+msgstr "Datos privados borrados."
+
+#: qt_ui/tabs/options.py
+msgid "Record downloaded VODs, recent channels, and search queries locally."
+msgstr "Guarda localmente los VODs descargados, canales recientes y búsquedas."
+
+#: qt_ui/tabs/options.py
+msgid "Save download history & recent URLs"
+msgstr "Guardar historial de descargas y URLs recientes"
+
+#: qt_ui/tabs/options.py
+msgid "These links currently open another copy of LuckyDownloader. Press the button to use this one."
+msgstr "Estos enlaces abren actualmente otra copia de LuckyDownloader. Pulsa el botón para usar esta."
+
+#: qt_ui/tabs/options.py
+msgid "View version info or export a redacted diagnostics bundle."
+msgstr "Ver información de la versión o exportar un paquete de diagnóstico censurado."
+
+#: qt_ui/tabs/options.py
+msgid ""
+"macOS sends these links to the app by itself once it is in Applications. If a link does nothing, "
+"open LuckyDownloader from Applications once and try again."
+msgstr ""
+"macOS envía estos enlaces a la aplicación automáticamente una vez que está en Aplicaciones. Si un"
+" enlace no hace nada, abre LuckyDownloader desde Aplicaciones una vez e inténtalo de nuevo."
 

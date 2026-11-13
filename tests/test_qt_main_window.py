@@ -367,3 +367,86 @@ def test_vod_with_muted_audio_adds_to_queue_and_starts(win, monkeypatch):
     win.add_to_queue(start=True)
     assert len(win.tab_queue.items) == 2
     assert started == [True]
+
+
+def test_save_ui_state_preserves_queue_and_layout_fields(qtbot, tmp_path, monkeypatch):
+    """G-01: _save_ui_state() preserves log_open, splitter_sizes, max_concurrent_jobs, and rate_limit."""
+    import core.paths as paths
+    from core.ui_state import UIState, load_ui_state, save_ui_state
+
+    ui_path = tmp_path / "luckytwitch_ui.json"
+    monkeypatch.setattr(paths, "UI_STATE_PATH", ui_path)
+    save_ui_state(
+        UIState(
+            log_open=True,
+            splitter_sizes=[320, 180],
+            max_concurrent_jobs=3,
+            rate_limit="5M",
+            has_completed_onboarding=True,
+        ),
+        path=ui_path,
+    )
+
+    win = mw.MainWindow(settings=dict(DEFAULTS), client=object())
+    qtbot.addWidget(win)
+    win.tab_queue.max_concurrent_jobs = 4
+    win.tab_queue.rate_limit = "10M"
+    win._save_ui_state()
+
+    loaded = load_ui_state(path=ui_path)
+    assert loaded.log_open is True
+    assert loaded.splitter_sizes == [320, 180]
+    assert loaded.max_concurrent_jobs == 4
+    assert loaded.rate_limit == "10M"
+
+
+def test_vod_strip_uses_date_and_twitch_vod_id_and_about_wired(qtbot):
+    from core.source_info import SourceInfo
+    from qt_ui.main_window import MainWindow
+
+    win = MainWindow(settings=dict(DEFAULTS), client=None)
+    qtbot.addWidget(win)
+    src = SourceInfo(
+        url="https://www.twitch.tv/videos/555666",
+        id="555666",
+        title="Speedrun Day 1",
+        uploader="Runner",
+        duration=3600.0,
+        date="2026-11-10",
+        twitch_vod_id="555666",
+    )
+    win.vod_strip.set_vod(src)
+    assert "2026-11-10" in win.vod_strip.meta_label.text()
+    assert hasattr(win.rail, "about_btn")
+    assert hasattr(win.tab_options, "about_btn")
+    assert hasattr(win.tab_options, "clear_data_btn")
+    assert "save_history" in win.tab_options.toggles
+    win.vod_strip.clear()
+    assert win.vod_strip._expected_thumb_url == ""
+    win.close()
+
+
+def test_enqueue_dropped_urls_adds_jobs_to_queue(qtbot, monkeypatch):
+    import core.source_info as source_info
+    from core.source_info import SourceInfo
+    from qt_ui.main_window import MainWindow
+
+    fake_src = SourceInfo(
+        url="https://www.twitch.tv/videos/777888",
+        id="777888",
+        title="Dropped VOD",
+        uploader="StreamerX",
+        duration=1200.0,
+        date="2026-11-11",
+        twitch_vod_id="777888",
+    )
+    monkeypatch.setattr(source_info, "get_source_info", lambda url, **kw: fake_src)
+
+    win = MainWindow(settings=dict(DEFAULTS), client=None)
+    qtbot.addWidget(win)
+    win.tab_queue.urls_dropped.emit(["https://www.twitch.tv/videos/777888"])
+    qtbot.waitUntil(lambda: len(win.tab_queue.items) == 1, timeout=3000)
+    assert win.tab_queue.items[0].label == "StreamerX · Dropped VOD"
+    assert win.tab_queue.items[0].job.source.id == "777888"
+    win.close()
+

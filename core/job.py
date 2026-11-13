@@ -55,6 +55,7 @@ class JobOptions:
     rate_limit: str = ""  # optional bandwidth limit passed to yt-dlp ("--limit-rate"), e.g. "5M", "500K"
     cookies_browser: str = ""  # browser to pass cookies from ("--cookies-from-browser"), e.g. "chrome", "firefox"
     cookies_scope: str = "known_only"  # "known_only" (YouTube, TikTok, Instagram, X) or "all"
+    cookies_explicit: bool | None = None  # optional per-job override for resolve_cookies_for_request()
     download_archive: str = ""  # optional path to yt-dlp download archive file ("--download-archive")
 
 

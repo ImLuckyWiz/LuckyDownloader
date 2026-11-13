@@ -46,14 +46,27 @@ def atomic_write_json(
         raise
 
 
-def backup_corrupt_json(path: Path | str) -> None:
-    """Rename a corrupted JSON file to <name>.corrupt so user data isn't silently overwritten."""
+def backup_corrupt_json(path: Path | str, max_backups: int = 3) -> None:
+    """Rename a corrupted JSON file to <name>.corrupt.<timestamp> keeping at most max_backups."""
+    import time
     target = Path(path)
     if not target.exists():
         return
     try:
-        backup = target.with_suffix(target.suffix + ".corrupt")
+        ts = time.strftime("%Y%m%d%H%M%S")
+        backup = target.with_name(f"{target.name}.corrupt.{ts}")
+        n = 1
+        while backup.exists():
+            backup = target.with_name(f"{target.name}.corrupt.{ts}_{n}")
+            n += 1
         os.replace(target, backup)
+        pattern = f"{target.name}.corrupt*"
+        backups = sorted(target.parent.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
+        for old in backups[max_backups:]:
+            try:
+                old.unlink(missing_ok=True)
+            except OSError:
+                pass
     except OSError:
         pass
 

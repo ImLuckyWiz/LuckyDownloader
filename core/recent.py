@@ -11,9 +11,15 @@ def load_recent() -> list[dict]:
     """Streamers picked in the Search tab, most recent first: [{id, login, name}]."""
     try:
         data = json.loads(paths.RECENT_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except json.JSONDecodeError:
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(paths.RECENT_PATH)
+        return []
+    except OSError:
         return []
     if not isinstance(data, list):
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(paths.RECENT_PATH)
         return []
     out = []
     for c in data:
@@ -35,9 +41,15 @@ def load_recent_searches() -> list[dict]:
     """Recent generic/YouTube searches or channels: [{id, login, name}]."""
     try:
         data = json.loads(paths.RECENT_SEARCHES_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except json.JSONDecodeError:
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(paths.RECENT_SEARCHES_PATH)
+        return []
+    except OSError:
         return []
     if not isinstance(data, list):
+        from core.files import backup_corrupt_json
+        backup_corrupt_json(paths.RECENT_SEARCHES_PATH)
         return []
     out = []
     for c in data:

@@ -56,11 +56,30 @@ def _data_folder_in_tmp(request, tmp_path, monkeypatch):
     except Exception:
         pass
     try:
+        import core.runtime
+        import core.tools
+        tools_dir = data_dir / "tools"
+        monkeypatch.setattr(core.runtime, "TOOLS_DIR", tools_dir)
+        monkeypatch.setattr(core.tools, "TOOLS_DIR", tools_dir)
+    except Exception:
+        pass
+    try:
         from qt_ui.motion import Motion
 
         Motion.set_enabled(False)
     except ImportError:  # pragma: no cover
         pass
+    yield
+    import logging
+    from logging.handlers import RotatingFileHandler
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        if isinstance(h, RotatingFileHandler):
+            root.removeHandler(h)
+            try:
+                h.close()
+            except Exception:
+                pass
 
 
 @pytest.fixture(autouse=True)
@@ -124,6 +143,10 @@ def pytest_unconfigure(config):
         session = getattr(tr, "_session", None)
         exitstatus = getattr(session, "exitstatus", None)
         if failed == 0 and errors == 0 and passed > 0 and (exitstatus == 0 or exitstatus is None):
+            qtw = sys.modules.get("PySide6.QtWidgets")
+            has_qapp = qtw is not None and qtw.QApplication.instance() is not None
+            if not has_qapp or "coverage" in sys.modules or sys.gettrace() is not None:
+                return
             sys.stdout.flush()
             sys.stderr.flush()
             if sys.platform == "win32":

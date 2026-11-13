@@ -334,12 +334,20 @@ class QueueModel(QAbstractTableModel):
             return []
         try:
             raw = json.loads(target.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            from core.files import backup_corrupt_json
+            backup_corrupt_json(target)
+            return []
         except Exception:  # noqa: BLE001
             return []
         if not isinstance(raw, dict):
+            from core.files import backup_corrupt_json
+            backup_corrupt_json(target)
             return []
         items_raw = raw.get("items")
         if not isinstance(items_raw, list):
+            from core.files import backup_corrupt_json
+            backup_corrupt_json(target)
             return []
         restored: list[QueueItem] = []
         for entry in items_raw:
@@ -353,6 +361,8 @@ class QueueModel(QAbstractTableModel):
                 continue
             restored.append(item)
         if not restored:
+            if only_unfinished:
+                self.save_state(target)
             return []
         with self._lock:
             self.beginResetModel()

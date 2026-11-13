@@ -85,6 +85,7 @@ class NavRail(QFrame):
 
     currentChanged = Signal(int)
     expandedChanged = Signal(bool)
+    about_requested = Signal()
 
     COLLAPSED_WIDTH = 46
     EXPANDED_WIDTH = 134
@@ -115,6 +116,19 @@ class NavRail(QFrame):
 
         btn_opt = self._make_button(2)
         lay.addWidget(btn_opt)
+
+        self.about_btn = QPushButton(self)
+        self.about_btn.setProperty("variant", "rail")
+        self.about_btn.setProperty("selected", False)
+        self.about_btn.setIcon(icon("info", 18))
+        self.about_btn.setIconSize(QSize(18, 18))
+        self.about_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.about_btn.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self.about_btn.setMinimumHeight(36)
+        self.about_btn.setToolTip(t("About & Diagnostics…"))
+        self.about_btn.setAccessibleName(t("About & Diagnostics"))
+        self.about_btn.clicked.connect(self.about_requested.emit)
+        lay.addWidget(self.about_btn)
 
         # Collapse / expand button at the very bottom
         # ICON NEEDED: chevron-right / chevron-left
@@ -229,6 +243,10 @@ class NavRail(QFrame):
                 btn.setText(f"{display_label}{badge}")
             else:
                 btn.setText(badge.strip())
+        if hasattr(self, "about_btn"):
+            self.about_btn.setText(t("About") if self._expanded else "")
+            self.about_btn.setToolTip(t("About & Diagnostics…"))
+            self.about_btn.setAccessibleName(t("About & Diagnostics"))
         self.toggle_btn.setIcon(icon("chevron-left" if self._expanded else "chevron-right", 16))
         self.toggle_btn.setText(t("Collapse") if self._expanded else "")
         self.toggle_btn.setToolTip(t("Expand or collapse navigation rail"))
@@ -546,11 +564,12 @@ class VodStrip(QFrame):
             self.clear()
             return
         clips = clips or []
-        self.vod_url = getattr(src, "url", "") or f"https://www.twitch.tv/videos/{getattr(src, 'vod_id', '')}"
-        self.title_label.setText(str(getattr(src, "title", "") or f"VOD {getattr(src, 'vod_id', '')}"))
+        vod_id = str(getattr(src, "twitch_vod_id", "") or getattr(src, "id", "") or getattr(src, "vod_id", "") or "")
+        self.vod_url = getattr(src, "url", "") or (f"https://www.twitch.tv/videos/{vod_id}" if vod_id else "")
+        self.title_label.setText(str(getattr(src, "title", "") or f"VOD {vod_id}"))
         bits = [
             str(getattr(src, "uploader", "")),
-            str(getattr(src, "upload_date", "")),
+            str(getattr(src, "date", "") or getattr(src, "upload_date", "")),
             fmt_hms(getattr(src, "duration", 0)),
         ]
         if clips:
@@ -597,6 +616,8 @@ class VodStrip(QFrame):
         thumb_url = getattr(src, "thumbnail", "")
         if thumb_url:
             self._fetch_thumbnail(thumb_url)
+        else:
+            self._expected_thumb_url = ""
         from qt_ui.motion import DURATION_NORMAL, Motion, animate_height
         if Motion.enabled() and self.parentWidget() and self.parentWidget().isVisible():
             self.setMaximumHeight(0)
@@ -657,6 +678,7 @@ class VodStrip(QFrame):
             pass
 
     def clear(self) -> None:
+        self._expected_thumb_url = ""
         self.vod_url = ""
         self.title_label.setText("")
         self.meta_label.setText("")

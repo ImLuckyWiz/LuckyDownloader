@@ -599,20 +599,26 @@ def reads(win, monkeypatch):
     return win
 
 
-def test_a_link_fills_the_plan_tab_and_reads_the_vod(qtbot, reads, boxes):
+def test_a_link_fills_the_plan_tab_without_auto_fetching(qtbot, reads, boxes):
+    """C-02: Deep links populate the form, switch to Plan, and focus info_btn without auto-running yt-dlp."""
     reads.open_link(link("0:20:00 to 3:30:00", "Big Stream"))
-    qtbot.waitUntil(lambda: reads.source is not None, timeout=3000)
     assert reads.vod_entry.text() == VOD
     assert reads.cut_text() == "0:20:00 to 3:30:00"
+    assert reads._read_calls == []
+    assert reads.source is None
+    assert reads.tabs.currentWidget() is reads.tab_plan
+    assert boxes.log == []
+
+    reads.on_get_info()
+    qtbot.waitUntil(lambda: reads.source is not None, timeout=3000)
     assert reads._read_calls == [VOD]
     assert reads.source.title == "Big Stream"
-    assert reads.tabs.currentWidget() is reads.tab_plan
     assert "opened from a link (Big Stream)" in reads.status_label.text()
-    assert boxes.log == []
 
 
 def test_without_cut_points_the_default_is_the_whole_vod(qtbot, reads):
     reads.open_link(link())
+    reads.on_get_info()
     qtbot.waitUntil(lambda: reads.source is not None, timeout=3000)
     assert reads.cut_text() == "0:00:00 - end"
 
@@ -620,6 +626,8 @@ def test_without_cut_points_the_default_is_the_whole_vod(qtbot, reads):
 def test_a_link_replaces_the_cut_points_that_were_there(qtbot, reads):
     reads.tab_plan.set_cut_text("1:00:00 - 2:00:00")
     reads.open_link(link("5:00 - 10:00"))
+    assert reads.cut_text() == "5:00 - 10:00"
+    reads.on_get_info()
     qtbot.waitUntil(lambda: reads.source is not None, timeout=3000)
     assert reads.cut_text() == "5:00 - 10:00"
 
@@ -628,7 +636,6 @@ def test_a_link_never_adds_to_the_queue_or_starts_a_download(qtbot, reads, monke
     started = []
     monkeypatch.setattr(reads.tab_queue, "start_queue", lambda *a, **k: started.append(1))
     reads.open_link(link("0:00 - 30:00"))
-    qtbot.waitUntil(lambda: reads.source is not None, timeout=3000)
     assert reads.tab_queue.items == [] and started == []
     assert not reads.tab_queue.runner.is_running()
 
@@ -639,6 +646,7 @@ def test_the_previous_vod_is_forgotten_so_its_cuts_cannot_be_reused(qtbot, win, 
                         lambda text: (_ for _ in ()).throw(eng.EngineError("no such VOD")))
     win.open_link(link("1:00 - 2:00"))
     assert win.source is None
+    win.on_get_info()
     qtbot.waitUntil(lambda: bool(boxes.log), timeout=3000)
     assert win.source is None
     assert boxes.log[0][0] == "error"
@@ -664,13 +672,14 @@ def test_a_link_waits_while_the_tools_are_being_prepared(qtbot, reads):
     qtbot.wait(200)
     assert reads._read_calls == [] and reads.vod_entry.text() == ""
     reads.tools_busy = False
-    qtbot.waitUntil(lambda: reads.source is not None, timeout=3000)
-    assert reads._read_calls == [VOD] and reads.cut_text() == "0:00 - 10:00"
+    qtbot.waitUntil(lambda: reads.vod_entry.text() == VOD, timeout=3000)
+    assert reads._read_calls == [] and reads.cut_text() == "0:00 - 10:00"
 
 
 def test_a_link_left_in_the_folder_is_picked_up_by_the_window(qtbot, reads):
     weblink._drop(paths.LINKS_DIR, link("0:10:00 - 0:20:00", "From a file"))
-    qtbot.waitUntil(lambda: reads.source is not None, timeout=3000)
+    qtbot.waitUntil(lambda: reads.vod_entry.text() == VOD, timeout=3000)
+    assert reads._read_calls == []
     assert reads.cut_text() == "0:10:00 - 0:20:00"
     assert not list(paths.LINKS_DIR.glob("*.link"))
 

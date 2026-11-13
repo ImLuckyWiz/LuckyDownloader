@@ -218,3 +218,32 @@ def test_history_dialog_populates_generic_entry(qtbot, tmp_path, monkeypatch):
     assert dlg.table.item(0, 2).text() == "user"
     assert dlg.table.item(0, 3).text() == "Fun Clip"
 
+
+def test_concurrent_record_download_preserves_all_entries(tmp_path: Path):
+    """G-04: Concurrent record_download calls from multiple threads must not lose entries."""
+    import threading
+
+    target = tmp_path / "luckytwitch_history.json"
+    barrier = threading.Barrier(8, timeout=5.0)
+    errors = []
+
+    def worker(idx: int) -> None:
+        try:
+            barrier.wait()
+            history.record_download(
+                {"vod_id": f"vod-{idx}", "title": f"Stream {idx}", "folder": str(tmp_path)},
+                path=target,
+            )
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(timeout=5.0)
+
+    assert not errors
+    entries = history.load_history(path=target)
+    assert {e.vod_id for e in entries} == {f"vod-{i}" for i in range(8)}
+

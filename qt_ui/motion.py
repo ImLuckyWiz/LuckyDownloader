@@ -45,10 +45,14 @@ def system_animations_enabled() -> bool:
         return True
     try:
         import ctypes
+        from ctypes import wintypes
 
         enabled = ctypes.c_int(1)
         # SPI_GETCLIENTAREAANIMATION = 0x1042
-        ok = ctypes.windll.user32.SystemParametersInfoW(0x1042, 0, ctypes.byref(enabled), 0)
+        fn = ctypes.windll.user32.SystemParametersInfoW
+        fn.argtypes = [wintypes.UINT, wintypes.UINT, wintypes.LPVOID, wintypes.UINT]
+        fn.restype = wintypes.BOOL
+        ok = fn(0x1042, 0, ctypes.byref(enabled), 0)
         return bool(enabled.value) if ok else True
     except Exception:  # noqa: BLE001
         return True

@@ -152,7 +152,7 @@ Making a page that offers such a link? The format is in [`docs/link-format.md`](
 | --- | --- | --- | --- |
 | Settings, Twitch login, history, watch list | `%LOCALAPPDATA%\LuckyDownloader` | `~/Library/Application Support/LuckyDownloader` | `~/.local/share/LuckyDownloader` |
 | yt-dlp and ffmpeg | `...\LuckyDownloader\tools` | `.../LuckyDownloader/tools` | `~/.local/share/LuckyDownloader/tools` |
-| Downloads (default) | `Downloads\LuckyDownloader` | `~/Downloads/LuckyDownloader` | `~/Downloads/LuckyDownloader` |
+| Downloads (default) | `Videos\LuckyDownloader` | `~/Videos/LuckyDownloader` | `~/Videos/LuckyDownloader` |
 
 The data folder also holds a small `links` folder and a `running.beat` file: they are how a second launch (a clicked link) hands its link to the window that is already open.
 
@@ -227,3 +227,8 @@ LuckyDownloader is not affiliated with Twitch Interactive, Inc., TwitchDownloade
 - The ffmpeg builds the app downloads are GPL. That is fine for personal use; follow the GPL terms if you redistribute them.
 - yt-dlp breaks now and then when Twitch changes things. The app updates it on launch, so restarting it is usually enough.
 - **Update check:** LuckyDownloader checks GitHub releases once per day to notify you of new versions. The request is anonymous (a single HTTPS GET with no settings, paths, or identifiers sent). You can toggle this off at any time under **Options > Tools > Updates**. On Windows installs, updates can be downloaded and installed in place seamlessly with verified SHA-256 integrity.
+- **Intel macOS (`x86_64`):** Prebuilt macOS releases target Apple Silicon (`arm64`); Intel Mac users can run from source or build locally with `bash build_mac.sh`.
+
+## License
+
+LuckyDownloader is distributed under the terms of the [MIT License](LICENSE).

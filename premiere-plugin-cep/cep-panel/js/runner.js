@@ -35,7 +35,10 @@
     var f = { seq: null, proj: "", video: [], audio: [], v1: [], a1: [], markers: null }, lines = body.split("\n"), i;
     for (i = 0; i < lines.length; i++) {
       var p = lines[i].split("\t");
-      if (p[0] === "seq") f.seq = { ok: true, name: p[1], fps: num(p[2]), timebase: num(p[3]), tc: p[4] || "", dropFrame: (p[4] || "").indexOf(";") >= 0 };
+      if (p[0] === "seq") {
+        var tcStr = p[4] || "";
+        f.seq = { ok: true, name: p[1], fps: num(p[2]), timebase: num(p[3]), tc: tcStr, tcValid: /^\d{2,}:\d{2}:\d{2}[:;]\d{2,}$/.test(tcStr), dropFrame: tcStr.indexOf(";") >= 0 };
+      }
       else if (p[0] === "proj") f.proj = p[1] || "";
       else if (p[0] === "vt") f.video[num(p[1])] = num(p[2]);
       else if (p[0] === "at") f.audio[num(p[1])] = num(p[2]);
@@ -73,7 +76,7 @@
     try { res.parsed = C.parseMarkersFile(r.data); } catch (e) { res.error = e && e.message ? e.message : String(e); return res; }
     res.loaded = true;
     if (res.parsed && res.parsed.preferences) {
-      applyFilePreferences(res.parsed.preferences);
+      applyFilePreferences(res.parsed.preferences, path);
     }
     res.matchesMedia = media ? C.markersNameMatchesMedia(res.name, media) : null;
     return res;
@@ -87,26 +90,27 @@
   function fieldEl(id) { return document.getElementById(id); }
   function fieldText(id) { var e = fieldEl(id); return e ? String(e.value === undefined ? "" : e.value).replace(/^\s+|\s+$/g, "").replace(",", ".") : ""; }
   // Throws (with a message fit for the log) when a field holds something that is not a number; an EMPTY field means "the default".
-  var appliedPrefs = false;
-  function applyFilePreferences(prefs) {
-    if (!prefs || appliedPrefs) return;
+  var appliedPrefsForPath = "";
+  function applyFilePreferences(prefs, filePath) {
+    var key = filePath || "__default__";
+    if (!prefs || appliedPrefsForPath === key) return;
     try {
       var saved = window.localStorage.getItem("ltSettings");
       var padB = fieldEl("padBefore"), padA = fieldEl("padAfter");
       var pb = prefs.padBefore !== undefined ? prefs.padBefore : prefs.pad_before;
       var pa = prefs.padAfter !== undefined ? prefs.padAfter : prefs.pad_after;
-      if (padB && pb !== undefined && (fieldText("padBefore") === "0" || fieldText("padBefore") === "" || !saved)) {
+      if (padB && pb !== undefined && (fieldText("padBefore") === "" || !saved)) {
         padB.value = String(pb);
       }
-      if (padA && pa !== undefined && (fieldText("padAfter") === "0" || fieldText("padAfter") === "" || !saved)) {
+      if (padA && pa !== undefined && (fieldText("padAfter") === "" || !saved)) {
         padA.value = String(pa);
       }
       var maxDel = prefs.maxDeletePct !== undefined ? prefs.maxDeletePct : prefs.max_delete_pct;
       var maxEl = fieldEl("maxDeletePct");
-      if (maxEl && maxDel !== undefined && (fieldText("maxDeletePct") === "0" || fieldText("maxDeletePct") === "" || !saved)) {
+      if (maxEl && maxDel !== undefined && (fieldText("maxDeletePct") === "99" || fieldText("maxDeletePct") === "" || !saved)) {
         maxEl.value = String(maxDel);
       }
-      appliedPrefs = true;
+      appliedPrefsForPath = key;
     } catch (ignore) {}
   }
 
@@ -123,6 +127,10 @@
     if (ch && rec.recipeCutChapters !== undefined) ch.checked = !!rec.recipeCutChapters;
     var rm = fieldEl("recipeMarkers");
     if (rm && rec.recipeMarkers !== undefined) rm.checked = !!rec.recipeMarkers;
+    var rdg = fieldEl("recipeDeleteGaps");
+    if (rdg && rec.deleteGaps !== undefined) rdg.checked = rec.deleteGaps !== false;
+    var rl = fieldEl("recipeRelink");
+    if (rl && rec.relink !== undefined) rl.checked = rec.relink !== false;
     saveSettings();
   }
 
@@ -149,6 +157,10 @@
       for (i = 0; i < NUM_FIELDS.length; i++) { e = fieldEl(NUM_FIELDS[i][0]); if (e && saved[NUM_FIELDS[i][0]] !== undefined) e.value = String(saved[NUM_FIELDS[i][0]]); }
       e = fieldEl("recipeCutChapters"); if (e && saved.recipeCutChapters !== undefined) e.checked = !!saved.recipeCutChapters;
       e = fieldEl("recipeMarkers"); if (e && saved.recipeMarkers !== undefined) e.checked = !!saved.recipeMarkers;
+      e = fieldEl("recipeDeleteGaps"); if (e && saved.recipeDeleteGaps !== undefined) e.checked = saved.recipeDeleteGaps !== false;
+      e = fieldEl("recipeRelink"); if (e && saved.recipeRelink !== undefined) e.checked = saved.recipeRelink !== false;
+      e = fieldEl("backupSeq"); if (e && saved.backupSeq !== undefined) e.checked = saved.backupSeq !== false;
+      e = fieldEl("recipeSelect"); if (e && saved.recipeSelect !== undefined) e.value = String(saved.recipeSelect);
       e = fieldEl("limitChapter"); if (e && saved.limitChapter !== undefined) e.value = String(saved.limitChapter);
     } catch (ignore) {}
   }
@@ -158,6 +170,10 @@
       for (i = 0; i < NUM_FIELDS.length; i++) o[NUM_FIELDS[i][0]] = fieldText(NUM_FIELDS[i][0]);
       e = fieldEl("recipeCutChapters"); o.recipeCutChapters = !!(e && e.checked);
       e = fieldEl("recipeMarkers"); o.recipeMarkers = !(e && e.checked === false);
+      e = fieldEl("recipeDeleteGaps"); o.recipeDeleteGaps = !(e && e.checked === false);
+      e = fieldEl("recipeRelink"); o.recipeRelink = !(e && e.checked === false);
+      e = fieldEl("backupSeq"); o.backupSeq = !(e && e.checked === false);
+      e = fieldEl("recipeSelect"); if (e) o.recipeSelect = e.value;
       e = fieldEl("limitChapter"); if (e) o.limitChapter = e.value;
       window.localStorage.setItem("ltSettings", JSON.stringify(o));
     } catch (ignore) {}
@@ -175,6 +191,12 @@
     var minTime = scope ? Math.max(0, scope.min) : 0;
     var maxTime = scope ? Math.min(v.outPoint, scope.max) : v.outPoint;
     var cs = C.planCutSet(items, { clips: s.recipeCutClips, chapters: s.recipeCutChapters, padBefore: s.padBefore, padAfter: s.padAfter, mergeGap: s.mergeGap, min: minTime, max: maxTime });
+    if (scope) {
+      var bPts = cs.points.slice();
+      if (scope.min > 0) bPts.push(Math.round(scope.min * 1000) / 1000);
+      if (isFinite(scope.max) && scope.max < v.outPoint) bPts.push(Math.round(scope.max * 1000) / 1000);
+      cs.points = Array.from(new Set(bPts)).sort(function (a, b) { return a - b; });
+    }
     var clips = [{ start: v.start, end: v.end, inPoint: v.inPoint, outPoint: v.outPoint, speed: 1 }];
     var cov = C.coverage(cs.ranges, clips);
     var pending = C.pendingCutPoints(cs.points, clips, frame);
@@ -400,17 +422,25 @@
     var t = String(await evalJsx("typeof LTTime"));
     if (t === "object") return true;
     // getSystemPath gives "file:///C:/Users/.../com.luckytwitch.markers" on Windows and "file:///Users/.../com.luckytwitch.markers" on macOS.
-    var p = decodeURIComponent(String(window.__adobe_cep__.getSystemPath("extension")).replace(/^file:\/\//, "")).replace(/\\/g, "/");
+    var rawExt = String(window.__adobe_cep__.getSystemPath("extension"));
+    var p = rawExt.replace(/^file:\/\//, "");
+    if (/^file:/i.test(rawExt)) {
+      try { p = decodeURIComponent(p); } catch (ignore) {}
+    }
+    p = p.replace(/\\/g, "/");
     if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);   // "/C:/Users/..." -> "C:/Users/..."; a macOS path keeps its leading slash
     var file = p + "/shared/timecode.js";
-    var r = String(await evalJsx("$.evalFile(" + JSON.stringify(file) + "); typeof LTTime"));
+    var r = String(await evalJsx("$.evalFile(" + lit(file) + "); typeof LTTime"));
     return r === "object";
   }
   function parseSnap(body) {
     var f = { seq: null, proj: "", video: [], audio: [], v1: [], a1: [], media: "", name: "" }, lines = body.split("\n"), i;
     for (i = 0; i < lines.length; i++) {
       var p = lines[i].split("\t");
-      if (p[0] === "seq") f.seq = { ok: true, name: p[1], fps: num(p[2]), timebase: num(p[3]), tc: p[4] || "", dropFrame: (p[4] || "").indexOf(";") >= 0 };
+      if (p[0] === "seq") {
+        var tcStr = p[4] || "";
+        f.seq = { ok: true, name: p[1], fps: num(p[2]), timebase: num(p[3]), tc: tcStr, tcValid: /^\d{2,}:\d{2}:\d{2}[:;]\d{2,}$/.test(tcStr), dropFrame: tcStr.indexOf(";") >= 0 };
+      }
       else if (p[0] === "proj") f.proj = p[1] || "";
       else if (p[0] === "vt") f.video[num(p[1])] = num(p[2]);
       else if (p[0] === "at") f.audio[num(p[1])] = num(p[2]);
@@ -534,7 +564,10 @@
         } },
     ];
   }
-  async function cutsPhases() { return runPhases(tagStep(cutsPhaseList({}), "cuts"), {}).then(function (ok) { log(ok ? "CUTS DONE. Nothing is deleted yet (that is the next phase). Ctrl+Z undoes the cuts one by one; the saved project is untouched." : "CUTS PHASE DID NOT FINISH; see above."); return ok; }); }
+  async function cutsPhases() {
+    if (!(await backupSequence())) { log("CUTS PHASE DID NOT FINISH; see above."); return false; }
+    return runPhases(tagStep(cutsPhaseList({}), "cuts"), {}).then(function (ok) { log(ok ? "CUTS DONE. Nothing is deleted yet (that is the next phase). Ctrl+Z undoes the cuts one by one; the saved project is untouched." : "CUTS PHASE DID NOT FINISH; see above."); return ok; });
+  }
 
   // =====================================================================================================================
   // The real DELETES phase (step 8). Ripple-deletes the gap pieces: the V1 piece, then the A1 piece, LAST GAP FIRST.
@@ -647,7 +680,10 @@
         } },
     ];
   }
-  async function deletesPhases() { return runPhases(tagStep(deletesPhaseList({}), "deletes"), {}).then(function (ok) { log(ok ? "DELETES DONE. Nothing is relinked yet (that is the next phase). Ctrl+Z undoes the deletes one by one; the saved project is untouched." : "DELETES PHASE DID NOT FINISH; see above."); return ok; }); }
+  async function deletesPhases() {
+    if (!(await backupSequence())) { log("DELETES PHASE DID NOT FINISH; see above."); return false; }
+    return runPhases(tagStep(deletesPhaseList({}), "deletes"), {}).then(function (ok) { log(ok ? "DELETES DONE. Nothing is relinked yet (that is the next phase). Ctrl+Z undoes the deletes one by one; the saved project is untouched." : "DELETES PHASE DID NOT FINISH; see above."); return ok; });
+  }
 
 
   // =====================================================================================================================
@@ -759,7 +795,12 @@
   // needs one clip on V1), so on a cut timeline "not there yet" is a reason to refuse, not something the run can repair.
   async function markerCounts(fileData) {
     var sc = await scan(), have = sc.facts && sc.facts.markers ? sc.facts.markers.existing : -1, want = -1;
-    try { want = window.LTCore.planMarkers(fileData.parsed, getSettings(), 0).items.length; } catch (e) { want = -1; }
+    try {
+      var C = window.LTCore, st = getSettings();
+      var scope = C.chapterScope(fileData.parsed, st.limitChapter);
+      var rawItems = C.planMarkers(fileData.parsed, st, 0).items;
+      want = (scope ? C.restrictItems(rawItems, scope) : rawItems).length;
+    } catch (e) { want = -1; }
     return { have: have, want: want };
   }
   async function linkCount(snap) {
@@ -769,6 +810,20 @@
     return { pairs: Number(p[1]), linked: Number(p[2]), unlinked: Number(p[3]), unknown: Number(p[4]) };
   }
   function markersWanted() { var e = fieldEl("recipeMarkers"); return !e || e.checked === undefined || e.checked !== false; }
+  function deleteGapsWanted() { var e = fieldEl("recipeDeleteGaps"); return !e || e.checked === undefined || e.checked !== false; }
+  function relinkWanted() { var e = fieldEl("recipeRelink"); return !e || e.checked === undefined || e.checked !== false; }
+  function backupWanted() { var e = fieldEl("backupSeq"); return !!(e && e.checked === true); }
+  async function backupSequence() {
+    if (!backupWanted()) return true;
+    log("Backing up active sequence (clone)...");
+    var r = String(await evalJsx("LT_b_clone()"));
+    if (r.indexOf("ok") !== 0) {
+      log("REFUSED. Sequence backup failed: " + r);
+      return false;
+    }
+    log("Sequence backup created.");
+    return true;
+  }
   function sumRanges(ranges) { var t = 0, i; for (i = 0; i < ranges.length; i++) t += ranges[i].end - ranges[i].start; return t; }
   function sub(list, tag, step) {   // every phase list gets its own context object, so phases can never see each other's variables
     var c = {};
@@ -783,6 +838,8 @@
     if (cc.ok) {
       var fresh = cc.snap.v1.length === 1;
       out.plan = cc.plan; out.snap = cc.snap; out.ranges = cc.plan.ranges; out.keepCount = cc.plan.gaps.keepCount; out.deleteCount = cc.plan.gaps.deleteCount;
+      out.outsideCount = cc.plan.gaps.outside ? cc.plan.gaps.outside.length : 0;
+      out.outsideSeconds = (cc.plan.gaps.outside || []).reduce(function (a, c) { return a + c.seconds; }, 0);
       out.cutsTotal = cc.edges.length - 2; out.cutsLeft = cc.remaining.length;
       out.state = fresh ? "a fresh, uncut timeline" : (cc.remaining.length ? "part cut (" + (out.cutsTotal - out.cutsLeft) + " of " + out.cutsTotal + " cuts already there)" : "fully cut, nothing deleted yet");
       if (fresh && wantMarkers) {
@@ -801,6 +858,8 @@
     var dc = await deletesCheck("partial", null);
     if (!dc.ok) return { refuse: ["This is not a timeline the run can start from. As a fresh / part-cut timeline: " + (cc.hard[0] || "refused") + "  As a cut / part-deleted timeline: " + (dc.hard[0] || "refused")] };
     out.snap = dc.snap; out.ranges = dc.ranges; out.keepCount = dc.gaps.keepCount; out.deleteCount = dc.gaps.deleteCount;
+    out.outsideCount = dc.gaps.outside ? dc.gaps.outside.length : 0;
+    out.outsideSeconds = (dc.gaps.outside || []).reduce(function (a, c) { return a + c.seconds; }, 0);
     var lc = await linkCount(dc.snap);
     if (lc.error) return { refuse: ["Could not read the link state: " + lc.error] };
     if (lc.unknown > 0) return { refuse: [lc.unknown + " pair(s) have a link state Premiere does not report (getLinkedItems). The run will not guess."] };
@@ -821,9 +880,10 @@
     var d = await deletesCheck("complete", null);
     if (!d.ok) return { ok: false, text: d.hard.join(" | ") };
     var snap = d.snap, fps = snap.seq.fps, n = snap.v1.length, bad = [], bits = [];
-    if (n !== cl.keepCount) bad.push("V1 has " + n + " pieces but the plan keeps " + cl.keepCount);
+    var expectedPieces = cl.keepCount + (cl.outsideCount || 0);
+    if (n !== expectedPieces) bad.push("V1 has " + n + " pieces but the plan keeps " + expectedPieces);
     if (snap.a1.length !== n) bad.push("A1 has " + snap.a1.length + " pieces, V1 has " + n);
-    var expLen = sumRanges(d.ranges || cl.ranges), gotLen = n ? snap.v1[n - 1].end - snap.v1[0].start : 0, tol = (n + 2) / fps;
+    var expLen = sumRanges(d.ranges || cl.ranges) + (cl.outsideSeconds || 0), gotLen = n ? snap.v1[n - 1].end - snap.v1[0].start : 0, tol = (n + 2) / fps;
     if (Math.abs(gotLen - expLen) > tol) bad.push("the timeline is " + gotLen.toFixed(2) + " s long but the plan keeps " + expLen.toFixed(2) + " s (allowed rounding " + tol.toFixed(2) + " s)");
     if (n && Math.abs(snap.v1[0].start) > 0.00001) bad.push("the first piece does not start at 0");
     bits.push(n + " pieces on V1 and A1, " + gotLen.toFixed(2) + " s long (plan " + expLen.toFixed(2) + " s), no gap pieces, no holes, nothing on other tracks");
@@ -831,7 +891,12 @@
     if (v.indexOf("ok|") !== 0) bad.push("links: " + v.replace(/^(FAIL\||ERROR: )/, "")); else bits.push(specs.length + " pairs verified linked");
     if (wantMarkers) {
       var fr = d.fileData, sc = await scan(), have = sc.facts && sc.facts.markers ? sc.facts.markers.existing : -1, want = -1;
-      try { want = window.LTCore.planMarkers(fr.parsed, getSettings(), 0).items.length; } catch (e) { bad.push("markers: could not work out the plan (" + e + ")"); }
+      try {
+        var C = window.LTCore, st = getSettings();
+        var scope = C.chapterScope(fr.parsed, st.limitChapter);
+        var rawItems = C.planMarkers(fr.parsed, st, 0).items;
+        want = (scope ? C.restrictItems(rawItems, scope) : rawItems).length;
+      } catch (e) { bad.push("markers: could not work out the plan (" + e + ")"); }
       if (want >= 0) { if (have < want) bad.push("markers: " + have + " on the clip, the plan needs " + want + " (markers can only be added before the first cut)"); else bits.push(have + " markers on the clip (plan " + want + ")"); }
     }
     return { ok: bad.length === 0, text: bad.length ? bad.join(" | ") : bits.join("; ") };
@@ -854,7 +919,10 @@
     try { log("Settings: " + describeSettings(getSettings())); } catch (e) { log("REFUSED. Nothing was changed: " + e.message); return false; }
     var cl = await classify(wantMarkers);
     if (cl.refuse) { log("REFUSED. Nothing was changed:"); cl.refuse.forEach(function (h) { log("  - " + h); }); return false; }
-    var S = cl.steps, pt = planTodo(cl), est = pt.est, todo = pt.todo;
+    var S = cl.steps;
+    if (!deleteGapsWanted()) { S.deletes = false; S.relink = false; }
+    if (!relinkWanted()) { S.relink = false; }
+    var pt = planTodo(cl), est = pt.est, todo = pt.todo;
     log("Timeline now: " + cl.state + ".");
     cl.lines.forEach(function (l) { log("  " + l); });
     if (cl.allDone) log("Nothing is left to do. Only the final check runs.");
@@ -865,6 +933,7 @@
       log("Confirmed by you. Each step now re-reads the timeline right before it changes anything.");
     }
     var phases = [], o = { noAsk: true };
+    if ((S.cuts || S.deletes) && !(await backupSequence())) return false;
     if (S.markers) phases = phases.concat(sub(markersPhaseList(o), "Markers: ", "markers"));
     if (S.cuts) phases = phases.concat(sub(cutsPhaseList(o), "Cuts: ", "cuts"));
     if (S.deletes) phases = phases.concat(sub(deletesPhaseList(o), "Deletes: ", "deletes"));
@@ -887,7 +956,7 @@
     res.seq = f.seq ? { name: f.seq.name, fps: f.seq.fps } : null;
     if (f.v1.length) res.clip = baseOf(media || f.v1[0].name || "");
     var fr = readFileFacts(media, f.proj);
-    res.file = { loaded: fr.loaded, name: fr.name || "", how: fr.how || "", error: fr.error || "", markerCount: fr.loaded ? fr.parsed.markers.length : 0, byHand: !!S.overridePath };
+    res.file = { loaded: fr.loaded, name: fr.name || "", how: fr.how || "", error: fr.error || "", markerCount: fr.loaded ? fr.parsed.markers.length : 0, byHand: !!S.overridePath, parsed: fr.parsed || null };
     if (!fr.loaded) { res.problems.push("Markers file: " + fr.error); return res; }
     var cl = await classify(res.wantMarkers);
     if (cl.refuse) { res.problems = cl.refuse.slice(); return res; }
@@ -910,7 +979,7 @@
 
   loadSavedSettings();
   (function () {
-    var ids = NUM_FIELDS.map(function (f) { return f[0]; }).concat(["recipeCutChapters", "recipeMarkers"]), i, e;
+    var ids = NUM_FIELDS.map(function (f) { return f[0]; }).concat(["recipeCutChapters", "recipeMarkers", "recipeDeleteGaps", "recipeRelink", "backupSeq"]), i, e;
     for (i = 0; i < ids.length; i++) { e = fieldEl(ids[i]); if (e && e.addEventListener) e.addEventListener("change", saveSettings); }
   })();
   bindRun("rAll", async function () { stopFlag = false; return await doItAll(); });

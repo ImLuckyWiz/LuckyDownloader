@@ -156,18 +156,8 @@ def test_ci_workflow_runs_pytest_offscreen_and_passes_version_to_both_builders()
 
 
 def test_linux_desktop_entry_and_assets():
-    desktop_file = ROOT / "assets" / "luckytwitch.desktop"
-    assert desktop_file.is_file()
-    content = desktop_file.read_text(encoding="utf-8")
-    assert "[Desktop Entry]" in content
-    assert "Name=LuckyTwitch" in content
-    assert "Exec=LuckyTwitch %u" in content
-    assert "Icon=luckytwitch" in content
-    assert "Type=Application" in content
-    assert "MimeType=x-scheme-handler/luckytwitch;" in content
-
-    icon_file = ROOT / "assets" / "luckytwitch.png"
-    assert icon_file.is_file()
+    assert not (ROOT / "assets" / "luckytwitch.desktop").exists()
+    assert not (ROOT / "assets" / "luckytwitch.png").exists()
 
     rebranded_desktop = ROOT / "assets" / "luckydownloader.desktop"
     assert rebranded_desktop.is_file()
@@ -204,8 +194,8 @@ def test_cli_help_and_version(capsys):
     from luckytwitch_qt import main
     assert main(["luckytwitch_qt.py", "--help"]) == 0
     out = capsys.readouterr().out
-    assert "Usage: LuckyTwitch" in out
+    assert "Usage: LuckyDownloader" in out
 
     assert main(["luckytwitch_qt.py", "--version"]) == 0
     out = capsys.readouterr().out
-    assert "LuckyTwitch" in out
+    assert "LuckyDownloader" in out

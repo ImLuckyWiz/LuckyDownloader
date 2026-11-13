@@ -194,12 +194,16 @@ def test_hit_test_top_edge_fitts_law_over_caption_buttons():
     client_rects = [(950, 0, 50, 32)]  # Close button flush at top-right
     max_button_rect = (900, 0, 50, 32) # Maximize button flush at top edge
 
-    # Topmost pixels (y = 1, 2) inside Close button must return CLIENT, not TOP or TOPRIGHT
-    assert hit_test(975, 1, w, h, client_rects=client_rects, max_button_rect=max_button_rect) == Region.CLIENT
-    assert hit_test(999, 1, w, h, client_rects=client_rects, max_button_rect=max_button_rect) == Region.CLIENT
+    # When maximized, topmost pixels (y = 1) inside Close/Max buttons preserve Fitts's Law
+    assert hit_test(975, 1, w, h, maximized=True, client_rects=client_rects, max_button_rect=max_button_rect) == Region.CLIENT
+    assert hit_test(999, 1, w, h, maximized=True, client_rects=client_rects, max_button_rect=max_button_rect) == Region.CLIENT
+    assert hit_test(925, 1, w, h, maximized=True, client_rects=client_rects, max_button_rect=max_button_rect) == Region.MAXBUTTON
 
-    # Topmost pixels (y = 1, 2) inside Maximize button must return MAXBUTTON, not TOP
-    assert hit_test(925, 1, w, h, client_rects=client_rects, max_button_rect=max_button_rect) == Region.MAXBUTTON
+    # When unmaximized, top-edge and top-right resize borders (y < border) take priority over caption buttons
+    assert hit_test(975, 1, w, h, maximized=False, client_rects=client_rects, max_button_rect=max_button_rect) == Region.TOP
+    assert hit_test(999, 1, w, h, maximized=False, client_rects=client_rects, max_button_rect=max_button_rect) == Region.TOPRIGHT
+    assert hit_test(925, 1, w, h, maximized=False, client_rects=client_rects, max_button_rect=max_button_rect) == Region.TOP
+    assert hit_test(975, 10, w, h, maximized=False, client_rects=client_rects, max_button_rect=max_button_rect) == Region.CLIENT
 
     # Normal top border away from buttons still returns TOP
     assert hit_test(500, 1, w, h, client_rects=client_rects, max_button_rect=max_button_rect) == Region.TOP
@@ -233,10 +237,11 @@ def test_get_autohide_taskbar_edges_secondary_monitor(monkeypatch):
     rc_work = RECT(1920, 0, 3840, 1080)
 
     def fake_shappbar(msg, p_data):
-        if msg == fl.ABM_GETSTATE:
-            return fl.ABS_AUTOHIDE
+        if msg == 0x0000000B:  # ABM_GETAUTOHIDEBAREX
+            abd = ctypes.cast(p_data, ctypes.POINTER(fl.APPBARDATA)).contents
+            return 1 if abd.uEdge == fl.ABE_TOP else 0
         return 0
 
     monkeypatch.setattr(fl.shell32, "SHAppBarMessage", fake_shappbar)
     edges = nf.get_autohide_taskbar_edges(hmon=123, rc_monitor=rc_mon, rc_work=rc_work)
-    assert edges == (False, False, False, True)
+    assert edges == (False, True, False, False)

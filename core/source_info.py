@@ -121,7 +121,6 @@ class SourceInfo:
     thumbnail: str = ""
     site: str = "twitch"
     provider: Any | None = None
-    is_age_restricted: bool = False
 
     def has_capability(self, cap: Any) -> bool:
         from core.providers.base import Capability
@@ -189,8 +188,12 @@ YTDLP_MISSING = "yt-dlp is not installed yet (it is downloaded automatically on 
 def _is_youtube_url(url: str) -> bool:
     """Check if the given URL points to a YouTube host."""
     try:
-        host = urlparse(url).hostname or ""
-        host = host.lower()
+        target = (url or "").strip()
+        if not target:
+            return False
+        if "://" not in target:
+            target = f"https://{target}"
+        host = (urlparse(target).hostname or "").lower()
         return host in {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"}
     except Exception:
         return False
@@ -276,7 +279,7 @@ def _run_ytdlp_json(
     except subprocess.TimeoutExpired as e:
         raise EngineError(t("yt-dlp took too long to read that URL.")) from e
     except OSError as e:
-        raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
+        raise EngineError(t("Could not run yt-dlp:\n{error}", error=e)) from e
 
     if proc.returncode != 0 and "--remote-components" in proc.stderr:
         cmd_fallback = [
@@ -298,7 +301,7 @@ def _run_ytdlp_json(
         except subprocess.TimeoutExpired as e:
             raise EngineError(t("yt-dlp took too long to read that URL.")) from e
         except OSError as e:
-            raise EngineError(t("Could not run yt-dlp:\n{error}").format(error=e)) from e
+            raise EngineError(t("Could not run yt-dlp:\n{error}", error=e)) from e
 
     if proc.returncode != 0:
         from core.providers.generic import map_generic_error
@@ -600,6 +603,19 @@ def is_playlist_dict(info: dict) -> bool:
     return bool(info.get("_type") in ("playlist", "channel", "multi_video") or "entries" in info)
 
 
+_SITE_PREFIX_ALIASES = ("youtube", "twitch", "tiktok", "instagram", "twitter", "reddit", "kick")
+
+
+def _normalize_site_name(raw_ext: str, prov: Any | None) -> str:
+    site = (raw_ext or "generic").lower().split(":")[0]
+    for prefix in _SITE_PREFIX_ALIASES:
+        if site.startswith(prefix):
+            return prefix
+    if prov and getattr(prov, "name", "generic") != "generic":
+        return prov.name
+    return site
+
+
 def parse_playlist_info(info: dict, url: str) -> PlaylistInfo:
     """Turn yt-dlp's -J / --flat-playlist output for a playlist or channel into PlaylistInfo."""
     title = str(info.get("title") or info.get("description", "")[:80] or "Playlist").strip()
@@ -607,16 +623,10 @@ def parse_playlist_info(info: dict, url: str) -> PlaylistInfo:
     playlist_id = str(info.get("id") or "")
     thumbnail = str(info.get("thumbnail") or "")
 
-    from core.providers.detect import detect_source
-    prov, _ = detect_source(url)
+    from core.providers.detect import detect_provider
+    prov = detect_provider(url)
     raw_ext = (info.get("extractor") or info.get("extractor_key") or "generic").lower()
-    site = raw_ext.split(":")[0]
-    if site.startswith("youtube"):
-        site = "youtube"
-    elif site.startswith("twitch"):
-        site = "twitch"
-    elif prov and prov.name != "generic":
-        site = prov.name
+    site = _normalize_site_name(raw_ext, prov)
 
     raw_entries = info.get("entries") or []
     items: list[PlaylistItem] = []
@@ -684,16 +694,10 @@ def parse_generic_source_info(info: dict, url: str) -> SourceInfo:
     uploader = str(info.get("uploader") or info.get("channel") or info.get("uploader_id") or "").strip()
     thumbnail = str(info.get("thumbnail") or "")
 
-    from core.providers.detect import detect_source
-    prov, _ = detect_source(url)
+    from core.providers.detect import detect_provider
+    prov = detect_provider(url)
     raw_ext = (info.get("extractor") or info.get("extractor_key") or "generic").lower()
-    site = raw_ext.split(":")[0]
-    if site.startswith("youtube"):
-        site = "youtube"
-    elif site.startswith("twitch"):
-        site = "twitch"
-    elif prov and prov.name != "generic":
-        site = prov.name
+    site = _normalize_site_name(raw_ext, prov)
     clean_id = re.sub(r"[\\/]+", "_", str(info.get("id", "") or "")).strip()
 
     return SourceInfo(

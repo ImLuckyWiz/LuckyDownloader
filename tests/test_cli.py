@@ -15,6 +15,11 @@ from core.errors import EngineError
 from core.source_info import SourceInfo, VideoFormat
 
 
+@pytest.fixture(autouse=True)
+def _mock_cli_ensure_tools(monkeypatch):
+    monkeypatch.setattr(cli, "ensure_tools", lambda *args, **kwargs: None)
+
+
 def test_cli_does_not_import_pyside6():
     """Verify that importing cli.py never imports PySide6 or qt_ui into sys.modules."""
     code = (
@@ -223,3 +228,137 @@ def test_cli_template_passed_to_job(mock_get_source_info, mock_run_job):
     called_job = mock_run_job.call_args[0][0]
     assert called_job.opts.name_template == "{streamer} - {title} - {game} - part{n}"
     assert called_job.opts.generic_name_template == "{streamer} - {title} - {game} - part{n}"
+
+
+@patch("cli.ensure_tools")
+@patch("cli.get_source_info")
+def test_cli_dry_run_skips_ensure_tools(mock_get_source_info, mock_ensure_tools):
+    """--dry-run must not call ensure_tools()."""
+    mock_get_source_info.return_value = SourceInfo(
+        url="https://www.twitch.tv/videos/123456789",
+        id="123456789",
+        title="Dry Stream",
+        uploader="Lucky",
+        duration=3600.0,
+        date="2026-11-06",
+        formats=[],
+        site="twitch",
+    )
+    ret = cli.main(["https://www.twitch.tv/videos/123456789", "--dry-run"])
+    assert ret == 0
+    mock_ensure_tools.assert_not_called()
+
+
+@patch("cli.ensure_tools")
+@patch("cli.make_client")
+@patch("cli.run_job")
+@patch("cli.get_source_info")
+def test_cli_chapters_wires_make_client_and_new_flags(
+    mock_get_source_info, mock_run_job, mock_make_client, mock_ensure_tools
+):
+    """--chapters should wire client=make_client() and forward new flags to JobOptions."""
+    fake_client = MagicMock()
+    mock_make_client.return_value = fake_client
+    mock_get_source_info.return_value = SourceInfo(
+        url="https://www.twitch.tv/videos/123456789",
+        id="123456789",
+        title="Chapter Stream",
+        uploader="Lucky",
+        duration=3600.0,
+        date="2026-11-06",
+        formats=[],
+        site="twitch",
+    )
+
+    ret = cli.main([
+        "https://www.twitch.tv/videos/123456789",
+        "--chapters",
+        "--download-archive", "archive.txt",
+        "--premiere-xml",
+        "--premiere-json",
+        "--game-markers",
+        "--muted-markers",
+        "--chat-render",
+        "--no-update-tools",
+    ])
+    assert ret == 0
+    mock_ensure_tools.assert_called_once()
+    assert mock_ensure_tools.call_args.kwargs["update_ytdlp"] is False
+    called_job = mock_run_job.call_args[0][0]
+    assert called_job.client is fake_client
+    assert called_job.opts.chapters is True
+    assert called_job.opts.download_archive == "archive.txt"
+    assert called_job.opts.premiere_xml is True
+    assert called_job.opts.premiere_plugin is True
+    assert called_job.opts.game_markers is True
+    assert called_job.opts.muted_markers is True
+    assert called_job.opts.chat_render is True
+
+
+@patch("cli.ensure_tools")
+@patch("cli.split_copy")
+@patch("cli._probe_duration", return_value=120.0)
+def test_cli_cut_local_uses_split_copy(mock_probe, mock_split_copy, mock_ensure_tools, tmp_path):
+    """cut-local should split a local file via split_copy and stage atomically."""
+    src_video = tmp_path / "vod.mp4"
+    src_video.write_bytes(b"fake-mp4")
+    seg1 = tmp_path / "seg1.mp4"
+    seg2 = tmp_path / "seg2.mp4"
+    seg1.write_bytes(b"part1")
+    seg2.write_bytes(b"part2")
+    mock_split_copy.return_value = {1: (seg1, 0.0, 60.0), 2: (seg2, 60.0, 120.0)}
+
+    out_dir = tmp_path / "out"
+    ret = cli.main(["cut-local", str(src_video), "-c", "0:00-1:00-end", "-o", str(out_dir)])
+    assert ret == 0
+    mock_split_copy.assert_called_once()
+    assert (out_dir / "vod - part1.mp4").read_bytes() == b"part1"
+    assert (out_dir / "vod - part2.mp4").read_bytes() == b"part2"
+
+
+@patch("cli.ensure_tools")
+@patch("cli.run_job")
+@patch("cli.get_source_info")
+def test_cli_playlist_expansion(mock_get_source_info, mock_run_job, mock_ensure_tools, tmp_path):
+    """PlaylistInfo should expand selected --items into individual run_job calls."""
+    from core.source_info import PlaylistInfo, PlaylistItem
+
+    mock_get_source_info.return_value = PlaylistInfo(
+        id="PL1",
+        title="My Playlist",
+        url="https://www.youtube.com/playlist?list=PL1",
+        uploader="Chan",
+        entries=[
+            PlaylistItem(id="v1", title="One", url="https://www.youtube.com/watch?v=v1", index=1),
+            PlaylistItem(id="v2", title="Two", url="https://www.youtube.com/watch?v=v2", index=2),
+        ],
+    )
+    ret = cli.main([
+        "https://www.youtube.com/playlist?list=PL1",
+        "--items", "2",
+        "--download-archive", str(tmp_path / "arch.txt"),
+        "-o", str(tmp_path),
+    ])
+    assert ret == 0
+    mock_run_job.assert_called_once()
+    assert mock_run_job.call_args[0][0].source.id == "v2"
+
+
+def test_colab_transcribe_helpers(tmp_path):
+    """tools/colab/transcribe.py should isolate chunk dirs per video and measure WAV duration accurately."""
+    import wave
+    from tools.colab import transcribe
+
+    v1 = tmp_path / "a.mp4"
+    v2 = tmp_path / "b.mp4"
+    v1.write_bytes(b"")
+    v2.write_bytes(b"")
+    assert transcribe.video_chunks_dir(tmp_path, v1) != transcribe.video_chunks_dir(tmp_path, v2)
+
+    wav_path = tmp_path / "test.wav"
+    with wave.open(str(wav_path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(16000)
+        wf.writeframes(b"\x00\x00" * 16000)  # 1.0 second
+    assert transcribe.wav_duration(wav_path) == pytest.approx(1.0)

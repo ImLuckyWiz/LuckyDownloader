@@ -208,13 +208,18 @@ function ltCCut(frames) {
   if (!frames || !frames.length) return "FAIL|No cut points were given.";
   app.enableQE();
   var tb = Number(seq.timebase), fps = LTTime.fpsFromTimebase(tb), start = ltStartFrame(seq, tb);
-  var q = qe.project.getActiveSequence(), t0 = ltNow(), i, f, tc, n = 0;
+  var q = null;
+  try { q = qe.project.getActiveSequence(); } catch (eQ) { q = null; }
+  if (!q) return "FAIL|Could not access the active sequence in Premiere (QE).";
+  var qtV = q.getVideoTrackAt(0), qtA = q.getAudioTrackAt(0);
+  if (!qtV || !qtA) return "FAIL|Could not access V1/A1 tracks in Premiere (QE).";
+  var t0 = ltNow(), i, f, tc, n = 0;
   for (i = 0; i < frames.length; i++) {
     f = Number(frames[i]);
     if (!(f >= 0) || Math.floor(f) !== f) return "FAIL|Bad cut frame " + frames[i] + " (not a whole number). " + n + " cut(s) were done before it.";
     tc = LTTime.framesToTimecode(f, fps, start);
-    q.getVideoTrackAt(0).razor(tc);
-    q.getAudioTrackAt(0).razor(tc);
+    qtV.razor(tc);
+    qtA.razor(tc);
     n++;
   }
   return "ok|" + n + "|" + (ltNow() - t0) + "|" + seq.videoTracks[0].clips.numItems + "|" + seq.audioTracks[0].clips.numItems + "|" + ltCOthers(seq);
@@ -380,3 +385,12 @@ function ltDDel(specs) {
   return "ok|" + done + "|" + (ltNow() - t0) + "|" + vt.clips.numItems + "|" + at.clips.numItems + "|" + ltCOthers(seq) + "|" + worst;
 }
 function LT_d_del(specs) { return ltRun(function () { return ltDDel(specs); }); }
+
+function ltBClone() {
+  var seq = ltSeq();
+  if (!seq) return "FAIL|No active sequence.";
+  if (typeof seq.clone !== "function") return "FAIL|Sequence clone is not supported in this Premiere version.";
+  var ok = seq.clone();
+  return ok === false ? "FAIL|Sequence clone returned false." : "ok";
+}
+function LT_b_clone() { return ltRun(function () { return ltBClone(); }); }

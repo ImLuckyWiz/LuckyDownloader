@@ -166,13 +166,7 @@ def detect_provider(text: str) -> Provider:
             if site_id == "twitch":
                 return TWITCH_PROVIDER
             if site_id == "youtube":
-                try:
-                    parts = urlsplit(target if "://" in target else f"https://{target}")
-                    path = (parts.path or "").lower()
-                    if path.startswith(("/@", "/channel/", "/c/")):
-                        from core.providers import YOUTUBE_PROVIDER
-                        return YOUTUBE_PROVIDER
-                except Exception:
-                    pass
+                from core.providers import YOUTUBE_PROVIDER
+                return YOUTUBE_PROVIDER
             return GenericProvider(site_id)
     return GENERIC_PROVIDER

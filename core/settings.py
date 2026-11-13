@@ -61,6 +61,8 @@ DEFAULTS = {
     "cookies_scope": "Only known platforms (YouTube, TikTok, Instagram, X)",
     "auto_update": True,
     "check_app_updates": True,
+    "save_history": True,
+    "ytdlp_extra_args": "",
 }
 
 

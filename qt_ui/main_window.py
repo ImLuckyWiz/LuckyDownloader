@@ -11,7 +11,7 @@ import sys
 import weakref
 from dataclasses import replace
 
-from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QCloseEvent, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QProgressBar, QPushButton, QVBoxLayout, QWidget,
@@ -74,6 +74,8 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
     """``client`` is the Twitch client (or None when nobody is signed in): without one the app starts on the Plan
     tab, as the tkinter app does. ``settings`` is the dict from ``core.settings.load_settings()``."""
 
+    _dropped_job_ready = Signal(object, str, int, str)
+
     def __init__(
         self,
         bridge: Bridge | None = None,
@@ -82,6 +84,7 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
         show_welcome: bool | None = None,
     ):
         super().__init__()
+        self._dropped_job_ready.connect(self._on_dropped_job_ready)
         self.bridge = bridge if bridge is not None else Bridge(self)
         self.settings = settings if settings is not None else {}
         self._client = client
@@ -202,6 +205,7 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
 
         # Left: Navigation Rail (spans full window height)
         self.rail = NavRail(expanded=False, parent=parent_container)
+        self.rail.about_requested.connect(self.open_about_dialog)
 
         # Middle shell: PageStack
         tabs_box = QWidget(main_pane)
@@ -273,6 +277,7 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
         queue.status_message.connect(self.set_status)
         queue.plan_requested.connect(self.show_plan_tab)
         queue.show_requested.connect(self.show_queue_tab)
+        queue.urls_dropped.connect(self._enqueue_dropped_urls)
         queue.model.rowsInserted.connect(self._sync_queue_badge)
         queue.model.rowsRemoved.connect(self._sync_queue_badge)
         queue.model.modelReset.connect(self._sync_queue_badge)
@@ -295,6 +300,7 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
         options.update_tools_requested.connect(self.update_tools_now)
         options.saved_chat_requested.connect(self.render_saved_chat)
         options.check_app_updates_requested.connect(lambda: self.start_update_check(force=True))
+        options.about_requested.connect(self.open_about_dialog)
         plan = self.tab_plan
         plan.add_requested.connect(self.add_to_queue)
         plan.clip_download_requested.connect(self.download_clips)
@@ -323,22 +329,12 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
 
     def refresh_language(self, _language: str = "") -> None:
         """Re-translate what was built by hand; runs on every language change (``i18n_qt.language_bus().changed``)."""
-        if hasattr(self, "rail"):
-            self.rail._refresh_labels()
         if hasattr(self, "command_bar"):
             self.command_bar.retranslate_ui()
         self.set_status(t("Ready. Paste a VOD URL or ID and press «Get info»."))
         if hasattr(self, "tabs"):
             for i, name in enumerate(TAB_NAMES):
                 self.tabs.setTabText(i, _tab_text(name))
-        if hasattr(self, "tab_plan") and hasattr(self.tab_plan, "refresh_language"):
-            self.tab_plan.refresh_language()
-        if hasattr(self, "tab_queue") and hasattr(self.tab_queue, "refresh_language"):
-            self.tab_queue.refresh_language()
-        if hasattr(self, "tab_options") and hasattr(self.tab_options, "refresh_language"):
-            self.tab_options.refresh_language()
-        if hasattr(self, "tab_browse") and hasattr(self.tab_browse, "refresh_language"):
-            self.tab_browse.refresh_language()
 
     # ---------------------------- keyboard & window events ---------------------------- #
     def _setup_shortcuts(self) -> None:
@@ -597,7 +593,8 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
             self.info_label.setText(
                 f"{self.source.uploader} \u00b7 {new_title} \u00b7 {fmt_hms(self.source.duration)} \u00b7 {self.source.date}{extra}"
             )
-            self.vod_strip.title_label.setText(new_title or f"VOD {getattr(self.source, 'vod_id', '')}")
+            vod_id = getattr(self.source, "twitch_vod_id", "") or getattr(self.source, "id", "") or getattr(self.source, "vod_id", "")
+            self.vod_strip.title_label.setText(new_title or f"VOD {vod_id}")
             self.tab_options.refresh_name_examples()
 
     def _on_frames_for_strip(self, src, frames) -> None:
@@ -614,6 +611,45 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
             for it in self.tab_queue.items:
                 if getattr(it.job, "source", None) is self.source and it.thumb is None:
                     self.tab_queue.model.set_thumbnail(it.iid, pm)
+
+    def _on_dropped_job_ready(self, job, label: str, parts: int, strat: str) -> None:
+        self.tab_queue.enqueue(job, label, parts, strat)
+        self._sync_queue_badge()
+        self.set_status(t("Added to queue ({count} item(s)).", count=len(self.tab_queue.items)))
+
+    def _enqueue_dropped_urls(self, urls: list) -> None:
+        """Fetch metadata and enqueue URLs dropped onto QueueTab."""
+        if not urls:
+            return
+        self.set_status(t("Adding {count} dropped URL(s)…", count=len(urls)))
+        import threading
+        from core.job import Job
+        from core.source_info import PlaylistInfo, get_source_info
+
+        opts = build_options(self.settings, "", quality=str(self.settings.get("default_quality", DEFAULTS["default_quality"])))
+        cookies_browser = str(self.settings.get("cookies_from_browser", "None")).strip()
+        cb = None if cookies_browser.lower() in ("none", "disabled", "") else cookies_browser
+        bridge = self.bridge
+        client = self.client
+
+        def work():
+            for u in urls:
+                try:
+                    src = get_source_info(u, cookies_browser=cb)
+                    if isinstance(src, PlaylistInfo):
+                        continue
+                    if flag(self.settings, "clean_title"):
+                        src.title = clean_title(src.title)
+                    has_timeline = getattr(src, "has_capability", lambda c: True)(Capability.TIMELINE)
+                    job_opts = replace(opts, cut_text="0:00:00 - end" if has_timeline else "", strategy="full")
+                    job = Job(source=src, opts=job_opts, client=client)
+                    label = f"{src.uploader or src.site} \u00b7 {src.title}"[:70]
+                    strat = "full VOD + split" if has_timeline else "full video"
+                    self._dropped_job_ready.emit(job, label, 1, strat)
+                except Exception as exc:  # noqa: BLE001
+                    bridge.log.emit(t("Drop failed ({url}): {err}", url=u, err=exc))
+
+        threading.Thread(target=work, daemon=True).start()
 
     def cut_text(self) -> str:
         """The text of the Plan tab's cut points box."""
@@ -731,8 +767,8 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
         if not self._info_busy:
             return
         dots = "." * (self._info_tick % 3 + 1)
-        self.info_btn.setText("Loading" + dots)
-        self.info_label.setText("Reading VOD info" + dots)
+        self.info_btn.setText(t("Loading") + dots)
+        self.info_label.setText(t("Reading VOD info") + dots)
         self._info_tick += 1
 
     def on_info_ok(self, info, clips, loaded: bool, warn: str) -> None:
