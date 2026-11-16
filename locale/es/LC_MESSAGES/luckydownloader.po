@@ -31,7 +31,7 @@ msgstr "Historial"
 msgid "Queue & log"
 msgstr "Cola y registros"
 
-#: qt_ui/main_window.py qt_ui/session_persistence.py
+#: qt_ui/dialogs.py qt_ui/main_window.py qt_ui/session_persistence.py
 msgid "Options"
 msgstr "Opciones"
 
@@ -671,7 +671,7 @@ msgstr "Cargar VOD"
 msgid "No VOD"
 msgstr "Sin VOD"
 
-#: qt_ui/main_window.py
+#: qt_ui/shell.py
 msgid "Open Queue & log"
 msgstr "Abrir Cola y registros"
 
@@ -806,7 +806,7 @@ msgstr "Expandir o colapsar la barra de navegación lateral"
 msgid "Focus and select the VOD URL / ID bar"
 msgstr "Enfocar y seleccionar la barra de URL / ID del VOD"
 
-#: qt_ui/shell.py
+#: qt_ui/dialogs.py qt_ui/shell.py
 msgid "Keyboard shortcuts"
 msgstr "Atajos de teclado"
 
@@ -3145,7 +3145,7 @@ msgstr ""
 "Pasa cookies del navegador a yt-dlp para contenido con restricción de edad o inicio de sesión "
 "requerido (YouTube, TikTok, Instagram)."
 
-#: qt_ui/main_window.py
+#: qt_ui/shell.py
 msgid "A new version of LuckyDownloader is available."
 msgstr "Hay una nueva versión de LuckyDownloader disponible."
 
@@ -3887,7 +3887,7 @@ msgstr "Acerca de"
 msgid "About & Diagnostics"
 msgstr "Acerca de y diagnóstico"
 
-#: qt_ui/shell.py qt_ui/tabs/options.py
+#: qt_ui/dialogs.py qt_ui/shell.py qt_ui/tabs/options.py
 msgid "About & Diagnostics…"
 msgstr "Acerca de y diagnóstico…"
 
@@ -4033,6 +4033,138 @@ msgid ""
 "auto probes for GPU hardware encoding (NVENC, QSV, AMF, VideoToolbox) and falls back to CPU "
 "(libx264)."
 msgstr ""
-"auto busca codificación por hardware de GPU (NVENC, QSV, AMF, VideoToolbox) y usa CPU (libx264) si"
-" no hay."
+"auto busca codificación por hardware de GPU (NVENC, QSV, AMF, VideoToolbox) y usa CPU (libx264) "
+"si no hay."
+
+#: qt_ui/dialogs.py
+msgid "Check GitHub releases for new versions"
+msgstr "Buscar nuevas versiones en los lanzamientos de GitHub"
+
+#: qt_ui/dialogs.py
+msgid "Check for Updates"
+msgstr "Buscar actualizaciones"
+
+#: qt_ui/dialogs.py
+msgid "Command"
+msgstr "Comando"
+
+#: qt_ui/dialogs.py
+msgid "Command Palette"
+msgstr "Paleta de comandos"
+
+#: qt_ui/dialogs.py
+msgid "Enter to run · ↑/↓ to navigate · Esc to close"
+msgstr "Enter para ejecutar · ↑/↓ para navegar · Esc para cerrar"
+
+#: qt_ui/dialogs.py
+msgid "Fetch VOD or video metadata"
+msgstr "Obtener metadatos del VOD o video"
+
+#: qt_ui/dialogs.py
+msgid "Get Info"
+msgstr "Obtener información"
+
+#: qt_ui/dialogs.py
+msgid "Open Output Folder"
+msgstr "Abrir carpeta de salida"
+
+#: qt_ui/dialogs.py
+msgid "Open the download destination folder"
+msgstr "Abrir la carpeta de destino de descargas"
+
+#: qt_ui/dialogs.py
+msgid "Recent"
+msgstr "Recientes"
+
+#: qt_ui/dialogs.py
+msgid "Recent YouTube search"
+msgstr "Búsqueda reciente de YouTube"
+
+#: qt_ui/dialogs.py
+msgid "Recent streamer"
+msgstr "Streamer reciente"
+
+#: qt_ui/dialogs.py
+msgid "Save redacted system logs and diagnostics"
+msgstr "Guardar registros del sistema y diagnósticos depurados"
+
+#: qt_ui/dialogs.py
+msgid "Show keyboard shortcuts reference"
+msgstr "Mostrar guía de atajos de teclado"
+
+#: qt_ui/dialogs.py
+msgid "Show version info and diagnostics export"
+msgstr "Mostrar información de versión y exportar diagnósticos"
+
+#: qt_ui/dialogs.py
+msgid "Start Queue"
+msgstr "Iniciar cola"
+
+#: qt_ui/dialogs.py
+msgid "Start queued downloads"
+msgstr "Iniciar las descargas en cola"
+
+#: qt_ui/dialogs.py
+msgid "Switch Language"
+msgstr "Cambiar idioma"
+
+#: qt_ui/dialogs.py
+msgid "Toggle interface language (English / Español)"
+msgstr "Alternar idioma de la interfaz (English / Español)"
+
+#: qt_ui/dialogs.py
+msgid "Type a command, setting, or channel…"
+msgstr "Escribe un comando, ajuste o canal…"
+
+#: qt_ui/dialogs.py
+msgid "Watch list"
+msgstr "Lista de seguimiento"
+
+#: qt_ui/main_window.py
+#, python-brace-format
+msgid "Loaded job into Cut & Plan: {title}"
+msgstr "Trabajo cargado en Corte y Plan: {title}"
+
+#: qt_ui/queue_runner.py qt_ui/shell.py
+#, python-brace-format
+msgid "{n} running · {speed} MB/s"
+msgstr "{n} en ejecución · {speed} MB/s"
+
+#: qt_ui/shell.py
+msgid "Aggregate download speed"
+msgstr "Velocidad de descarga total"
+
+#: qt_ui/shell.py
+msgid "Open Command Palette"
+msgstr "Abrir paleta de comandos"
+
+#: qt_ui/shell.py
+#, python-brace-format
+msgid "{n} running"
+msgstr "{n} en ejecución"
+
+#: qt_ui/tabs/queue.py
+msgid "All jobs"
+msgstr "Todos los trabajos"
+
+#: qt_ui/tabs/queue.py
+msgid "Change Output Folder"
+msgstr "Cambiar carpeta de salida"
+
+#: qt_ui/tabs/queue.py
+msgid "Change Output Folder…"
+msgstr "Cambiar carpeta de salida…"
+
+#: qt_ui/tabs/queue.py
+msgid "Load into Cut & Plan"
+msgstr "Cargar en Corte y Plan"
+
+#: qt_ui/tabs/queue.py
+#, python-brace-format
+msgid "Output folder updated for {name}: {folder}"
+msgstr "Carpeta de salida actualizada para {name}: {folder}"
+
+#: qt_ui/tabs/queue.py
+msgid "Selected item"
+msgstr "Elemento seleccionado"
 

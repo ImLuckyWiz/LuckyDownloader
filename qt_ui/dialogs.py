@@ -7,10 +7,13 @@ and one-click 'Copy details' button.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from pathlib import Path
+import unicodedata
+
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
-    QApplication, QDialog, QFileDialog, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton,
-    QVBoxLayout, QWidget,
+    QApplication, QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
 
 from core.palette import ACCENT, ERR, MUTED
@@ -434,7 +437,7 @@ class AboutDialog(QDialog):
         self.export_btn = QPushButton(t("Export Diagnostics…"), self)
         self.export_btn.setProperty("variant", "ghost")
         self.export_btn.setIcon(icon("file-text", 14))
-        self.export_btn.clicked.connect(self._on_export_diagnostics)
+        self.export_btn.clicked.connect(self.export_diagnostics_bundle)
         btn_row.addWidget(self.export_btn)
 
         btn_row.addStretch(1)
@@ -446,20 +449,335 @@ class AboutDialog(QDialog):
 
         outer.addLayout(btn_row)
 
+    def export_diagnostics_bundle(self, target_path: str | Path | None = None) -> bool:
+        return export_diagnostics_bundle(self, target_path=target_path)
+
     def _on_export_diagnostics(self) -> None:
-        from pathlib import Path
-        from core.diagnostics import export_diagnostics_zip
+        self.export_diagnostics_bundle()
+
+
+def export_diagnostics_bundle(parent: QWidget | None = None, target_path: str | Path | None = None) -> bool:
+    """Prompt (unless ``target_path`` is supplied) and export a redacted diagnostics zip bundle."""
+    from core.diagnostics import export_diagnostics_zip
+
+    if target_path:
+        path = str(target_path)
+    else:
         path, _ = QFileDialog.getSaveFileName(
-            self,
+            parent,
             t("Export Diagnostics Bundle"),
             "luckydownloader_diagnostics.zip",
             "Zip archives (*.zip);;All files (*.*)",
         )
-        if not path:
-            return
-        try:
-            export_diagnostics_zip(Path(path))
-            info(self, t("Diagnostics Exported"), t("Diagnostics bundle successfully saved to:\n{path}", path=path))
-        except Exception as e:
-            error(self, t("Export Failed"), t("Could not export diagnostics bundle: {error}", error=e))
+    if not path:
+        return False
+    try:
+        export_diagnostics_zip(Path(path))
+        info(parent, t("Diagnostics Exported"), t("Diagnostics bundle successfully saved to:\n{path}", path=path))
+        return True
+    except Exception as e:
+        error(parent, t("Export Failed"), t("Could not export diagnostics bundle: {error}", error=e))
+        return False
+
+
+def _fold_text(text: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", (text or "").casefold()) if unicodedata.category(c) != "Mn")
+
+
+def fuzzy_score(query: str, text: str) -> int | None:
+    """Return a positive fuzzy match score (higher is better), or None when ``query`` does not match ``text``."""
+    q_fold = _fold_text(query).strip()
+    if not q_fold:
+        return 0
+    t_fold = _fold_text(text)
+    if not t_fold:
+        return None
+    total = 0
+    for tok in q_fold.split():
+        idx = t_fold.find(tok)
+        if idx >= 0:
+            bonus = 100 if (idx == 0 or not t_fold[idx - 1].isalnum()) else 0
+            total += 200 + bonus - min(idx, 100)
+            continue
+        pos = -1
+        span = 0
+        first = -1
+        matched = True
+        for ch in tok:
+            nxt = t_fold.find(ch, pos + 1)
+            if nxt < 0:
+                matched = False
+                break
+            if first < 0:
+                first = nxt
+            pos = nxt
+        if not matched:
+            return None
+        span = pos - first + 1
+        total += max(5, 60 - max(0, span - len(tok)) * 2)
+    return total
+
+
+class CommandPaletteDialog(QDialog):
+    """Global Ctrl+K Command Palette for quick commands, Options settings, watchlist, and recent streamers."""
+
+    def __init__(
+        self,
+        host: QWidget | None = None,
+        items: list[dict] | None = None,
+        parent: QWidget | None = None,
+    ):
+        super().__init__(parent or host)
+        self.host = host
+        self.setObjectName("commandPaletteDialog")
+        self.setWindowTitle(t("Command Palette"))
+        self.setModal(True)
+        self.setMinimumWidth(520)
+        self.resize(560, 420)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(14, 14, 14, 12)
+        outer.setSpacing(10)
+
+        self.search_input = QLineEdit(self)
+        self.search_input.setObjectName("commandPaletteSearch")
+        self.search_input.setPlaceholderText(t("Type a command, setting, or channel…"))
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.installEventFilter(self)
+        self.search_input.textChanged.connect(self.filter_items)
+        outer.addWidget(self.search_input)
+
+        # Compatibility aliases
+        self.search_edit = self.search_input
+        self.input = self.search_input
+
+        self.results_list = QListWidget(self)
+        self.results_list.setObjectName("commandPaletteList")
+        self.results_list.itemActivated.connect(self._on_item_activated)
+        self.results_list.itemClicked.connect(self._on_item_activated)
+        outer.addWidget(self.results_list, 1)
+        self.list_widget = self.results_list
+
+        self.hint_label = QLabel(t("Enter to run · ↑/↓ to navigate · Esc to close"), self)
+        self.hint_label.setProperty("role", "muted")
+        outer.addWidget(self.hint_label)
+
+        self._all_items: list[dict] = list(items) if items is not None else self.build_entries_from_host(host)
+        self.filtered_items: list[dict] = []
+        self.filter_items("")
+
+    @staticmethod
+    def build_entries_from_host(host: QWidget | None) -> list[dict]:
+        entries: list[dict] = []
+
+        def add_entry(
+            entry_id: str,
+            title: str,
+            subtitle: str,
+            category: str,
+            action,
+            extra_search: str = "",
+        ) -> None:
+            search_text = " ".join(x for x in (title, subtitle, category, extra_search) if x)
+            entries.append({
+                "id": entry_id,
+                "title": title,
+                "subtitle": subtitle,
+                "category": category,
+                "search_text": search_text,
+                "action": action,
+            })
+
+        cat_cmd = t("Command")
+        if host is not None:
+            def _do_get_info() -> None:
+                entry = getattr(host, "vod_entry", None)
+                if entry is not None and entry.text().strip() and hasattr(host, "on_get_info"):
+                    host.on_get_info()
+                elif hasattr(host, "focus_vod_bar"):
+                    host.focus_vod_bar()
+
+            add_entry("cmd:get_info", t("Get Info"), t("Fetch VOD or video metadata"), cat_cmd, _do_get_info, "get info fetch vod url")
+            if hasattr(host, "tab_queue"):
+                add_entry("cmd:start_queue", t("Start Queue"), t("Start queued downloads"), cat_cmd, host.tab_queue.start_queue, "start queue downloads")
+                add_entry("cmd:open_folder", t("Open Output Folder"), t("Open the download destination folder"), cat_cmd, host.tab_queue.open_output_folder, "open output folder")
+            if hasattr(host, "export_diagnostics_bundle"):
+                add_entry("cmd:export_diagnostics", t("Export Diagnostics Bundle"), t("Save redacted system logs and diagnostics"), cat_cmd, host.export_diagnostics_bundle, "export diagnostics bundle zip")
+            if hasattr(host, "start_update_check"):
+                add_entry("cmd:check_updates", t("Check for Updates"), t("Check GitHub releases for new versions"), cat_cmd, lambda: host.start_update_check(force=True), "check updates version")
+            if hasattr(host, "toggle_language"):
+                add_entry("cmd:switch_language", t("Switch Language"), t("Toggle interface language (English / Español)"), cat_cmd, host.toggle_language, "switch language idioma")
+            if hasattr(host, "open_about_dialog"):
+                add_entry("cmd:about", t("About & Diagnostics…"), t("Show version info and diagnostics export"), cat_cmd, host.open_about_dialog, "about diagnostics")
+            if hasattr(host, "show_shortcuts"):
+                add_entry("cmd:shortcuts", t("Keyboard shortcuts"), t("Show keyboard shortcuts reference"), cat_cmd, host.show_shortcuts, "shortcuts f1")
+
+        # Options settings
+        tab_options = getattr(host, "tab_options", None)
+        if tab_options is not None and hasattr(tab_options, "searchable_rows"):
+            cat_opt = t("Options")
+            for item in tab_options.searchable_rows:
+                key = str(item.get("key") or "")
+                if not key or key == "_about_diag":
+                    continue
+                row = item.get("row")
+                title = (
+                    row.title_label.text()
+                    if row is not None and getattr(row, "title_label", None) is not None
+                    else str(item.get("raw_title") or key)
+                )
+                hint = (
+                    row.hint_label.text()
+                    if row is not None and getattr(row, "hint_label", None) is not None
+                    else str(item.get("raw_hint") or "")
+                )
+                extra = f"{key} {item.get('en_text', '')} {item.get('section_key', '')}"
+                add_entry(
+                    f"opt:{key}",
+                    title,
+                    hint or str(item.get("section_key") or ""),
+                    cat_opt,
+                    (lambda k=key: host.jump_to_option(k)) if hasattr(host, "jump_to_option") else (lambda k=key: tab_options.jump_to_setting(k)),
+                    extra,
+                )
+
+        # Watchlist channels
+        seen_twitch: set[str] = set()
+        if host is not None and hasattr(host, "open_channel_from_palette"):
+            try:
+                from core.watchlist import load_watchlist
+                cat_watch = t("Watch list")
+                for w in load_watchlist():
+                    login = str(getattr(w, "login", "") or "").strip()
+                    name = str(getattr(w, "name", "") or login).strip()
+                    prov = str(getattr(w, "provider", "twitch") or "twitch").strip()
+                    url = str(getattr(w, "url", "") or "").strip()
+                    if prov == "twitch" and login:
+                        seen_twitch.add(login.lower())
+                    add_entry(
+                        f"watch:{prov}:{login or url}",
+                        name or login or url,
+                        f"{prov.capitalize()} · {cat_watch}",
+                        cat_watch,
+                        lambda l=login, n=name, p=prov, u=url: host.open_channel_from_palette(login=l, name=n, provider=p, url=u),
+                        f"{login} {prov} {url}",
+                    )
+            except Exception:
+                pass
+
+            # Recent Twitch streamers and YouTube searches
+            cat_recent = t("Recent")
+            tab_browse = getattr(host, "tab_browse", None)
+            recent_twitch = list(getattr(tab_browse, "recent", None) or [])
+            if not recent_twitch:
+                try:
+                    from core.recent import load_recent
+                    recent_twitch = load_recent()
+                except Exception:
+                    recent_twitch = []
+            for ch in recent_twitch:
+                login = str(ch.get("login") or "").strip()
+                name = str(ch.get("name") or login).strip()
+                if not (login or name):
+                    continue
+                if login and login.lower() in seen_twitch:
+                    continue
+                add_entry(
+                    f"recent:twitch:{login or name}",
+                    name,
+                    t("Recent streamer"),
+                    cat_recent,
+                    lambda l=login, n=name: host.open_channel_from_palette(login=l, name=n, provider="twitch"),
+                    f"{login} twitch streamer",
+                )
+
+            recent_yt = list(getattr(tab_browse, "recent_yt", None) or [])
+            if not recent_yt:
+                try:
+                    from core.recent import load_recent_searches
+                    recent_yt = load_recent_searches()
+                except Exception:
+                    recent_yt = []
+            for ch in recent_yt:
+                qname = str(ch.get("name") or ch.get("login") or "").strip()
+                if not qname:
+                    continue
+                add_entry(
+                    f"recent:youtube:{qname}",
+                    qname,
+                    t("Recent YouTube search"),
+                    cat_recent,
+                    lambda q=qname: host.open_channel_from_palette(login=q, name=q, provider="youtube"),
+                    f"{qname} youtube",
+                )
+
+        return entries
+
+    def filter_items(self, query: str) -> list[dict]:
+        scored: list[tuple[int, int, dict]] = []
+        for idx, entry in enumerate(self._all_items):
+            sc = fuzzy_score(query, entry.get("search_text", entry.get("title", "")))
+            if sc is not None:
+                scored.append((sc, idx, entry))
+        if (query or "").strip():
+            scored.sort(key=lambda pair: (-pair[0], pair[1]))
+        self.filtered_items = [pair[2] for pair in scored]
+
+        self.results_list.clear()
+        for entry in self.filtered_items:
+            cat = entry.get("category", "")
+            title = entry.get("title", "")
+            sub = entry.get("subtitle", "")
+            label = f"[{cat}] {title}" if cat else title
+            if sub:
+                label = f"{label}  —  {sub}"
+            lw_item = QListWidgetItem(label)
+            lw_item.setData(Qt.ItemDataRole.UserRole, entry)
+            self.results_list.addItem(lw_item)
+        if self.results_list.count() > 0:
+            self.results_list.setCurrentRow(0)
+        return list(self.filtered_items)
+
+    def _on_item_activated(self, item: QListWidgetItem) -> None:
+        self.trigger_item(item)
+
+    def trigger_item(self, item: QListWidgetItem | int | None = None) -> bool:
+        if isinstance(item, int):
+            item = self.results_list.item(item)
+        if item is None:
+            item = self.results_list.currentItem()
+            if item is None and self.results_list.count() > 0:
+                item = self.results_list.item(0)
+        if item is None:
+            return False
+        entry = item.data(Qt.ItemDataRole.UserRole)
+        if not isinstance(entry, dict):
+            return False
+        action = entry.get("action")
+        self.accept()
+        if callable(action):
+            action()
+        return True
+
+    def execute_selected(self) -> bool:
+        return self.trigger_item(self.results_list.currentItem())
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802
+        if watched is self.search_input and event.type() == QEvent.Type.KeyPress:
+            key = event.key()
+            if key in (Qt.Key.Key_Down, Qt.Key.Key_Up):
+                count = self.results_list.count()
+                if count > 0:
+                    cur = self.results_list.currentRow()
+                    step = 1 if key == Qt.Key.Key_Down else -1
+                    nxt = (cur + step) % count if cur >= 0 else 0
+                    self.results_list.setCurrentRow(nxt)
+                return True
+            if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                if self.execute_selected():
+                    return True
+        return super().eventFilter(watched, event)
+
+
+CommandPalette = CommandPaletteDialog
 

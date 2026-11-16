@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-15 22:14-0300\n"
+"POT-Creation-Date: 2026-11-16 02:41-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -786,12 +786,24 @@ msgstr ""
 msgid "The download did not pass the integrity check."
 msgstr ""
 
+#: qt_ui/dialogs.py qt_ui/shell.py qt_ui/tabs/options.py
+msgid "About & Diagnostics…"
+msgstr ""
+
 #: qt_ui/dialogs.py
 msgid "About LuckyDownloader"
 msgstr ""
 
 #: qt_ui/dialogs.py
 msgid "Actions"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Check GitHub releases for new versions"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Check for Updates"
 msgstr ""
 
 #: qt_ui/dialogs.py
@@ -804,6 +816,14 @@ msgstr ""
 
 #: qt_ui/dialogs.py qt_ui/shell.py qt_ui/titlebar.py qt_ui/twitch_dialog.py qt_ui/update_dialog.py
 msgid "Close"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Command"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Command Palette"
 msgstr ""
 
 #: qt_ui/dialogs.py qt_ui/twitch_dialog.py
@@ -839,6 +859,10 @@ msgid "Downloaded"
 msgstr ""
 
 #: qt_ui/dialogs.py
+msgid "Enter to run · ↑/↓ to navigate · Esc to close"
+msgstr ""
+
+#: qt_ui/dialogs.py
 msgid "Export Diagnostics Bundle"
 msgstr ""
 
@@ -851,6 +875,10 @@ msgid "Export Failed"
 msgstr ""
 
 #: qt_ui/dialogs.py
+msgid "Fetch VOD or video metadata"
+msgstr ""
+
+#: qt_ui/dialogs.py
 msgid "Finished downloads will appear here with date, parts and folder location."
 msgstr ""
 
@@ -859,7 +887,15 @@ msgid "Folder"
 msgstr ""
 
 #: qt_ui/dialogs.py
+msgid "Get Info"
+msgstr ""
+
+#: qt_ui/dialogs.py
 msgid "Hide details"
+msgstr ""
+
+#: qt_ui/dialogs.py qt_ui/shell.py
+msgid "Keyboard shortcuts"
 msgstr ""
 
 #: qt_ui/dialogs.py
@@ -878,6 +914,18 @@ msgstr ""
 msgid "No downloads yet"
 msgstr ""
 
+#: qt_ui/dialogs.py
+msgid "Open Output Folder"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Open the download destination folder"
+msgstr ""
+
+#: qt_ui/dialogs.py qt_ui/main_window.py qt_ui/session_persistence.py
+msgid "Options"
+msgstr ""
+
 #: qt_ui/dialogs.py qt_ui/queue_model.py
 msgid "Parts"
 msgstr ""
@@ -892,7 +940,31 @@ msgid "Quality"
 msgstr ""
 
 #: qt_ui/dialogs.py
+msgid "Recent"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Recent YouTube search"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Recent streamer"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Save redacted system logs and diagnostics"
+msgstr ""
+
+#: qt_ui/dialogs.py
 msgid "Show details"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Show keyboard shortcuts reference"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Show version info and diagnostics export"
 msgstr ""
 
 #: qt_ui/dialogs.py
@@ -900,7 +972,19 @@ msgid "Site"
 msgstr ""
 
 #: qt_ui/dialogs.py
+msgid "Start Queue"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Start queued downloads"
+msgstr ""
+
+#: qt_ui/dialogs.py
 msgid "Streamer"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Switch Language"
 msgstr ""
 
 #: qt_ui/dialogs.py qt_ui/playlist_dialog.py qt_ui/search_models.py qt_ui/tabs/plan_storyboard.py
@@ -908,8 +992,20 @@ msgid "Title"
 msgstr ""
 
 #: qt_ui/dialogs.py
+msgid "Toggle interface language (English / Español)"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Type a command, setting, or channel…"
+msgstr ""
+
+#: qt_ui/dialogs.py
 #, python-brace-format
 msgid "Version {ver}"
+msgstr ""
+
+#: qt_ui/dialogs.py
+msgid "Watch list"
 msgstr ""
 
 #: qt_ui/dialogs.py
@@ -930,10 +1026,6 @@ msgstr ""
 
 #: qt_ui/main_window.py
 msgid "A job is running. Cancel it and quit?"
-msgstr ""
-
-#: qt_ui/main_window.py
-msgid "A new version of LuckyDownloader is available."
 msgstr ""
 
 #: qt_ui/main_window.py
@@ -1002,6 +1094,11 @@ msgid "Job {n}/{total}: "
 msgstr ""
 
 #: qt_ui/main_window.py
+#, python-brace-format
+msgid "Loaded job into Cut & Plan: {title}"
+msgstr ""
+
+#: qt_ui/main_window.py
 msgid "Loading"
 msgstr ""
 
@@ -1009,16 +1106,8 @@ msgstr ""
 msgid "No VOD"
 msgstr ""
 
-#: qt_ui/main_window.py
-msgid "Open Queue & log"
-msgstr ""
-
 #: qt_ui/main_window.py qt_ui/tabs/options.py qt_ui/tabs/queue.py
 msgid "Open folder"
-msgstr ""
-
-#: qt_ui/main_window.py qt_ui/session_persistence.py
-msgid "Options"
 msgstr ""
 
 #: qt_ui/main_window.py qt_ui/tabs/plan_crop_controls.py
@@ -1238,6 +1327,11 @@ msgstr ""
 msgid "running…"
 msgstr ""
 
+#: qt_ui/queue_runner.py qt_ui/shell.py
+#, python-brace-format
+msgid "{n} running · {speed} MB/s"
+msgstr ""
+
 #: qt_ui/search_models.py
 msgid "Date"
 msgstr ""
@@ -1299,15 +1393,15 @@ msgid "Twitch VOD in clipboard"
 msgstr ""
 
 #: qt_ui/shell.py
+msgid "A new version of LuckyDownloader is available."
+msgstr ""
+
+#: qt_ui/shell.py
 msgid "About"
 msgstr ""
 
 #: qt_ui/shell.py qt_ui/tabs/options.py
 msgid "About & Diagnostics"
-msgstr ""
-
-#: qt_ui/shell.py qt_ui/tabs/options.py
-msgid "About & Diagnostics…"
 msgstr ""
 
 #: qt_ui/shell.py
@@ -1316,6 +1410,10 @@ msgstr ""
 
 #: qt_ui/shell.py
 msgid "Add current VOD to queue without starting (on Plan)"
+msgstr ""
+
+#: qt_ui/shell.py
+msgid "Aggregate download speed"
 msgstr ""
 
 #: qt_ui/shell.py qt_ui/tabs/plan.py qt_ui/tabs/plan_storyboard.py
@@ -1360,10 +1458,6 @@ msgid "History"
 msgstr ""
 
 #: qt_ui/shell.py
-msgid "Keyboard shortcuts"
-msgstr ""
-
-#: qt_ui/shell.py
 #, python-brace-format
 msgid "Navigate to {tab} tab"
 msgstr ""
@@ -1377,7 +1471,15 @@ msgid "Not signed in to Twitch API"
 msgstr ""
 
 #: qt_ui/shell.py
+msgid "Open Command Palette"
+msgstr ""
+
+#: qt_ui/shell.py
 msgid "Open Options (Settings)"
+msgstr ""
+
+#: qt_ui/shell.py
+msgid "Open Queue & log"
 msgstr ""
 
 #: qt_ui/shell.py
@@ -1460,6 +1562,11 @@ msgstr ""
 
 #: qt_ui/shell.py
 msgid "View download history"
+msgstr ""
+
+#: qt_ui/shell.py
+#, python-brace-format
+msgid "{n} running"
 msgstr ""
 
 #: qt_ui/tabs/options.py
@@ -2655,6 +2762,10 @@ msgid "4 parallel jobs"
 msgstr ""
 
 #: qt_ui/tabs/queue.py
+msgid "All jobs"
+msgstr ""
+
+#: qt_ui/tabs/queue.py
 msgid "Are you sure you want to clear all jobs from the queue?"
 msgstr ""
 
@@ -2683,6 +2794,14 @@ msgstr ""
 
 #: qt_ui/tabs/queue.py
 msgid "Cancelling…"
+msgstr ""
+
+#: qt_ui/tabs/queue.py
+msgid "Change Output Folder"
+msgstr ""
+
+#: qt_ui/tabs/queue.py
+msgid "Change Output Folder…"
 msgstr ""
 
 #: qt_ui/tabs/queue.py
@@ -2727,6 +2846,10 @@ msgid "How many queue jobs can run at the same time"
 msgstr ""
 
 #: qt_ui/tabs/queue.py
+msgid "Load into Cut & Plan"
+msgstr ""
+
+#: qt_ui/tabs/queue.py
 msgid "Log"
 msgstr ""
 
@@ -2768,6 +2891,11 @@ msgid "Open"
 msgstr ""
 
 #: qt_ui/tabs/queue.py
+#, python-brace-format
+msgid "Output folder updated for {name}: {folder}"
+msgstr ""
+
+#: qt_ui/tabs/queue.py
 msgid "Pause autoscroll"
 msgstr ""
 
@@ -2797,6 +2925,10 @@ msgstr ""
 
 #: qt_ui/tabs/queue.py
 msgid "Save log…"
+msgstr ""
+
+#: qt_ui/tabs/queue.py
+msgid "Selected item"
 msgstr ""
 
 #: qt_ui/tabs/queue.py

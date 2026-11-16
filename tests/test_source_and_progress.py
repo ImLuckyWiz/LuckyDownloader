@@ -2,7 +2,15 @@
 
 import pytest
 
-from luckytwitch_engine import normalize_url, parse_ffmpeg_stats, parse_progress, twitch_vod_id
+from luckytwitch_engine import (
+    ProgressTelemetry,
+    fmt_eta,
+    normalize_url,
+    parse_ffmpeg_stats,
+    parse_progress,
+    parse_progress_telemetry,
+    twitch_vod_id,
+)
 
 
 # --------------------------------------------------------------------------- URLs
@@ -107,3 +115,41 @@ def test_ffmpeg_stats_size_units(unit, value, shown):
 def test_ffmpeg_stats_ignores_lines_without_a_time():
     assert parse_ffmpeg_stats("Press [q] to stop", 600) is None
     assert parse_ffmpeg_stats("", 600) is None
+
+
+def test_fmt_eta_formats_minutes_and_hours():
+    assert fmt_eta(None) == ""
+    assert fmt_eta(-5) == ""
+    assert fmt_eta(75) == "01:15"
+    assert fmt_eta(3873) == "1:04:33"
+
+
+def test_parse_progress_telemetry_ytdlp_ffmpeg_and_formatted_text():
+    tel_yt = parse_progress_telemetry(
+        line(dl="67108864", total="209715200", f_idx="5", f_cnt="20", speed="14889779.2", eta="75")
+    )
+    assert isinstance(tel_yt, ProgressTelemetry)
+    assert tel_yt.fraction == pytest.approx(0.25)
+    assert tel_yt.downloaded_bytes == 67108864
+    assert tel_yt.total_bytes == 209715200
+    assert tel_yt.speed_mbps == pytest.approx(14.2, abs=0.05)
+    assert tel_yt.eta_seconds == 75.0
+    assert tel_yt.pill_text() == "14.2 MB/s · ETA 01:15"
+
+    tel_ff = parse_progress_telemetry("size=   10240KiB time=00:00:10.00 bitrate=8192kbits/s speed=2.0x", total_secs=50.0)
+    assert tel_ff is not None
+    assert tel_ff.fraction == pytest.approx(0.2)
+    assert tel_ff.downloaded_bytes == 10240 * 1024
+    assert tel_ff.speed_multiplier == pytest.approx(2.0)
+    assert tel_ff.eta_seconds == pytest.approx(20.0)
+    assert tel_ff.speed_bps > 0
+
+    tel_txt = parse_progress_telemetry("Downloading  ·  64 / 200 MiB · 14.2 MB/s · ETA 01:15")
+    assert tel_txt is not None
+    assert tel_txt.downloaded_bytes == 64 * 1024 * 1024
+    assert tel_txt.total_bytes == 200 * 1024 * 1024
+    assert tel_txt.speed_mbps == pytest.approx(14.2)
+    assert tel_txt.eta_seconds == 75.0
+    assert tel_txt.pill_text() == "14.2 MB/s · ETA 01:15"
+
+    assert parse_progress_telemetry("Just a plain message") is None

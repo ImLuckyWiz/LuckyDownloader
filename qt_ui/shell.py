@@ -27,6 +27,7 @@ from qt_ui.i18n_qt import language_bus
 from luckytwitch_engine import fmt_hms
 from qt_ui.icons import icon
 from qt_ui.motion import Motion, animate_width
+from qt_ui.theme import mono_font
 
 # Logical tab order stays identical to Phases 1-8 so all 28 ``win.tabs`` call sites work unchanged:
 # 0 = Browse (formerly Search), 1 = Plan, 2 = Options, 3 = Queue & log.
@@ -704,12 +705,97 @@ class VodStrip(QFrame):
         super().mousePressEvent(event)
 
 
+class StatusBar(QFrame):
+    """Compact bottom status bar with 3 px progress bar, status line, throughput telemetry pill, update pill, and activity pill."""
+
+    queue_requested = Signal()
+    update_requested = Signal()
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setObjectName("statusBar")
+        bot = QVBoxLayout(self)
+        bot.setContentsMargins(0, 0, 0, 0)
+        bot.setSpacing(0)
+
+        self.progress = QProgressBar(self)
+        self.progress.setObjectName("shellProgress")
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self.progress.setTextVisible(False)
+        bot.addWidget(self.progress)
+
+        status_row = QHBoxLayout()
+        status_row.setContentsMargins(10, 4, 10, 5)
+        status_row.setSpacing(8)
+        self.status_label = QLabel(self)
+        status_row.addWidget(self.status_label, 1)
+
+        self.telemetry_pill = QPushButton("", self)
+        self.telemetry_pill.setObjectName("telemetryPill")
+        self.telemetry_pill.setProperty("variant", "pill")
+        self.telemetry_pill.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.telemetry_pill.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.telemetry_pill.setFont(mono_font())
+        self.telemetry_pill.setToolTip(t("Aggregate download speed"))
+        self.telemetry_pill.setVisible(False)
+        self.telemetry_pill.clicked.connect(self.queue_requested.emit)
+        status_row.addWidget(self.telemetry_pill)
+
+        self.update_pill = QPushButton("", self)
+        self.update_pill.setProperty("variant", "pill")
+        self.update_pill.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.update_pill.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.update_pill.setToolTip(t("A new version of LuckyDownloader is available."))
+        self.update_pill.setVisible(False)
+        self.update_pill.clicked.connect(self.update_requested.emit)
+        status_row.addWidget(self.update_pill)
+
+        self.activity_pill = QPushButton("", self)
+        self.activity_pill.setProperty("variant", "pill")
+        self.activity_pill.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.activity_pill.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.activity_pill.setToolTip(t("Open Queue & log"))
+        self.activity_pill.setVisible(False)
+        self.activity_pill.clicked.connect(self.queue_requested.emit)
+        status_row.addWidget(self.activity_pill)
+        bot.addLayout(status_row)
+
+    def set_telemetry(self, running_count: int, total_speed_bps: float) -> str:
+        running = max(0, int(running_count))
+        bps = max(0.0, float(total_speed_bps or 0.0))
+        if running <= 0 or (bps <= 0 and running <= 1):
+            self.telemetry_pill.setText("")
+            self.telemetry_pill.setVisible(False)
+            return ""
+        if bps > 0:
+            mbps = bps / 1048576.0
+            spd = f"{mbps:.1f}" if mbps < 100 else f"{mbps:.0f}"
+            text = t("{n} running · {speed} MB/s", n=running, speed=spd)
+        else:
+            text = t("{n} running", n=running)
+        self.telemetry_pill.setText(text)
+        self.telemetry_pill.setVisible(True)
+        return text
+
+    def update_from_items(self, items) -> str:
+        running = [it for it in items if getattr(it, "status", "") == "running"]
+        total_bps = sum(max(0.0, float(getattr(it, "speed_bps", 0.0) or 0.0)) for it in running)
+        return self.set_telemetry(len(running), total_bps)
+
+    def retranslate_ui(self) -> None:
+        self.telemetry_pill.setToolTip(t("Aggregate download speed"))
+        self.update_pill.setToolTip(t("A new version of LuckyDownloader is available."))
+        self.activity_pill.setToolTip(t("Open Queue & log"))
+
+
 class ShortcutsDialog(QDialog):
     """Compact keyboard shortcut reference sheet opened with ``F1`` (Phase 9b, B8)."""
 
     @classmethod
     def get_shortcuts(cls) -> list[tuple[str, str]]:
         return [
+            ("Ctrl+K", t("Open Command Palette")),
             ("Ctrl+L", t("Focus and select the VOD URL / ID bar")),
             ("Ctrl+1 / 2 / 3 / 4", t("Switch to Browse, Plan, Options, or Queue & log")),
             ("Ctrl+,", t("Open Options (Settings)")),

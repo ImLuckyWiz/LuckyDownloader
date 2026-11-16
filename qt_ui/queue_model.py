@@ -9,6 +9,8 @@ retry of waiting/failed/cancelled jobs (F4).
 
 from __future__ import annotations
 
+from collections import deque
+import dataclasses
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -18,6 +20,7 @@ from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor
 
 from core import paths
+from core.download import ProgressTelemetry, fmt_eta, parse_progress_telemetry
 from core.files import JsonStore, backup_corrupt_json
 from core.i18n import N_, t, tn
 from core.job import Job, deserialize_job, serialize_job
@@ -41,6 +44,22 @@ def _alignment(kind: str) -> Qt.AlignmentFlag:
         Qt.AlignmentFlag.AlignVCenter
 
 
+MAX_ITEM_LOG_LINES = 500
+
+
+def _fmt_bytes_compact(num_bytes: int) -> str:
+    if num_bytes <= 0:
+        return ""
+    if num_bytes >= 1024 * 1024 * 1024:
+        return f"{num_bytes / (1024 * 1024 * 1024):.1f} GiB"
+    mib = num_bytes / (1024 * 1024)
+    if mib >= 10:
+        return f"{mib:.0f} MiB"
+    if mib >= 1:
+        return f"{mib:.1f} MiB"
+    return f"{max(1, round(num_bytes / 1024))} KiB"
+
+
 @dataclass
 class QueueItem:
     job: object
@@ -55,6 +74,44 @@ class QueueItem:
     progress: float = 0.0
     progress_text: str = ""
     thumb: object = None  # QPixmap or None (populated from job storyboard / thumbnail if available)
+    speed_bps: float = 0.0
+    eta_seconds: float | None = None
+    downloaded_bytes: int = 0
+    total_bytes: int = 0
+    speed_multiplier: float | None = None
+    log_lines: deque[str] = field(default_factory=lambda: deque(maxlen=MAX_ITEM_LOG_LINES))
+
+    @property
+    def speed_mbps(self) -> float:
+        return self.speed_bps / 1048576.0 if self.speed_bps > 0 else 0.0
+
+    @property
+    def eta_text(self) -> str:
+        return fmt_eta(self.eta_seconds)
+
+    @property
+    def bytes_text(self) -> str:
+        if self.downloaded_bytes <= 0:
+            return ""
+        if self.total_bytes > 0:
+            if self.total_bytes < 1024 * 1024 * 1024:
+                dl_mib = self.downloaded_bytes / (1024 * 1024)
+                tot_mib = self.total_bytes / (1024 * 1024)
+                return f"{dl_mib:.0f} / {tot_mib:.0f} MiB"
+            return f"{_fmt_bytes_compact(self.downloaded_bytes)} / {_fmt_bytes_compact(self.total_bytes)}"
+        return _fmt_bytes_compact(self.downloaded_bytes)
+
+    def telemetry_pill_text(self) -> str:
+        bits: list[str] = []
+        if self.speed_bps > 0:
+            mbps = self.speed_mbps
+            bits.append(f"{mbps:.1f} MB/s" if mbps < 100 else f"{mbps:.0f} MB/s")
+        elif self.speed_multiplier is not None and self.speed_multiplier > 0:
+            bits.append(f"{self.speed_multiplier:.1f}x")
+        eta = self.eta_text
+        if eta:
+            bits.append(f"ETA {eta}")
+        return " · ".join(bits)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize this QueueItem for persistent queue recovery."""
@@ -194,15 +251,24 @@ class QueueModel(QAbstractTableModel):
             item.shown_status = status
             if item.status == "done":
                 item.progress = 1.0
+                item.speed_bps = 0.0
+                item.eta_seconds = None
+                item.speed_multiplier = None
             elif item.status in ("queued", "failed", "cancelled"):
                 item.progress = 0.0
                 item.progress_text = ""
+                item.speed_bps = 0.0
+                item.eta_seconds = None
+                item.downloaded_bytes = 0
+                item.total_bytes = 0
+                item.speed_multiplier = None
             self.save_state()
         self.dataChanged.emit(self.index(row, 0), self.index(row, len(COLUMNS) - 1))
         return True
 
     def set_progress(self, iid: str, frac: float, text: str = "") -> bool:
         """Update the in-row progress of ``iid`` (Phase 9c, F1)."""
+        tel = parse_progress_telemetry(text) if text else None
         with self._lock:
             row = self.row_of(iid)
             if row < 0:
@@ -210,8 +276,103 @@ class QueueModel(QAbstractTableModel):
             item = self.items[row]
             item.progress = float(frac)
             item.progress_text = text
+            if tel is not None:
+                item.speed_bps = tel.speed_bps
+                item.eta_seconds = tel.eta_seconds
+                item.speed_multiplier = tel.speed_multiplier
+                if tel.downloaded_bytes > 0:
+                    item.downloaded_bytes = tel.downloaded_bytes
+                if tel.total_bytes > 0:
+                    item.total_bytes = tel.total_bytes
+            else:
+                item.speed_bps = 0.0
+                item.eta_seconds = None
+                item.speed_multiplier = None
+                if not text and float(frac) <= 0.0:
+                    item.downloaded_bytes = 0
+                    item.total_bytes = 0
         self.dataChanged.emit(self.index(row, 0), self.index(row, len(COLUMNS) - 1))
         return True
+
+    def set_telemetry(self, iid: str, telemetry: Any) -> bool:
+        """Apply structured telemetry (`ProgressTelemetry` or dict) to ``iid`` on the GUI thread."""
+        if telemetry is None:
+            return False
+        if isinstance(telemetry, ProgressTelemetry):
+            speed_bps = telemetry.speed_bps
+            eta_seconds = telemetry.eta_seconds
+            dl_bytes = telemetry.downloaded_bytes
+            tot_bytes = telemetry.total_bytes
+            mult = telemetry.speed_multiplier
+        elif isinstance(telemetry, dict):
+            speed_bps = float(telemetry.get("speed_bps") or 0.0)
+            eta_val = telemetry.get("eta_seconds")
+            eta_seconds = float(eta_val) if eta_val is not None else None
+            dl_bytes = int(telemetry.get("downloaded_bytes") or 0)
+            tot_bytes = int(telemetry.get("total_bytes") or 0)
+            mult_val = telemetry.get("speed_multiplier")
+            mult = float(mult_val) if mult_val is not None else None
+        else:
+            return False
+
+        with self._lock:
+            row = self.row_of(iid)
+            if row < 0:
+                return False
+            item = self.items[row]
+            item.speed_bps = max(0.0, float(speed_bps))
+            item.eta_seconds = eta_seconds
+            item.speed_multiplier = mult
+            if dl_bytes > 0:
+                item.downloaded_bytes = dl_bytes
+            if tot_bytes > 0:
+                item.total_bytes = tot_bytes
+        self.dataChanged.emit(self.index(row, 0), self.index(row, len(COLUMNS) - 1))
+        return True
+
+    def append_log(self, iid: str, line: str) -> bool:
+        """Append one log message to ``iid``'s bounded per-item log buffer."""
+        with self._lock:
+            item = self.find(iid)
+            if item is None:
+                return False
+            item.log_lines.append(str(line))
+            return True
+
+    def set_item_output_folder(self, iid: str, out_dir: str) -> bool:
+        """Update output folder on a waiting, failed, or cancelled item."""
+        clean_dir = str(out_dir or "").strip()
+        if not clean_dir:
+            return False
+        with self._lock:
+            row = self.row_of(iid)
+            if row < 0:
+                return False
+            item = self.items[row]
+            if item.status not in ("queued", "failed", "cancelled"):
+                return False
+            job = item.job
+            opts = getattr(job, "opts", None)
+            if opts is None:
+                return False
+            if dataclasses.is_dataclass(opts):
+                new_opts = dataclasses.replace(opts, out_dir=clean_dir)
+                if dataclasses.is_dataclass(job):
+                    item.job = dataclasses.replace(job, opts=new_opts)
+                else:
+                    job.opts = new_opts
+            else:
+                opts.out_dir = clean_dir
+            self.save_state()
+        self.dataChanged.emit(self.index(row, 0), self.index(row, len(COLUMNS) - 1))
+        return True
+
+    def active_throughput(self) -> tuple[int, float]:
+        """Return ``(running_count, total_speed_bps)`` across active running rows."""
+        with self._lock:
+            running = [it for it in self.items if it.status == "running"]
+            total_bps = sum(max(0.0, float(it.speed_bps or 0.0)) for it in running)
+            return len(running), total_bps
 
     def set_running_progress(self, frac: float, text: str = "") -> bool:
         """Update the in-row progress of whichever item is currently ``running``."""
@@ -278,6 +439,11 @@ class QueueModel(QAbstractTableModel):
             item.shown_status = "queued"
             item.progress = 0.0
             item.progress_text = ""
+            item.speed_bps = 0.0
+            item.eta_seconds = None
+            item.downloaded_bytes = 0
+            item.total_bytes = 0
+            item.speed_multiplier = None
             item.files = []
             last = len(self.items) - 1
             if row != last:

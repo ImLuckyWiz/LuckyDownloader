@@ -17,9 +17,9 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QItemSelectionModel, QModelIndex, QObject, QRect, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap, QTextCharFormat, QTextCursor, QTextOption
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap, QTextCharFormat, QTextCursor, QTextOption
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPlainTextEdit,
+    QAbstractItemView, QApplication, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMenu, QPlainTextEdit,
     QProgressBar, QPushButton, QSizePolicy, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QTableView, QVBoxLayout,
     QWidget,
 )
@@ -219,8 +219,14 @@ class QueueRowDelegate(QStyledItemDelegate):
         painter.setFont(f_sub)
         painter.setPen(QColor(MUTED))
         sub = f"{item.parts} part{'s' if item.parts != 1 else ''} \u00b7 {item.strategy}"
+        if item.status == "running" and item.bytes_text:
+            sub = f"{sub} \u00b7 {item.bytes_text}"
         elided_sub = painter.fontMetrics().elidedText(sub, Qt.TextElideMode.ElideRight, text_w)
         painter.drawText(bot_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, elided_sub)
+
+    @staticmethod
+    def telemetry_pill_text(item: QueueItem) -> str:
+        return item.telemetry_pill_text() if item.status == "running" else ""
 
     def _paint_status_cell(self, painter: QPainter, rect: QRect, item: QueueItem, _selected: bool) -> None:
         colour_hex = STATUS_COLOURS.get(item.status, MUTED)
@@ -239,19 +245,46 @@ class QueueRowDelegate(QStyledItemDelegate):
 
         has_open = item.status == "done" and bool(item.files)
         open_rect = self.open_button_rect(rect) if has_open else QRect()
-        avail_w = (open_rect.left() - rect.left() - 12) if has_open else (rect.width() - 12)
-
-        chip_w = min(max(fm.horizontalAdvance(label_text) + 16, 64), max(64, avail_w))
+        pill_txt = self.telemetry_pill_text(item)
         chip_h = 20
         chip_y = rect.top() + (6 if item.status == "running" else (rect.height() - chip_h) // 2)
+
+        pill_rect = QRect()
+        f_pill = None
+        if pill_txt:
+            f_pill = mono_font()
+            f_pill.setPointSize(max(7, f_chip.pointSize() - 1))
+            fm_pill = QFontMetrics(f_pill)
+            max_pill_w = max(60, rect.width() - 62)
+            pill_w = min(fm_pill.horizontalAdvance(pill_txt) + 12, max_pill_w)
+            pill_rect = QRect(rect.right() - pill_w - 6, chip_y, pill_w, chip_h)
+            avail_w = max(36, pill_rect.left() - rect.left() - 10)
+            if fm.horizontalAdvance(label_text) + 12 > avail_w:
+                label_text = f"\u25b6 {round(item.progress * 100)}%" if item.progress > 0 else "\u25b6"
+            chip_w = min(max(fm.horizontalAdvance(label_text) + 12, 36), avail_w)
+        else:
+            avail_w = (open_rect.left() - rect.left() - 12) if has_open else (rect.width() - 12)
+            chip_w = min(max(fm.horizontalAdvance(label_text) + 16, 64), max(64, avail_w))
+
         chip_rect = QRect(rect.left() + 6, chip_y, chip_w, chip_h)
 
         painter.setBrush(fill_col)
         painter.setPen(QPen(base_col, 1))
         painter.drawRoundedRect(QRectF(chip_rect).adjusted(0.5, 0.5, -0.5, -0.5), 9.0, 9.0)
         painter.setPen(base_col)
-        elided = fm.elidedText(label_text, Qt.TextElideMode.ElideRight, chip_w - 12)
+        elided = fm.elidedText(label_text, Qt.TextElideMode.ElideRight, max(12, chip_w - 10))
         painter.drawText(chip_rect, Qt.AlignmentFlag.AlignCenter, elided)
+
+        if pill_txt and not pill_rect.isNull() and f_pill is not None:
+            painter.save()
+            painter.setFont(f_pill)
+            painter.setBrush(QColor(BG3))
+            painter.setPen(QPen(QColor(BORDER_STRONG), 1))
+            painter.drawRoundedRect(QRectF(pill_rect).adjusted(0.5, 0.5, -0.5, -0.5), 9.0, 9.0)
+            painter.setPen(QColor(FG))
+            elided_pill = painter.fontMetrics().elidedText(pill_txt, Qt.TextElideMode.ElideRight, max(20, pill_rect.width() - 8))
+            painter.drawText(pill_rect, Qt.AlignmentFlag.AlignCenter, elided_pill)
+            painter.restore()
 
         if item.status == "running":
             self._ensure_shimmer()
@@ -388,6 +421,7 @@ class QueueTab(QWidget):
     plan_requested = Signal()
     show_requested = Signal()
     urls_dropped = Signal(list)
+    edit_in_plan_requested = Signal(object)
 
     def __init__(self, bridge: Bridge | None = None, parent: QWidget | None = None):
         super().__init__(parent)
@@ -398,6 +432,9 @@ class QueueTab(QWidget):
         self.blocked_reason = lambda: ""
         self.output_dir = lambda: DEFAULTS["out_dir"]
         self.cancel_other = lambda: False  # the window cancels what it runs itself (a chat overlay); True if it did
+        self._all_log_entries: list[tuple[str, str, str]] = []
+        self._item_log_stamps: dict[str, list[tuple[str, str, str]]] = {}
+        self.log_scope: str = "all"
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -411,6 +448,8 @@ class QueueTab(QWidget):
         self.bridge.log.connect(self.log)
         self.bridge.item.connect(self.set_item_status)
         self.bridge.item_progress.connect(self.model.set_progress)
+        self.bridge.item_telemetry.connect(self.model.set_telemetry)
+        self.bridge.item_log.connect(self._on_item_log)
         self.bridge.progress.connect(self._on_progress)
         self.bridge.queue_done.connect(self.on_queue_done)
         self._thumb_fetcher = QueueThumbFetcher(self)
@@ -458,10 +497,14 @@ class QueueTab(QWidget):
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.installEventFilter(self)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._on_table_context_menu)
         self.table.setShowGrid(False)
         self.table.setWordWrap(False)
         self.table.verticalHeader().hide()
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
+        if self.table.selectionModel() is not None:
+            self.table.selectionModel().selectionChanged.connect(self._on_selection_changed_for_log)
         head = self.table.horizontalHeader()
         head.setFixedHeight(HEADER_HEIGHT)
         head.setHighlightSections(False)
@@ -597,6 +640,32 @@ class QueueTab(QWidget):
         toolbar = _FlowLayout(toolbar_box, hspacing=6, vspacing=6)
         toolbar.setContentsMargins(0, 0, 0, 8)
 
+        self.all_jobs_log_btn = QPushButton(t("All jobs"))
+        self.all_jobs_log_btn.setProperty("variant", "chip")
+        self.all_jobs_log_btn.setCheckable(True)
+        self.all_jobs_log_btn.setChecked(True)
+        self.all_jobs_log_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.all_jobs_log_btn.clicked.connect(lambda: self.set_log_scope("all"))
+        toolbar.addWidget(self.all_jobs_log_btn)
+
+        self.selected_item_log_btn = QPushButton(t("Selected item"))
+        self.selected_item_log_btn.setProperty("variant", "chip")
+        self.selected_item_log_btn.setCheckable(True)
+        self.selected_item_log_btn.setChecked(False)
+        self.selected_item_log_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.selected_item_log_btn.clicked.connect(lambda: self.set_log_scope("selected"))
+        toolbar.addWidget(self.selected_item_log_btn)
+
+        self.scope_buttons: dict[str, QPushButton] = {
+            "all": self.all_jobs_log_btn,
+            "selected": self.selected_item_log_btn,
+        }
+
+        log_sep = QFrame()
+        log_sep.setObjectName("divider")
+        log_sep.setFixedSize(1, 18)
+        toolbar.addWidget(log_sep)
+
         self.filter_buttons: dict[str, QPushButton] = {}
         for key, label in (("all", "All"), ("warn", "Warnings"), ("err", "Errors")):
             btn = QPushButton(t(label))
@@ -649,8 +718,59 @@ class QueueTab(QWidget):
         self.log_preview_label = QLabel()
 
     # ---------------------------- the log (F3) ---------------------------- #
+    def _record_item_log(self, iid: str, msg: str) -> None:
+        if not self.model.append_log(iid, msg):
+            return
+        stamp = f"[{time.strftime('%H:%M:%S')}] "
+        kind = log_kind(msg)
+        stamps = self._item_log_stamps.setdefault(iid, [])
+        stamps.append((stamp, msg, kind))
+        if len(stamps) > 500:
+            del stamps[:-500]
+
+    def _on_item_log(self, iid: str, msg: str) -> None:
+        self._record_item_log(iid, msg)
+        if self.log_scope == "selected" and iid == self.selected_iid():
+            self.log_view.add_line(msg)
+
+    def _on_selection_changed_for_log(self, *_args) -> None:
+        if self.log_scope == "selected":
+            self._refresh_log_view_for_scope()
+
+    def set_log_scope(self, scope: str) -> None:
+        scope = "selected" if scope == "selected" else "all"
+        self.log_scope = scope
+        if hasattr(self, "scope_buttons"):
+            for k, btn in self.scope_buttons.items():
+                btn.setChecked(k == scope)
+        self._refresh_log_view_for_scope()
+
+    def _refresh_log_view_for_scope(self) -> None:
+        if self.log_scope == "all":
+            self.log_view.entries = list(self._all_log_entries)
+            self.log_view.rebuild()
+            return
+        iid = self.selected_iid()
+        item = self.model.find(iid) if iid else None
+        if item is None:
+            self.log_view.entries = []
+            self.log_view.rebuild()
+            return
+        stamps = self._item_log_stamps.get(item.iid)
+        if stamps and len(stamps) == len(item.log_lines) and all(s[1] == raw for s, raw in zip(stamps, item.log_lines)):
+            self.log_view.entries = list(stamps)
+        else:
+            fallback_stamp = f"[{time.strftime('%H:%M:%S')}] "
+            self.log_view.entries = [(fallback_stamp, raw, log_kind(raw)) for raw in item.log_lines]
+        self.log_view.rebuild()
+
     def log(self, msg: str) -> None:
-        stamp, kind = self.log_view.add_line(msg)
+        if self.log_scope == "all":
+            stamp, kind = self.log_view.add_line(msg)
+        else:
+            stamp = f"[{time.strftime('%H:%M:%S')}] "
+            kind = log_kind(msg)
+        self._all_log_entries.append((stamp, msg, kind))
         colour = LOG_COLOURS.get(kind, FG)
         self.log_preview_label.setText(f"{stamp}{msg}")
         self.log_preview_label.setStyleSheet(f"color: {colour};")
@@ -667,6 +787,14 @@ class QueueTab(QWidget):
         self.log_view.set_pause_autoscroll(paused)
 
     def clear_log(self) -> None:
+        if self.log_scope == "all":
+            self._all_log_entries.clear()
+        else:
+            iid = self.selected_iid()
+            item = self.model.find(iid) if iid else None
+            if item is not None:
+                item.log_lines.clear()
+                self._item_log_stamps.pop(item.iid, None)
         self.log_view.clear_log()
         self.log_preview_label.setText(t("No log messages yet."))
         self.log_preview_label.setStyleSheet(f"color: {MUTED};")
@@ -714,7 +842,9 @@ class QueueTab(QWidget):
     def enqueue(self, job: object, label: str, n_parts: int, strat: str, thumb: object = None) -> QueueItem:
         item = self.model.add(job, label, n_parts, strat, thumb=thumb)
         self.refresh_summary()
-        self.log(f"Queued: {label} ({n_parts} parts, {strat})")
+        queued_msg = f"Queued: {label} ({n_parts} parts, {strat})"
+        self._record_item_log(item.iid, queued_msg)
+        self.log(queued_msg)
         if thumb is None:
             self._ensure_thumbnail(item)
         return item
@@ -804,8 +934,91 @@ class QueueTab(QWidget):
         item = self.model.retry_item(iid)
         if item is not None:
             self.refresh_summary()
-            self.log(f"Retrying: {item.label}")
+            retry_msg = f"Retrying: {item.label}"
+            self._record_item_log(item.iid, retry_msg)
+            self.log(retry_msg)
+            if self.log_scope == "selected" and item.iid == self.selected_iid():
+                self._refresh_log_view_for_scope()
         return item
+
+    def build_context_menu(self, iid: str | None = None) -> QMenu:
+        """Build the context menu for a queue row with edit/inspect actions."""
+        target_iid = iid or self.selected_iid()
+        item = self.model.find(target_iid) if target_iid else None
+        editable = item is not None and item.status in ("queued", "failed", "cancelled")
+
+        menu = QMenu(self)
+        change_folder_act = menu.addAction(t("Change Output Folder…"))
+        change_folder_act.setEnabled(editable and getattr(getattr(item, "job", None), "opts", None) is not None)
+        change_folder_act.triggered.connect(lambda: self.change_item_output_folder(target_iid))
+
+        load_plan_act = menu.addAction(t("Load into Cut & Plan"))
+        load_plan_act.setEnabled(editable and getattr(getattr(item, "job", None), "source", None) is not None)
+        load_plan_act.triggered.connect(lambda: self.load_item_into_plan(target_iid))
+
+        menu.addSeparator()
+
+        retry_act = menu.addAction(t("Retry"))
+        retry_act.setEnabled(item is not None and item.status in ("failed", "cancelled"))
+        retry_act.triggered.connect(lambda: self.retry_item(target_iid) if target_iid else None)
+
+        open_act = menu.addAction(t("Open folder"))
+        open_act.setEnabled(item is not None)
+        open_act.triggered.connect(lambda: self.open_item_folder(target_iid) if target_iid else None)
+
+        remove_act = menu.addAction(t("Remove selected"))
+        remove_act.setEnabled(item is not None and item.status != "running")
+        remove_act.triggered.connect(self.remove_selected)
+        return menu
+
+    def _on_table_context_menu(self, pos) -> None:
+        idx = self.table.indexAt(pos)
+        if idx.isValid():
+            iid = self.model.index(idx.row(), 0).data(IID_ROLE)
+            if iid and iid not in self.selected_iids():
+                self.select_item(iid)
+        else:
+            iid = self.selected_iid()
+        if not iid:
+            return
+        menu = self.build_context_menu(iid)
+        menu.exec(self.table.viewport().mapToGlobal(pos))
+
+    def change_item_output_folder(self, iid: str | None = None, new_folder: str | Path | None = None) -> bool:
+        """Modify the output folder of a waiting, failed, or cancelled job."""
+        target_iid = iid or self.selected_iid()
+        item = self.model.find(target_iid) if target_iid else None
+        if item is None or item.status not in ("queued", "failed", "cancelled"):
+            return False
+        opts = getattr(item.job, "opts", None)
+        if opts is None:
+            return False
+        if new_folder is None:
+            start_dir = str(getattr(opts, "out_dir", "") or self.output_dir() or DEFAULTS["out_dir"])
+            chosen = dialogs.choose_folder(self, t("Change Output Folder"), start_dir)
+            if not chosen:
+                return False
+            new_folder = chosen
+        if not self.model.set_item_output_folder(target_iid, str(new_folder)):
+            return False
+        msg = t("Output folder updated for {name}: {folder}", name=item.label, folder=str(new_folder))
+        self._record_item_log(target_iid, msg)
+        self.log(msg)
+        if self.log_scope == "selected" and target_iid == self.selected_iid():
+            self._refresh_log_view_for_scope()
+        self.status_message.emit(msg)
+        return True
+
+    def load_item_into_plan(self, iid: str | None = None) -> bool:
+        """Request loading a waiting, failed, or cancelled job back into Cut & Plan."""
+        target_iid = iid or self.selected_iid()
+        item = self.model.find(target_iid) if target_iid else None
+        if item is None or item.status not in ("queued", "failed", "cancelled"):
+            return False
+        if getattr(getattr(item, "job", None), "source", None) is None:
+            return False
+        self.edit_in_plan_requested.emit(item)
+        return True
 
     def retry_failed_or_selected(self) -> list[QueueItem]:
         """Retry selected failed/cancelled items, or all failed/cancelled items if none selected."""
@@ -995,6 +1208,9 @@ class QueueTab(QWidget):
         self.speed_limit_combo.setCurrentIndex(cur_speed)
         self.speed_limit_combo.setToolTip(t("Bandwidth limit passed to yt-dlp (--limit-rate)"))
         self.speed_limit_combo.blockSignals(False)
+        if hasattr(self, "scope_buttons"):
+            self.all_jobs_log_btn.setText(t("All jobs"))
+            self.selected_item_log_btn.setText(t("Selected item"))
         if hasattr(self, "filter_buttons"):
             labels = {"all": "All", "warn": "Warnings", "err": "Errors"}
             for k, btn in self.filter_buttons.items():

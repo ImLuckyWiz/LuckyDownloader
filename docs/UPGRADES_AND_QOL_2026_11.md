@@ -1,6 +1,6 @@
 # LuckyDownloader — Upgrades & Quality-of-Life Plan (2026-11)
 
-> Status: **PHASE 4B IMPLEMENTED** (`U-DATA-01`, `U-DATA-02` completed 2026-11-16; Phase 4A `U-DL-01`/`02` shipped in `v2.19.0`; Wave 1 + `U-CLI-01..03` shipped in `v2.17.0`; remaining Wave 2 `U-UI-01`/`02`/`07`, `U-CEP-02` and Wave 3 pending). Baseline HEAD `4fb1877`.
+> Status: **PHASE 4C IMPLEMENTED** (`U-UI-01`, `U-UI-02`, `U-UI-07` completed 2026-11-16 and shipping in `v2.21.0`; Phase 4B `U-DATA-01`/`02` shipped in `v2.20.0`; Phase 4A `U-DL-01`/`02` shipped in `v2.19.0`; Wave 1 + `U-CLI-01..03` shipped in `v2.17.0`; remaining Wave 2 `U-CEP-02` and Wave 3 pending). Baseline HEAD `4fb1877`.
 > Scope: meaningful UX, feature and architecture upgrades only. Bugs, security issues and regressions live in
 > [`REVIEW_2026_11_V2.md`](REVIEW_2026_11_V2.md); where an upgrade depends on a bug fix, the finding ID is cited.
 
@@ -52,9 +52,9 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 | 11 | `U-CLI-01` | Unified parameterized `cli.py` (`cut-local`, `batch`) replacing root Colab scripts | High | M | Retires hardcoded `Vexoria` scripts (`M-01`) while bringing single-pass `split_copy` to local files. |
 | 12 | `U-DATA-01` | OS Keyring / Windows DPAPI protection for Twitch OAuth & secrets | High | M | **DONE (Phase 4B, 2026-11-16)** — Windows DPAPI encryption & OS keyring storage with transparent legacy migration and `0o600` headless fallback. |
 | 13 | `U-DATA-02` | Unified `JsonStore` with schema migrations, locks & rotated `.corrupt` backups | High | M | **DONE (Phase 4B, 2026-11-16)** — Typed `JsonStore[T]` with per-path `RLock`, `schema_version` migrations, and 3-copy `<name>.corrupt.<YYYYMMDD-HHMMSS>` rotation. |
-| 14 | `U-UI-01` | Per-row live speed, ETA & byte counters + aggregate status bar telemetry | High | M | Makes 2–4 concurrent downloads transparent and easy to monitor. |
-| 15 | `U-UI-02` | Per-item log filtering & «Edit / Inspect Job» drawer in `QueueTab` | High | M | Stops interleaved parallel logs and lets users adjust failed jobs in place. |
-| 16 | `U-UI-07` | Global Command Palette (`Ctrl+K`) & accessible About/Diagnostics entry point | Medium | M | Exposes `AboutDialog` / `export_diagnostics_bundle` (`D-04`) and speeds up power-user navigation. |
+| 14 | `U-UI-01` | Per-row live speed, ETA & byte counters + aggregate status bar telemetry | High | M | **DONE (Phase 4C, 2026-11-16)** — `ProgressTelemetry` / `parse_progress_telemetry()`, per-row speed/ETA pills (`QueueRowDelegate`), and `StatusBar` aggregate throughput pill. |
+| 15 | `U-UI-02` | Per-item log filtering & «Edit / Inspect Job» drawer in `QueueTab` | High | M | **DONE (Phase 4C, 2026-11-16)** — Bounded per-item `deque` log buffer, `Selected item` / `All jobs` filter toggle, **Change Output Folder…**, and **Load into Cut & Plan**. |
+| 16 | `U-UI-07` | Global Command Palette (`Ctrl+K`) & accessible About/Diagnostics entry point | Medium | M | **DONE (Phase 4C, 2026-11-16)** — `Ctrl+K` `CommandPaletteDialog` fuzzy search across commands, Options, watchlist, and recent streamers, plus `NavRail` / `OptionsTab` About & Diagnostics triggers. |
 | 17 | `U-CEP-02` | Multi-track / linked overlay support (`V2` Chat Overlay & `A2..AN` Audio) | High | M | Unblocks Premiere auto-cutting for multi-track OBS recordings and rendered chat overlays. |
 
 ### Wave 3 — Flagship Editing, Capture & Polish Upgrades (`Effort: M–L`)
@@ -226,7 +226,7 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 
 ## Theme 3 — Desktop UI, Queue UX & Timeline Editing Workflow (`U-UI-*`)
 
-### [U-UI-01] Per-Row Live Speed, ETA & Byte Counters + Aggregate Status Bar Telemetry
+### [U-UI-01] Per-Row Live Speed, ETA & Byte Counters + Aggregate Status Bar Telemetry — **DONE (Phase 4C, 2026-11-16)**
 - **Impact:** High | **Effort:** M
 - **Current Limitation:** `QueueRunner.start` (`qt_ui/queue_runner.py:105-119`) only forwards a 0..1 progress float and short status string (`"42%"`), while a single shared `StatusBar` label flickers between parallel workers (`2–4` concurrent downloads). Users cannot see per-job transfer speed, ETA, or aggregate throughput.
 - **Proposed Upgrade:**
@@ -239,7 +239,7 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 
 ---
 
-### [U-UI-02] Per-Item Log Filtering & «Edit / Inspect Job» Drawer in `QueueTab`
+### [U-UI-02] Per-Item Log Filtering & «Edit / Inspect Job» Drawer in `QueueTab` — **DONE (Phase 4C, 2026-11-16)**
 - **Impact:** High | **Effort:** M
 - **Current Limitation:** All concurrent jobs write into one shared `log_view` in `QueueTab`, interleaving lines across workers, and failed/waiting items cannot have their output folder, container, or cut points inspected or adjusted without re-fetching metadata and re-queuing.
 - **Proposed Upgrade:**
@@ -297,7 +297,7 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 
 ---
 
-### [U-UI-07] Global Command Palette (`Ctrl+K`) & Accessible About / Diagnostics Entry Point
+### [U-UI-07] Global Command Palette (`Ctrl+K`) & Accessible About / Diagnostics Entry Point — **DONE (Phase 4C, 2026-11-16)**
 - **Impact:** Medium | **Effort:** M
 - **Current Limitation:** `MainWindow.open_about_dialog()` (`qt_ui/main_window.py:203-205`) and `export_diagnostics_bundle()` (`qt_ui/dialogs.py:299-413`) have zero UI triggers (V2 `D-04` / V1 `L-03`), and Options/action discovery relies on scrolling through 1,088 lines of `OptionsTab`.
 - **Proposed Upgrade:**

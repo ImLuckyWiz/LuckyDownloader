@@ -1,3 +1,13 @@
+## v2.21.0
+
+LuckyDownloader **v2.21.0** enhances queue monitoring, per-job troubleshooting, job editing, and keyboard-first navigation across the desktop app:
+
+- **Live Download Speed, ETA & Byte Counters:** Active queue rows now display real-time transfer speed (`MB/s` or processing multiplier), estimated time remaining (`ETA`), and downloaded byte progress (`downloaded / total`) in compact tabular-numeral pills so digits stay aligned without jumping. When running parallel downloads, the bottom status bar also displays your combined active download throughput.
+- **Per-Item Log Filtering & Job Editing in Queue:** Concurrent downloads no longer force you to untangle interleaved console lines—each queued item now records its own log history, and a new **All jobs / Selected item** toggle lets you isolate logs for whichever job row is selected. Right-clicking any waiting, failed, or cancelled job also offers **Change Output Folder…** to adjust its destination in place and **Load into Cut & Plan** to restore its video metadata and cut points back into the Plan tab without re-fetching.
+- **Global Command Palette (`Ctrl+K`) & Quick Diagnostics Access:** Press `Ctrl+K` anywhere in the app to fuzzy-search quick actions (**Get Info**, **Start Queue**, **Open Output Folder**, **Export Diagnostics Bundle**, **Check for Updates**, **Switch Language**), jump straight to any setting in **Options** (automatically expanding Advanced sections), or open channels from your **Watch list** and **Recent streamers**. **About & Diagnostics…** is also directly accessible from both the navigation rail and **Options → Tools**.
+
+---
+
 ## v2.20.0
 
 LuckyDownloader **v2.20.0** strengthens credential protection and data persistence reliability across your configuration, history, watchlist, and download queue:

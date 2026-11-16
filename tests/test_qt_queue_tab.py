@@ -1036,3 +1036,138 @@ def test_queue_batch_retry_and_url_drop(tab, qtbot):
     )
     tab.dropEvent(ev)
     assert received == [["https://www.twitch.tv/videos/11111", "https://www.youtube.com/watch?v=abc123"]]
+
+
+def test_row_telemetry_pills_and_gui_thread_signals(tab, qtbot, monkeypatch):
+    from PySide6.QtCore import QThread
+
+    gui_thread = QThread.currentThread()
+    signal_threads = []
+    tab.model.dataChanged.connect(lambda *_a: signal_threads.append(QThread.currentThread()))
+
+    def fake_run(job, ctx):
+        ctx.stage(0.0, 1.0, "Downloading")
+        ctx.report(0.5, "64 / 200 MiB · 14.2 MiB/s · ETA 0:01:15")
+        return ["out.mp4"]
+
+    fake_jobs(monkeypatch, fake_run)
+    (iid,) = add(tab, 1)
+    item = tab.model.find(iid)
+
+    # Active telemetry pill before completion
+    tab.set_item_status(iid, "running…")
+    tab.bridge.item_progress.emit(iid, 0.5, "Downloading  ·  64 / 200 MiB · 14.2 MiB/s · ETA 0:01:15")
+    qtbot.waitUntil(lambda: item.speed_mbps > 14.0, timeout=2000)
+    assert item.eta_text == "01:15"
+    assert item.bytes_text == "64 / 200 MiB"
+    assert tab.delegate.telemetry_pill_text(item) == "14.2 MB/s · ETA 01:15"
+
+    # Painting the viewport with active telemetry pill succeeds cleanly
+    img = tab.table.viewport().grab().toImage()
+    assert not img.isNull()
+
+    # Running through QueueRunner marshals telemetry onto the GUI thread
+    tab.set_item_status(iid, "queued")
+    signal_threads.clear()
+    run_all(qtbot, tab)
+    assert signal_threads and all(th is gui_thread for th in signal_threads)
+    assert item.status == "done"
+    assert tab.delegate.telemetry_pill_text(item) == ""
+
+
+def test_per_item_log_buffer_and_selected_item_filter(tab, qtbot, monkeypatch):
+    from collections import deque
+    import threading as _th
+
+    b1 = _th.Barrier(2, timeout=3.0)
+
+    def fake_run(job, ctx):
+        b1.wait()
+        ctx.log(f"alpha line for {job}")
+        ctx.log(f"beta line for {job}")
+        return [f"{job}.mp4"]
+
+    fake_jobs(monkeypatch, fake_run)
+    i1 = tab.enqueue("jobA", "Stream A", 1, "auto").iid
+    i2 = tab.enqueue("jobB", "Stream B", 1, "auto").iid
+    assert isinstance(tab.model.find(i1).log_lines, deque)
+    assert tab.model.find(i1).log_lines.maxlen == queue_model.MAX_ITEM_LOG_LINES
+
+    tab.max_concurrent_jobs = 2
+    run_all(qtbot, tab)
+
+    logs_a = list(tab.model.find(i1).log_lines)
+    logs_b = list(tab.model.find(i2).log_lines)
+    assert any("alpha line for jobA" in ln for ln in logs_a)
+    assert not any("jobB" in ln for ln in logs_a)
+    assert any("alpha line for jobB" in ln for ln in logs_b)
+
+    # All jobs shows both
+    tab.set_log_scope("all")
+    all_txt = tab.log_view.log_text()
+    assert "alpha line for jobA" in all_txt
+    assert "alpha line for jobB" in all_txt
+
+    # Selected item scope filters to only the selected row
+    tab.select_item(i1)
+    tab.set_log_scope("selected")
+    sel1_txt = tab.log_view.log_text()
+    assert "alpha line for jobA" in sel1_txt
+    assert "jobB" not in sel1_txt
+
+    # Selecting the second row updates the log view immediately
+    tab.select_item(i2)
+    sel2_txt = tab.log_view.log_text()
+    assert "alpha line for jobB" in sel2_txt
+    assert "jobA" not in sel2_txt
+
+
+def test_context_menu_edit_output_folder_and_load_into_plan(win, qtbot, tmp_path, monkeypatch):
+    from core.job import Job, JobOptions
+    from core.source_info import SourceInfo, VideoFormat
+
+    orig_dir = tmp_path / "orig"
+    new_dir = tmp_path / "custom_dest"
+    orig_dir.mkdir()
+    new_dir.mkdir()
+
+    src = SourceInfo(
+        url="https://www.twitch.tv/videos/888999",
+        id="888999",
+        title="Editable VOD",
+        uploader="Editor",
+        duration=1800.0,
+        date="2026-11-16",
+        twitch_vod_id="888999",
+        formats=[VideoFormat(format_id="1080p60", height=1080, fps=60.0)],
+        site="twitch",
+    )
+    opts = JobOptions(cut_text="0:01:00 - 0:05:00", out_dir=str(orig_dir), strategy="sections")
+    job = Job(source=src, opts=opts, clips=[{"id": "c1", "title": "Clip", "vod_offset": 90, "duration": 10}])
+
+    tab = win.tab_queue
+    item = tab.enqueue(job, "Editor · Editable VOD", 1, "only the parts")
+    tab.set_item_status(item.iid, "failed")
+    tab.select_item(item.iid)
+
+    menu = tab.build_context_menu(item.iid)
+    action_texts = [act.text() for act in menu.actions() if act.text()]
+    assert "Change Output Folder…" in action_texts
+    assert "Load into Cut & Plan" in action_texts
+
+    # Change Output Folder updates item.job.opts.out_dir without re-queuing
+    monkeypatch.setattr(dialogs, "choose_folder", lambda *_a, **_kw: str(new_dir))
+    assert tab.change_item_output_folder(item.iid)
+    assert tab.model.find(item.iid).job.opts.out_dir == str(new_dir)
+
+    # Load into Cut & Plan restores SourceInfo and cut points without calling get_source_info
+    called_fetch = []
+    monkeypatch.setattr("core.source_info.get_source_info", lambda *a, **k: called_fetch.append(a))
+    win.show_queue_tab()
+    assert tab.load_item_into_plan(item.iid)
+    assert called_fetch == []
+    assert win.tabs.currentWidget() is win.tab_plan
+    assert win.source is src
+    assert win.tab_plan.cut_text() == "0:01:00 - 0:05:00"
+    assert win.tab_plan.current_strategy_key() == "sections"
+    assert win.vod_strip.isVisible()

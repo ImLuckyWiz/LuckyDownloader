@@ -19,7 +19,7 @@ from typing import Sequence
 
 from PySide6.QtCore import QObject
 
-from luckytwitch_engine import Cancelled, Ctx, run_job
+from luckytwitch_engine import Cancelled, Ctx, parse_progress_telemetry, run_job
 from qt_ui.bridge import Bridge
 from core.i18n import N_, t
 from qt_ui.queue_model import QueueItem, QueueModel
@@ -57,6 +57,7 @@ class QueueRunner(QObject):
         self.ctx: Ctx | None = None  # the context of the running job (for cancel button backward compatibility)
         self.active_contexts: dict[str, Ctx] = {}  # iid -> Ctx for currently running jobs
         self._worker_progress: dict[str, float] = {}  # iid -> progress fraction for active jobs
+        self._worker_speeds: dict[str, float] = {}  # iid -> current transfer speed in B/s
         self.worker: threading.Thread | None = None  # coordinator thread (joined by tests)
         self.workers: list[threading.Thread] = []  # active worker threads
         self._lock = threading.RLock()
@@ -79,6 +80,7 @@ class QueueRunner(QObject):
         self._cancel_all_event.clear()
         with self._lock:
             self._worker_progress.clear()
+            self._worker_speeds.clear()
         bridge = self.bridge
         fallback = list(items)
         seen: set[str] = set()
@@ -106,19 +108,33 @@ class QueueRunner(QObject):
                 return nxt, total
 
         def on_item_progress(iid: str, frac: float, text: str) -> None:
+            tel = parse_progress_telemetry(text) if text else None
             with self._lock:
                 self._worker_progress[iid] = float(frac)
+                self._worker_speeds[iid] = tel.speed_bps if tel is not None else 0.0
                 if len(self._worker_progress) > 1:
                     vals = list(self._worker_progress.values())
                     if all(v < 0 for v in vals):
                         overall_frac = -1.0
                     else:
                         overall_frac = sum(max(0.0, min(1.0, v)) for v in vals) / len(vals)
+                    total_bps = sum(self._worker_speeds.values())
+                    if total_bps > 0:
+                        overall_text = t(
+                            "{n} running · {speed} MB/s",
+                            n=len(self._worker_progress),
+                            speed=f"{total_bps / 1048576:.1f}",
+                        )
+                    else:
+                        overall_text = text
                 else:
                     overall_frac = float(frac)
-            bridge.progress.emit(overall_frac, text)
+                    overall_text = text
+            bridge.progress.emit(overall_frac, overall_text)
             if model is not None:
                 bridge.item_progress.emit(iid, float(frac), text)
+            if tel is not None:
+                bridge.item_telemetry.emit(iid, tel)
 
         def worker_loop():
             while not self._cancel_all_event.is_set():
@@ -129,15 +145,18 @@ class QueueRunner(QObject):
                     job_counter[0] += 1
                     cur_n = job_counter[0]
 
+                def on_item_log(msg: str, item_id: str = it.iid, item_label: str = it.label) -> None:
+                    bridge.item_log.emit(item_id, msg)
+                    bridge.log.emit(f"[{item_label}] {msg}" if concurrency > 1 else msg)
+
                 ctx = Ctx(
-                    log=lambda m, item_label=it.label: bridge.log.emit(
-                        f"[{item_label}] {m}" if concurrency > 1 else m
-                    ),
+                    log=on_item_log,
                     progress=lambda f, msg, item_id=it.iid: on_item_progress(item_id, f, msg),
                 )
                 with self._lock:
                     self.active_contexts[it.iid] = ctx
                     self._worker_progress[it.iid] = 0.0
+                    self._worker_speeds[it.iid] = 0.0
                     self.ctx = ctx
 
                 job_to_run = it.job
@@ -173,17 +192,22 @@ class QueueRunner(QObject):
                     bridge.item.emit(it.iid, N_("done ({} files)").format(len(results)))
                 except Cancelled:
                     bridge.item.emit(it.iid, "cancelled")
-                    bridge.log.emit(f"Cancelled: {it.label}" if concurrency > 1 else "Cancelled.")
+                    cancel_msg = f"Cancelled: {it.label}" if concurrency > 1 else "Cancelled."
+                    bridge.item_log.emit(it.iid, cancel_msg)
+                    bridge.log.emit(cancel_msg)
                     if concurrency == 1:
                         # Sequential queue stops on cancel
                         break
                 except Exception as e:  # noqa: BLE001
                     bridge.item.emit(it.iid, "failed")
-                    bridge.log.emit(t("ERROR: {error}", error=e))
+                    err_msg = t("ERROR: {error}", error=e)
+                    bridge.item_log.emit(it.iid, err_msg)
+                    bridge.log.emit(err_msg)
                 finally:
                     with self._lock:
                         self.active_contexts.pop(it.iid, None)
                         self._worker_progress.pop(it.iid, None)
+                        self._worker_speeds.pop(it.iid, None)
                         self.ctx = next(iter(self.active_contexts.values()), None)
 
         def coordinator():
@@ -200,6 +224,7 @@ class QueueRunner(QObject):
                 self.workers = []
                 self.active_contexts.clear()
                 self._worker_progress.clear()
+                self._worker_speeds.clear()
                 self.ctx = None
             bridge.queue_done.emit()
 

@@ -214,6 +214,166 @@ def _num(value: str) -> float | None:
         return None
 
 
+_UNIT_SCALE = {
+    "kib": 1024,
+    "kb": 1024,
+    "mib": 1024 * 1024,
+    "mb": 1024 * 1024,
+    "gib": 1024 * 1024 * 1024,
+    "gb": 1024 * 1024 * 1024,
+}
+_TEXT_BYTES_PAIR = re.compile(r"(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)\s*(KiB|MiB|GiB|KB|MB|GB)\b", re.IGNORECASE)
+_TEXT_BYTES_SINGLE = re.compile(r"(\d+(?:\.\d+)?)\s*(KiB|MiB|GiB|KB|MB|GB)\b(?!/s)", re.IGNORECASE)
+_TEXT_SPEED = re.compile(r"(\d+(?:\.\d+)?)\s*(KiB|MiB|GiB|KB|MB|GB)/s\b", re.IGNORECASE)
+_TEXT_MULT = re.compile(r"\b(\d+(?:\.\d+)?)x\b", re.IGNORECASE)
+_TEXT_ETA = re.compile(r"\bETA\s+(?:(\d+):)?(\d{1,2}):(\d{2})\b")
+
+
+def fmt_eta(seconds: float | None) -> str:
+    """Format ETA seconds compactly as MM:SS (<1h) or H:MM:SS (>=1h)."""
+    if seconds is None or seconds < 0:
+        return ""
+    s = int(round(seconds))
+    if s >= 3600:
+        return f"{s // 3600:d}:{s % 3600 // 60:02d}:{s % 60:02d}"
+    return f"{s // 60:02d}:{s % 60:02d}"
+
+
+@dataclass(frozen=True)
+class ProgressTelemetry:
+    """Structured live transfer telemetry parsed from yt-dlp or ffmpeg progress output."""
+
+    fraction: float | None = None
+    speed_bps: float = 0.0
+    eta_seconds: float | None = None
+    downloaded_bytes: int = 0
+    total_bytes: int = 0
+    speed_multiplier: float | None = None
+
+    @property
+    def speed_mbps(self) -> float:
+        return self.speed_bps / 1048576.0 if self.speed_bps > 0 else 0.0
+
+    @property
+    def eta_text(self) -> str:
+        return fmt_eta(self.eta_seconds)
+
+    def pill_text(self) -> str:
+        bits: list[str] = []
+        if self.speed_bps > 0:
+            mbps = self.speed_mbps
+            bits.append(f"{mbps:.1f} MB/s" if mbps < 100 else f"{mbps:.0f} MB/s")
+        elif self.speed_multiplier is not None and self.speed_multiplier > 0:
+            bits.append(f"{self.speed_multiplier:.1f}x")
+        eta = self.eta_text
+        if eta:
+            bits.append(f"ETA {eta}")
+        return " · ".join(bits)
+
+
+def parse_progress_telemetry(line: str, total_secs: float | None = None) -> ProgressTelemetry | None:
+    """Parse yt-dlp ``LTPROG|...``, ffmpeg stats, or formatted progress strings into ``ProgressTelemetry``."""
+    text = (line or "").strip()
+    if not text:
+        return None
+
+    if text.startswith("LTPROG|"):
+        fields = text.split("|")
+        if len(fields) < 9:
+            return None
+        dl, total, est, f_idx, f_cnt, speed, eta = (_num(x) for x in fields[2:9])
+        frac = None
+        if f_cnt:
+            frac = (f_idx or 0) / f_cnt
+        elif total or est:
+            frac = (dl or 0) / (total or est)  # type: ignore[operator]
+        dl_bytes = int(dl) if dl and dl > 0 else 0
+        tot_val = total if (total and total > 0) else (est if est and est > 0 else 0)
+        tot_bytes = int(tot_val)
+        speed_bps = float(speed) if speed and speed > 0 else 0.0
+        eta_sec = float(eta) if eta is not None and eta >= 0 else None
+        if frac is None and dl_bytes == 0 and tot_bytes == 0 and speed_bps <= 0 and eta_sec is None:
+            return None
+        return ProgressTelemetry(
+            fraction=frac,
+            speed_bps=speed_bps,
+            eta_seconds=eta_sec,
+            downloaded_bytes=dl_bytes,
+            total_bytes=tot_bytes,
+        )
+
+    m_time = _FF_TIME.search(text)
+    if m_time:
+        t_sec = int(m_time[1]) * 3600 + int(m_time[2]) * 60 + float(m_time[3])
+        frac = min(t_sec / total_secs, 1.0) if total_secs else None
+        dl_bytes = 0
+        ms = _FF_SIZE.search(text)
+        if ms:
+            scale = _UNIT_SCALE.get(ms[2].lower(), 1024 * 1024)
+            dl_bytes = int(round(float(ms[1]) * scale))
+        mult = None
+        eta_sec = None
+        speed_bps = 0.0
+        mp = _FF_SPEED.search(text)
+        if mp:
+            mult = float(mp[1])
+            if total_secs and mult > 0:
+                eta_sec = max(total_secs - t_sec, 0.0) / mult
+            if dl_bytes > 0 and t_sec > 0 and mult > 0:
+                speed_bps = (dl_bytes / t_sec) * mult
+        return ProgressTelemetry(
+            fraction=frac,
+            speed_bps=speed_bps,
+            eta_seconds=eta_sec,
+            downloaded_bytes=dl_bytes,
+            total_bytes=0,
+            speed_multiplier=mult,
+        )
+
+    dl_bytes = 0
+    tot_bytes = 0
+    m_pair = _TEXT_BYTES_PAIR.search(text)
+    if m_pair:
+        scale = _UNIT_SCALE.get(m_pair.group(3).lower(), 1024 * 1024)
+        dl_bytes = int(round(float(m_pair.group(1)) * scale))
+        tot_bytes = int(round(float(m_pair.group(2)) * scale))
+    else:
+        m_single = _TEXT_BYTES_SINGLE.search(text)
+        if m_single:
+            scale = _UNIT_SCALE.get(m_single.group(2).lower(), 1024 * 1024)
+            dl_bytes = int(round(float(m_single.group(1)) * scale))
+
+    speed_bps = 0.0
+    m_spd = _TEXT_SPEED.search(text)
+    if m_spd:
+        scale = _UNIT_SCALE.get(m_spd.group(2).lower(), 1024 * 1024)
+        speed_bps = float(m_spd.group(1)) * scale
+
+    mult = None
+    m_mult = _TEXT_MULT.search(text)
+    if m_mult:
+        mult = float(m_mult.group(1))
+
+    eta_sec = None
+    m_eta = _TEXT_ETA.search(text)
+    if m_eta:
+        h = int(m_eta.group(1) or 0)
+        mins = int(m_eta.group(2))
+        secs = int(m_eta.group(3))
+        eta_sec = float(h * 3600 + mins * 60 + secs)
+
+    if speed_bps <= 0 and eta_sec is None and dl_bytes == 0 and tot_bytes == 0 and mult is None:
+        return None
+    return ProgressTelemetry(
+        fraction=None,
+        speed_bps=speed_bps,
+        eta_seconds=eta_sec,
+        downloaded_bytes=dl_bytes,
+        total_bytes=tot_bytes,
+        speed_multiplier=mult,
+    )
+
+
 def parse_progress(line: str) -> tuple[float | None, str] | None:
     """One line printed by yt-dlp with PROGRESS_TEMPLATE -> (fraction or None, text), else None."""
     if not line.startswith("LTPROG|"):

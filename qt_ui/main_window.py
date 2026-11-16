@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 import weblink
 from core import paths, updates
 from core.config import make_client
-from core.i18n import LANG_AUTO, N_, t
+from core.i18n import LANG_AUTO, LANG_EN, LANG_ES, N_, get_language, t
 from core.options import build_filter, build_options, flag
 from core.providers import Capability, detect_source
 from core.settings import DEFAULTS, save_settings
@@ -39,7 +39,7 @@ from qt_ui.session_persistence import (
     extract_vod_input,
     is_valid_url,
 )
-from qt_ui.shell import CommandBar, NavRail, PageStack, ShortcutsDialog, VodStrip
+from qt_ui.shell import CommandBar, NavRail, PageStack, ShortcutsDialog, StatusBar, VodStrip
 from qt_ui.tabs import BrowseTab, OptionsTab, PlanTab, QueueTab, SearchTab
 from qt_ui.theme import dark_titlebar
 from qt_ui.titlebar import CustomTitleBar
@@ -100,6 +100,7 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
         )
         self._login_dialog: TwitchDialog | None = None
         self._shortcuts_dialog: ShortcutsDialog | None = None
+        self._command_palette: dialogs.CommandPaletteDialog | None = None
         self._last_clipboard_offer: str = ""
         # the background jobs: the tools setup, the overlay of a saved chat, and «Get info»
         self.tools_busy = False
@@ -224,44 +225,16 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
         tabs_lay.addWidget(self.tabs)
         main_lay.addWidget(tabs_box, 1)
 
-        # Bottom compact status bar: 3 px progress bar along top edge + status line + activity pill (Phase 9b, B7)
-        bottom = QFrame(main_pane)
-        bottom.setObjectName("statusBar")
-        bot = QVBoxLayout(bottom)
-        bot.setContentsMargins(0, 0, 0, 0)
-        bot.setSpacing(0)
-        self.progress = QProgressBar(bottom)
-        self.progress.setObjectName("shellProgress")
-        self.progress.setRange(0, 100)
-        self.progress.setValue(0)
-        self.progress.setTextVisible(False)
-        bot.addWidget(self.progress)
-
-        status_row = QHBoxLayout()
-        status_row.setContentsMargins(10, 4, 10, 5)
-        status_row.setSpacing(8)
-        self.status_label = QLabel(bottom)
-        status_row.addWidget(self.status_label, 1)
-
-        self.update_pill = QPushButton("", bottom)
-        self.update_pill.setProperty("variant", "pill")
-        self.update_pill.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.update_pill.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.update_pill.setToolTip(t("A new version of LuckyDownloader is available."))
-        self.update_pill.setVisible(False)
-        self.update_pill.clicked.connect(self.open_update_dialog)
-        status_row.addWidget(self.update_pill)
-
-        self.activity_pill = QPushButton("", bottom)
-        self.activity_pill.setProperty("variant", "pill")
-        self.activity_pill.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.activity_pill.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.activity_pill.setToolTip(t("Open Queue & log"))
-        self.activity_pill.setVisible(False)
-        self.activity_pill.clicked.connect(self.show_queue_tab)
-        status_row.addWidget(self.activity_pill)
-        bot.addLayout(status_row)
-        main_lay.addWidget(bottom)
+        # Bottom compact status bar: 3 px progress bar along top edge + status line + telemetry/update/activity pills
+        self.status_bar = StatusBar(main_pane)
+        self.status_bar.queue_requested.connect(self.show_queue_tab)
+        self.status_bar.update_requested.connect(self.open_update_dialog)
+        self.progress = self.status_bar.progress
+        self.status_label = self.status_bar.status_label
+        self.telemetry_pill = self.status_bar.telemetry_pill
+        self.update_pill = self.status_bar.update_pill
+        self.activity_pill = self.status_bar.activity_pill
+        main_lay.addWidget(self.status_bar)
 
         # Layout placements: NavRail on the far left, main pane on the right
         root_lay.addWidget(self.rail)
@@ -278,9 +251,14 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
         queue.plan_requested.connect(self.show_plan_tab)
         queue.show_requested.connect(self.show_queue_tab)
         queue.urls_dropped.connect(self._enqueue_dropped_urls)
+        queue.edit_in_plan_requested.connect(self.load_job_into_plan)
+        queue.model.dataChanged.connect(self._sync_status_telemetry)
         queue.model.rowsInserted.connect(self._sync_queue_badge)
+        queue.model.rowsInserted.connect(self._sync_status_telemetry)
         queue.model.rowsRemoved.connect(self._sync_queue_badge)
+        queue.model.rowsRemoved.connect(self._sync_status_telemetry)
         queue.model.modelReset.connect(self._sync_queue_badge)
+        queue.model.modelReset.connect(self._sync_status_telemetry)
         queue.blocked_reason = _weak(self.queue_blocked_reason)
         queue.output_dir = _weak(self.output_dir)
         search = self.tab_browse
@@ -331,6 +309,9 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
         """Re-translate what was built by hand; runs on every language change (``i18n_qt.language_bus().changed``)."""
         if hasattr(self, "command_bar"):
             self.command_bar.retranslate_ui()
+        if hasattr(self, "status_bar"):
+            self.status_bar.retranslate_ui()
+            self._sync_status_telemetry()
         self.set_status(t("Ready. Paste a VOD URL or ID and press «Get info»."))
         if hasattr(self, "tabs"):
             for i, name in enumerate(TAB_NAMES):
@@ -346,6 +327,7 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
             sc.activated.connect(slot)
             self.shortcuts[seq] = sc
 
+        bind("Ctrl+K", self.open_command_palette)
         bind("Ctrl+L", self.focus_vod_bar)
         bind("Ctrl+1", lambda: self.tabs.setCurrentIndex(0))
         bind("Ctrl+2", lambda: self.tabs.setCurrentIndex(1))
@@ -406,6 +388,106 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
         self._shortcuts_dialog.open()
         return self._shortcuts_dialog
 
+    def open_command_palette(self) -> dialogs.CommandPaletteDialog:
+        if getattr(self, "_command_palette", None) is not None:
+            self._command_palette.close()
+            self._command_palette.deleteLater()
+        dlg = dialogs.CommandPaletteDialog(host=self, parent=self)
+        self._command_palette = dlg
+        dlg.open()
+        dlg.search_input.setFocus()
+        return dlg
+
+    def jump_to_option(self, key: str) -> bool:
+        self.show_options_tab()
+        return self.tab_options.jump_to_setting(key)
+
+    def export_diagnostics_bundle(self, target_path=None) -> bool:
+        return dialogs.export_diagnostics_bundle(self, target_path=target_path)
+
+    def toggle_language(self) -> str:
+        cur = get_language()
+        nxt = LANG_EN if cur == LANG_ES else LANG_ES
+        i18n_qt.apply_language(nxt)
+        st = load_ui_state()
+        st.language = nxt
+        save_ui_state(st)
+        if hasattr(self, "tab_options") and hasattr(self.tab_options, "select_language_setting"):
+            self.tab_options.select_language_setting(nxt)
+        return nxt
+
+    def open_channel_from_palette(self, login: str = "", name: str = "", provider: str = "twitch", url: str = "") -> None:
+        self.show_browse_tab()
+        prov = (provider or "twitch").lower()
+        self.tab_browse.set_provider(prov)
+        target = login or name or url
+        if prov == "youtube":
+            self.tab_browse.search_edit.setText(url or target)
+            self.tab_browse.on_search()
+        else:
+            self.tab_browse.search_edit.setText(target)
+            if self.client and login:
+                self.tab_browse.load_channel({"id": login, "login": login, "name": name or login})
+            else:
+                self.tab_browse.on_search()
+
+    def load_job_into_plan(self, item_or_job) -> bool:
+        """Restore a queued/failed/cancelled job's SourceInfo and cut points into PlanTab without re-fetching metadata."""
+        job = getattr(item_or_job, "job", item_or_job)
+        src = getattr(job, "source", None)
+        if src is None:
+            return False
+        opts = getattr(job, "opts", None)
+        clips = list(getattr(job, "clips", None) or [])
+
+        self.source = src
+        self.clips = clips
+        self.clips_loaded = bool(clips)
+
+        has_timeline = getattr(src, "has_capability", lambda _c: True)(Capability.TIMELINE)
+        self.tab_plan.set_mode(has_timeline)
+        qual_val = getattr(opts, "quality", None) or str(self.settings.get("default_quality", DEFAULTS["default_quality"]))
+        self.tab_plan.set_formats(getattr(src, "formats", []), qual_val)
+        if qual_val:
+            for combo_name in ("quality_combo", "generic_quality_combo"):
+                combo = getattr(self.tab_plan, combo_name, None)
+                if combo is not None:
+                    idx = combo.findData(qual_val)
+                    if idx >= 0:
+                        combo.setCurrentIndex(idx)
+
+        raw_title = getattr(src, "raw_title", src.title)
+        self.tab_plan.set_title(src.title, raw_title=raw_title)
+
+        if not has_timeline:
+            self.tab_plan.update_generic_card(src)
+            if opts is not None:
+                if getattr(opts, "out_dir", "") and hasattr(self.tab_plan, "generic_folder_entry"):
+                    self.tab_plan.generic_folder_entry.setText(str(opts.out_dir))
+                if getattr(opts, "container", "") and hasattr(self.tab_plan, "generic_container_combo"):
+                    self.tab_plan.generic_container_combo.setCurrentText(str(opts.container))
+                if hasattr(self.tab_plan, "generic_audio_toggle"):
+                    self.tab_plan.generic_audio_toggle.setChecked(getattr(opts, "quality", "") == "audio")
+        elif opts is not None and getattr(opts, "strategy", "") in ("auto", "full", "sections"):
+            self.tab_plan.set_strategy(opts.strategy)
+
+        cut_text = getattr(opts, "cut_text", "") if opts is not None else ""
+        self.tab_plan.set_cut_text(cut_text)
+
+        self.vod_entry.setText(getattr(src, "url", "") or "")
+        extra = f" \u00b7 {len(clips)} clips" if clips else ""
+        self.info_label.setText(
+            f"{src.uploader} \u00b7 {src.title} \u00b7 {fmt_hms(src.duration)} \u00b7 {src.date}{extra}"
+        )
+        self.vod_strip.set_vod(src, clips, "")
+        self.update_preview()
+        if has_timeline:
+            self.refresh_clips()
+        self.tab_options.refresh_name_examples()
+        self.show_plan_tab()
+        self.set_status(t("Loaded job into Cut & Plan: {title}", title=src.title))
+        return True
+
     def event(self, event) -> bool:
         if event.type() == QEvent.Type.WindowActivate:
             app = QApplication.instance()
@@ -457,6 +539,10 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
     def _sync_queue_badge(self, *_args) -> None:
         if hasattr(self, "rail") and hasattr(self, "tab_queue"):
             self.rail.set_queue_count(len(self.tab_queue.items))
+
+    def _sync_status_telemetry(self, *_args) -> None:
+        if hasattr(self, "status_bar") and hasattr(self, "tab_queue"):
+            self.status_bar.update_from_items(self.tab_queue.items)
 
     def set_status(self, text: str) -> None:
         self.status_label.setText(text)
@@ -525,6 +611,8 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
         self.set_progress(0, "")
         self._job_prefix = ""
         self._set_activity_pill_visible(False)
+        if hasattr(self, "status_bar"):
+            self.status_bar.set_telemetry(0, 0.0)
         self.set_status(t("Queue finished."))
         notify.system_notify(
             self, t("Queue finished"), t("All queued downloads have finished."),
@@ -695,6 +783,8 @@ class MainWindow(SessionPersistenceMixin, UpdateControllerMixin, WatchlistContro
             self._login_dialog.close()  # cancels a sign-in that is waiting for the person
         if self._shortcuts_dialog is not None:
             self._shortcuts_dialog.close()
+        if getattr(self, "_command_palette", None) is not None:
+            self._command_palette.close()
         self.tab_search.shutdown()
         self.tab_queue.shutdown()
         if self.settings:  # a window made without settings must not overwrite the saved file with nothing

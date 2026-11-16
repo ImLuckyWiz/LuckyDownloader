@@ -450,3 +450,84 @@ def test_enqueue_dropped_urls_adds_jobs_to_queue(qtbot, monkeypatch):
     assert win.tab_queue.items[0].job.source.id == "777888"
     win.close()
 
+
+def test_status_bar_aggregate_throughput_pill(win, qtbot):
+    tab = win.tab_queue
+    i1 = tab.enqueue(object(), "Job One", 1, "full video").iid
+    i2 = tab.enqueue(object(), "Job Two", 1, "full video").iid
+
+    tab.set_item_status(i1, "running…")
+    tab.set_item_status(i2, "running…")
+    win.bridge.item_progress.emit(i1, 0.3, "Downloading · 14.2 MB/s · ETA 01:00")
+    win.bridge.item_progress.emit(i2, 0.4, "Downloading · 14.2 MB/s · ETA 02:00")
+
+    qtbot.waitUntil(lambda: win.telemetry_pill.isVisible(), timeout=2000)
+    assert win.telemetry_pill.text() == "2 running · 28.4 MB/s"
+
+    win.on_queue_done()
+    assert not win.telemetry_pill.isVisible()
+
+
+def test_command_palette_ctrl_k_search_and_execution_plus_about_entry(win, qtbot, monkeypatch, tmp_path):
+    from core import recent, watchlist
+    from qt_ui.dialogs import CommandPaletteDialog
+
+    # Seed watchlist and recent streamers
+    watchlist.add_to_watchlist("shroud", name="Shroud", provider="twitch")
+    recent.save_recent([{"id": "1", "login": "summit1g", "name": "summit1g"}])
+
+    # Open via Ctrl+K shortcut
+    assert "Ctrl+K" in win.shortcuts
+    dlg = win.open_command_palette()
+    assert isinstance(dlg, CommandPaletteDialog)
+    assert dlg.isVisible()
+
+    # 1. Fuzzy search finds Advanced option setting and jumps to it
+    dlg.search_input.setText("video enc")
+    assert dlg.filtered_items
+    assert any(it["id"] == "opt:video_encoder" for it in dlg.filtered_items)
+    dlg.search_input.setText("video_encoder")
+    assert dlg.filtered_items[0]["id"] == "opt:video_encoder"
+    assert dlg.execute_selected()
+    assert win.tabs.currentWidget() is win.tab_options
+    assert win.tab_options.nav.current == "cuts"
+    assert win.tab_options.advanced["cuts"].opened
+
+    # 2. Command Palette finds watchlist & recent streamers and opens Browse tab
+    dlg2 = win.open_command_palette()
+    dlg2.search_input.setText("summit")
+    assert any(it["id"].startswith("recent:twitch:summit1g") for it in dlg2.filtered_items)
+    dlg2.search_input.setText("shroud")
+    assert any(it["id"].startswith("watch:twitch:shroud") for it in dlg2.filtered_items)
+    loaded_channels = []
+    monkeypatch.setattr(win.tab_browse, "load_channel", lambda ch: loaded_channels.append(ch))
+    assert dlg2.execute_selected()
+    assert win.tabs.currentWidget() is win.tab_browse
+    assert loaded_channels and loaded_channels[0]["login"] == "shroud"
+
+    # 3. Quick commands: Export Diagnostics Bundle & Switch Language
+    exported = []
+    monkeypatch.setattr(win, "export_diagnostics_bundle", lambda *a, **k: exported.append(True) or True)
+    dlg3 = win.open_command_palette()
+    dlg3.search_input.setText("exp diag")
+    assert dlg3.filtered_items[0]["id"] == "cmd:export_diagnostics"
+    assert dlg3.execute_selected()
+    assert exported == [True]
+
+    dlg4 = win.open_command_palette()
+    dlg4.search_input.setText("switch lang")
+    assert dlg4.filtered_items[0]["id"] == "cmd:switch_language"
+    assert dlg4.execute_selected()
+    from core.i18n import LANG_EN, LANG_ES, get_language
+    assert get_language() == LANG_ES
+    win.toggle_language()
+    assert get_language() == LANG_EN
+
+    # 4. NavRail & OptionsTab About & Diagnostics buttons both invoke open_about_dialog
+    about_calls = []
+    monkeypatch.setattr(win, "open_about_dialog", lambda: about_calls.append(True))
+    win.rail.about_btn.click()
+    win.tab_options.about_btn.click()
+    assert len(about_calls) == 2
+    win.close()
+

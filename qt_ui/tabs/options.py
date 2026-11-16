@@ -388,6 +388,29 @@ class OptionsTab(QWidget):
         self.match_counter.setText(tn("{n} match", "{n} matches", matched))
         self.match_counter.setVisible(True)
 
+    def jump_to_setting(self, key: str) -> bool:
+        """Select the section for ``key``, expand any Advanced fold, and scroll the row into view."""
+        if self.search_entry.text():
+            self.search_entry.clear()
+        entry = next((item for item in self.searchable_rows if item.get("key") == key), None)
+        if entry is None:
+            pair = self.rows_by_key.get(key)
+            if pair is None:
+                return False
+            row, section_key = pair
+            adv = None
+        else:
+            row = entry["row"]
+            section_key = entry["section_key"]
+            adv = entry.get("adv")
+        if section_key in self.sections:
+            self.nav.select(section_key)
+            self.show_section(section_key)
+        if adv is not None:
+            adv.set_opened(True)
+        self.scroll.ensureWidgetVisible(row)
+        return True
+
 
     def _sync_provider_dir_display(self) -> None:
         p_key = self.provider_select_combo.currentData() or "youtube"
@@ -1123,6 +1146,10 @@ class OptionsTab(QWidget):
             self.clean_temp_row.hint_label.setText(t("Remove incomplete temporary download directories from the output folder."))
         if hasattr(self, "check_app_updates_btn") and self.check_app_updates_btn:
             self.check_app_updates_btn.setText(t("Check now"))
+        if hasattr(self, "about_btn") and self.about_btn:
+            self.about_btn.setText(t("About & Diagnostics…"))
+        if hasattr(self, "clear_data_btn") and self.clear_data_btn:
+            self.clear_data_btn.setText(t("Clear Private Data…"))
         if hasattr(self, "save_preview_card_row") and self.save_preview_card_row:
             self.save_preview_card_row.title_label.setText(t("Destination preview"))
         if hasattr(self, "ytdlp_row") and self.ytdlp_row:
