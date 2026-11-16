@@ -20,7 +20,7 @@ Template per proposal: ID / Title / Impact (`High`/`Medium`/`Low`) / Effort (`S`
 
 ### Release Cadence & Publishing
 After completing any meaningful phase or upgrade batch (once `pytest` and `python tools/i18n.py check` pass cleanly):
-1. Add a new `## vX.Y.Z` section at the top of [`RELEASE_NOTES.md`](../RELEASE_NOTES.md) (must match the tag name on line 1, or `.github/workflows/build.yml` `init-release` will fail).
+1. Add a new `## vX.Y.Z` section at the top of [`RELEASE_NOTES.md`](../RELEASE_NOTES.md) (must match the tag name on line 1, or `.github/workflows/build.yml` `init-release` will fail). **Write release notes strictly for end users:** clearly explain the new features, UX improvements, and user-visible fixes—never include internal phase/wave names, audit/proposal IDs (`U-*`, `A-*`), or internal function/test names.
 2. Commit and push to `main` so GitHub Actions runs `test` + cross-platform Nuitka/CEP builds (`windows`, `macos-arm64`, `linux-x86_64`).
 3. Create and push the matching `vX.Y.Z` tag (`git tag vX.Y.Z && git push origin vX.Y.Z`) to create the draft release, compile all GUI/CLI/CEP artifacts, generate `SHA256SUMS.txt`, and publish the GitHub Release atomically.
 
