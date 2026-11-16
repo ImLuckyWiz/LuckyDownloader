@@ -57,6 +57,7 @@ class JobOptions:
     cookies_scope: str = "known_only"  # "known_only" (YouTube, TikTok, Instagram, X) or "all"
     cookies_explicit: bool | None = None  # optional per-job override for resolve_cookies_for_request()
     download_archive: str = ""  # optional path to yt-dlp download archive file ("--download-archive")
+    video_encoder: str = "auto"  # auto | cpu | nvenc | qsv | amf | videotoolbox
 
 
 @dataclass

@@ -60,6 +60,103 @@ def probe_video(path: Path) -> tuple[float, int, int] | None:
         return None
 
 
+def probe_keyframes(path: Path, around_times: list[float]) -> list[float]:
+    """Return sorted keyframe PTS timestamps (seconds) near ``around_times``, or [] on failure."""
+    if not around_times:
+        return []
+    _find = resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
+    _env = resolve_dep("_tool_env", _ORIG_TOOL_ENV, _tool_env)
+    _nw = resolve_dep("_NO_WINDOW", _ORIG_NO_WINDOW, _NO_WINDOW)
+    if not _find:
+        return []
+    ffprobe = _find("ffprobe")
+    if not ffprobe:
+        return []
+    intervals = ",".join(f"{max(0.0, float(t_val) - 15.0):.3f}%+30" for t_val in around_times)
+    try:
+        res = subprocess.run(
+            [
+                ffprobe,
+                "-v", "error",
+                "-select_streams", "v:0",
+                "-skip_frame", "nokey",
+                "-read_intervals", intervals,
+                "-show_entries", "frame=pkt_pts_time",
+                "-of", "csv=p=0",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,
+            env=_env(),
+            creationflags=_nw,
+            timeout=60,
+        )
+        if res.returncode != 0:
+            return []
+        points: set[float] = set()
+        for line in (res.stdout or "").splitlines():
+            token = line.strip().split(",")[0].strip()
+            if not token or token == "N/A":
+                continue
+            try:
+                val = float(token)
+            except ValueError:
+                continue
+            if math.isfinite(val) and val >= 0.0:
+                points.add(val)
+        return sorted(points)
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError):
+        return []
+
+
+def probe_stream_signature(path: Path) -> dict[str, str] | None:
+    """Return basic video stream metadata (codec_name, profile, pix_fmt, time_base), or None on failure."""
+    _find = resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
+    _env = resolve_dep("_tool_env", _ORIG_TOOL_ENV, _tool_env)
+    _nw = resolve_dep("_NO_WINDOW", _ORIG_NO_WINDOW, _NO_WINDOW)
+    if not _find:
+        return None
+    ffprobe = _find("ffprobe")
+    if not ffprobe:
+        return None
+    try:
+        res = subprocess.run(
+            [
+                ffprobe,
+                "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=codec_name,profile,pix_fmt,time_base",
+                "-of", "json",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,
+            env=_env(),
+            creationflags=_nw,
+            timeout=60,
+        )
+        if res.returncode != 0:
+            return None
+        streams = json.loads(res.stdout or "{}").get("streams") or []
+        if not streams or not isinstance(streams[0], dict):
+            return None
+        st = streams[0]
+        return {
+            "codec_name": str(st.get("codec_name") or "").lower(),
+            "profile": str(st.get("profile") or ""),
+            "pix_fmt": str(st.get("pix_fmt") or ""),
+            "time_base": str(st.get("time_base") or ""),
+        }
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, IndexError, TypeError):
+        return None
+
+
 def premiere_markers_xml(
     name: str, chapters: list[Chapter], duration: float, fps: float, width: int = 1920, height: int = 1080
 ) -> str:

@@ -132,3 +132,11 @@ def test_quality_and_audio_format_resolution():
     # Explicit quality argument overrides settings
     assert options.build_options(s(default_quality="720p"), quality="480p").quality == "480p"
     assert options.build_options(s(default_quality="720p"), quality="best").quality == "best"
+
+
+def test_video_encoder_option_mapping():
+    assert options.build_options(s()).video_encoder == "auto"
+    assert options.build_options(s(video_encoder="nvenc")).video_encoder == "nvenc"
+    assert options.build_options(s(video_encoder="h264_qsv")).video_encoder == "qsv"
+    assert options.build_options(s(video_encoder="libx264")).video_encoder == "cpu"
+    assert options.build_options(s(video_encoder="unknown")).video_encoder == "auto"

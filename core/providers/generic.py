@@ -139,37 +139,3 @@ class GenericProvider(Provider):
         if self._site_name != "generic":
             src.site = self._site_name
         return src
-
-    def build_download_args(
-        self,
-        src: SourceInfo,
-        opts: Any | None = None,
-        *,
-        quality: str = "best",
-        container: str = "mp4",
-        audio_only: bool = False,
-        audio_format: str | None = None,
-        out_template: str | None = None,
-        rate_limit: str | None = None,
-        threads: int = 4,
-    ) -> list[str]:
-        from core.source_info import build_generic_download_args
-        q = getattr(opts, "quality", quality) if opts else quality
-        cnt = getattr(opts, "container", container) if opts else container
-        afmt = getattr(opts, "audio_format", audio_format) if opts else audio_format
-        rl = getattr(opts, "rate_limit", rate_limit) if opts else rate_limit
-        th = getattr(opts, "threads", threads) if opts else threads
-        cb = getattr(opts, "cookies_browser", None)
-        da = getattr(opts, "download_archive", None)
-        return build_generic_download_args(
-            src.url,
-            quality=q,
-            container=cnt,
-            audio_only=audio_only,
-            audio_format=afmt,
-            out_template=out_template,
-            rate_limit=rl,
-            threads=th,
-            cookies_browser=cb,
-            download_archive=da,
-        )

@@ -53,6 +53,7 @@ def test_cli_parser_defaults():
     assert args.threads == 8
     assert args.name_template == ""
     assert args.dry_run is False
+    assert args.video_encoder == "auto"
 
 
 def test_cli_parser_custom_args():
@@ -293,6 +294,31 @@ def test_cli_chapters_wires_make_client_and_new_flags(
     assert called_job.opts.game_markers is True
     assert called_job.opts.muted_markers is True
     assert called_job.opts.chat_render is True
+
+
+@patch("cli.ensure_tools")
+@patch("cli.run_job")
+@patch("cli.get_source_info")
+def test_cli_video_encoder_forwarded(mock_get_source_info, mock_run_job, mock_ensure_tools):
+    mock_get_source_info.return_value = SourceInfo(
+        url="https://www.twitch.tv/videos/123456789",
+        id="123456789",
+        title="Enc Stream",
+        uploader="Lucky",
+        duration=3600.0,
+        date="2026-11-06",
+        formats=[],
+        site="twitch",
+    )
+    ret = cli.main([
+        "https://www.twitch.tv/videos/123456789",
+        "--exact",
+        "--video-encoder", "nvenc",
+    ])
+    assert ret == 0
+    called_job = mock_run_job.call_args[0][0]
+    assert called_job.opts.exact is True
+    assert called_job.opts.video_encoder == "nvenc"
 
 
 @patch("cli.ensure_tools")

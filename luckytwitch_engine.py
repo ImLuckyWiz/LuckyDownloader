@@ -3,8 +3,6 @@ LuckyTwitch engine facade (legacy compatibility module).
 
 This module re-exports all symbols from the modular core package (`core/`),
 maintaining 100% backward compatibility for all importers and test suites.
-Kept for backward-compatible test monkeypatching:
-sys.modules["luckydownloader_engine"] = sys.modules[__name__]
 """
 
 from __future__ import annotations
@@ -104,18 +102,21 @@ from core.finalize import (
     _write_sidecar,
     GENERIC_NAME_TEMPLATE,
     PipelineDeps,
+    VIDEO_ENCODER_ARGS,
     check_disk_space,
     clean_title,
     cleanup_stale_workdirs,
     compute_job_workdir,
     format_generic_stem,
     cut_exact,
+    cut_smart,
     date_components,
     dominant_game,
     finalize_audio_part,
     finalize_part,
     format_duration_tag,
     part_stem,
+    resolve_video_encoder,
     run_job,
     safe_name,
     split_copy,
@@ -180,6 +181,8 @@ from core.premiere_export import (
     _timebase,
     premiere_markers_json,
     premiere_markers_xml,
+    probe_keyframes,
+    probe_stream_signature,
     probe_video,
     write_markers_json,
     write_premiere_xml,
@@ -227,7 +230,6 @@ from core.source_info import (
     normalize_url,
     parse_formats,
     parse_game_segments,
-    build_generic_download_args,
     build_generic_format_string,
     parse_generic_formats,
     parse_generic_source_info,
@@ -262,6 +264,7 @@ from core.tools import (
     _download_file,
     _extract_tdcli,
     describe_tools,
+    detect_hw_encoder,
     ensure_tdcli,
     ensure_tools,
     find_tdcli,
@@ -293,6 +296,8 @@ from core.vod_search import (
     search_channels,
 )
 import sys as _sys
+
+_sys.modules["luckydownloader_engine"] = _sys.modules[__name__]
 
 
 def _facade_override_provider(name: str, default):

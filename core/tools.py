@@ -28,6 +28,7 @@ from core.runtime import (
     _NO_WINDOW,
     _tool_env,
     find_tool,
+    resolve_dep,
 )
 
 from typing import TYPE_CHECKING
@@ -35,11 +36,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from core.runtime import Ctx
 
+_ORIG_FIND_TOOL = find_tool
+
 YTDLP_RELEASES = "https://github.com/yt-dlp/yt-dlp/releases"
 FFMPEG_BUILDS = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest"
 TDCLI_REPO = "lay295/TwitchDownloader"
 TDCLI_VERSION = "1.56.5"
 _TDCLI_EXE = "TwitchDownloaderCLI" + EXE
+HW_ENCODERS: tuple[str, ...] = ("h264_nvenc", "h264_qsv", "h264_amf", "h264_videotoolbox")
 
 
 def _is_managed(path: str | Path) -> bool:
@@ -99,6 +103,62 @@ def installed_ytdlp_version() -> str | None:
     if not path:
         return None
     return (_read_versions().get("yt-dlp") if _is_managed(path) else None) or _run_version(path, "--version")
+
+
+def detect_hw_encoder(ffmpeg_path: str | None = None) -> str:
+    """Probe hardware H.264 encoders (NVENC/QSV/AMF/VideoToolbox), cached in versions.json by ffmpeg mtime."""
+    _find = resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
+    ffmpeg = ffmpeg_path or (_find("ffmpeg") if _find else None)
+    if not ffmpeg:
+        return "libx264"
+    try:
+        mtime = round(Path(ffmpeg).stat().st_mtime, 3)
+    except OSError:
+        mtime = 0.0
+    cache_key = f"{ffmpeg}:{mtime}"
+    versions = _read_versions()
+    if versions.get("hw_encoder_key") == cache_key and isinstance(versions.get("hw_encoder"), str) and versions["hw_encoder"]:
+        return versions["hw_encoder"]
+
+    detected = "libx264"
+    for enc in HW_ENCODERS:
+        try:
+            proc = subprocess.run(
+                [
+                    ffmpeg,
+                    "-hide_banner",
+                    "-f", "lavfi",
+                    "-i", "nullsrc=s=128x128:d=0.04",
+                    "-frames:v", "1",
+                    "-c:v", enc,
+                    "-f", "null",
+                    "-",
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                stdin=subprocess.DEVNULL,
+                env=_tool_env(),
+                creationflags=_NO_WINDOW,
+                timeout=10,
+            )
+            if proc.returncode == 0:
+                detected = enc
+                break
+        except (OSError, subprocess.SubprocessError):
+            continue
+
+    try:
+        data = _read_versions()
+        data["hw_encoder"] = detected
+        data["hw_encoder_key"] = cache_key
+        TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+        from core.files import atomic_write_json
+        atomic_write_json(TOOLS_DIR / "versions.json", data)
+    except OSError:
+        pass
+    return detected
 
 
 def describe_tools() -> str:

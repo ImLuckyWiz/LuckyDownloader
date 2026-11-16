@@ -30,7 +30,7 @@ from qt_ui.widgets import Collapsible, ComboBox, SpinBox, Toggle  # noqa: E402
 
 # every setting the Options tab edits (the other five of the 38 belong to the Plan tab)
 OPTIONS_KEYS = {
-    "out_dir", "container", "threads", "strategy", "threshold", "name_template", "clean_title", "subfolders", "provider_subfolders", "folder_template",
+    "out_dir", "container", "threads", "strategy", "threshold", "video_encoder", "name_template", "clean_title", "subfolders", "provider_subfolders", "folder_template",
     "exact", "keep_full", "title_tpl", "pad_after", "gap_title", "sidecar", "premiere_xml", "premiere_plugin",
     "game_markers", "muted_markers", "clip_name_template", "clip_pad_before", "clip_pad_after", "chat", "chat_format",
     "chat_embed", "auto_update", "check_app_updates",
@@ -161,7 +161,7 @@ def test_booleans_are_switches(tab):
 def test_numbers_are_spin_boxes_and_lists_are_combo_boxes(tab):
     spins = {"threads", "threshold", "pad_after", "clip_pad_before", "clip_pad_after", "chat_render_width",
              "chat_render_height", "chat_render_font_size"}
-    combos = {"container", "strategy", "chat_format", "chat_render_mode", "chat_render_look", "chat_render_fps",
+    combos = {"container", "strategy", "video_encoder", "chat_format", "chat_render_mode", "chat_render_look", "chat_render_fps",
               "default_quality", "audio_format", "cookies_from_browser", "cookies_scope"}
     assert {k for k, c in tab.binder.controls.items() if isinstance(c, SpinBox)} == spins
     assert {k for k, c in tab.binder.controls.items() if isinstance(c, ComboBox)} == combos
@@ -176,7 +176,7 @@ UP_FRONT = {
 }
 IN_ADVANCED = {
     "output": {"threads", "name_template", "subfolders", "provider_subfolders", "folder_template"},
-    "cuts": {"threshold"},
+    "cuts": {"threshold", "video_encoder"},
     "premiere": {"premiere_xml", "sidecar"},
     "chat": {"chat_format", "chat_embed", "chat_render_mode", "chat_render_look", "chat_render_width",
              "chat_render_height", "chat_render_font_size", "chat_render_fps", "chat_render_smooth"},
@@ -940,3 +940,16 @@ def test_clean_temp_files_aborts_when_queue_active(tab, monkeypatch):
     tab.queue_busy_hook = lambda: False
     # When queue is inactive, it proceeds to clean
     assert tab.clean_temp_files() >= 0
+
+
+def test_video_encoder_combo_binds_in_options_tab(tab):
+    from core.options import VIDEO_ENCODER_NAMES
+
+    enc_combo = control(tab, "video_encoder")
+    assert isinstance(enc_combo, ComboBox)
+    assert [enc_combo.itemText(i) for i in range(enc_combo.count())] == VIDEO_ENCODER_NAMES
+    assert enc_combo.currentText() == "auto"
+
+    enc_combo.setCurrentText("nvenc")
+    assert tab.settings["video_encoder"] == "nvenc"
+    assert build_options(tab.settings).video_encoder == "nvenc"

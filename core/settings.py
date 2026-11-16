@@ -63,6 +63,7 @@ DEFAULTS = {
     "check_app_updates": True,
     "save_history": True,
     "ytdlp_extra_args": "",
+    "video_encoder": "auto",
 }
 
 

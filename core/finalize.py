@@ -49,7 +49,13 @@ from core.job import Job, JobOptions
 from core.providers import Capability
 from core.muted import muted_from_playlist_url
 from core.planning import Part, Plan, make_plan
-from core.premiere_export import probe_video, write_markers_json, write_premiere_xml
+from core.premiere_export import (
+    probe_keyframes,
+    probe_stream_signature,
+    probe_video,
+    write_markers_json,
+    write_premiere_xml,
+)
 from core.runtime import Ctx, find_tool, resolve_dep
 from core.source_info import (
     GameSegment,
@@ -60,7 +66,7 @@ from core.source_info import (
     resolve_format,
 )
 from core.timeutil import fmt_hms
-from core.tools import ensure_tdcli
+from core.tools import detect_hw_encoder, ensure_tdcli
 from core.twitch_api import fetch_clips_for_vod
 
 _ORIG_FIND_TOOL = find_tool
@@ -73,7 +79,10 @@ _ORIG_GET_PLAYLIST_URL = get_playlist_url
 _ORIG_MUTED_FROM_PLAYLIST_URL = muted_from_playlist_url
 _ORIG_MAKE_CHAPTERS = make_chapters
 _ORIG_ENSURE_TDCLI = ensure_tdcli
+_ORIG_DETECT_HW_ENCODER = detect_hw_encoder
 _ORIG_PROBE_VIDEO = probe_video
+_ORIG_PROBE_KEYFRAMES = probe_keyframes
+_ORIG_PROBE_STREAM_SIGNATURE = probe_stream_signature
 _ORIG_WRITE_PREMIERE_XML = write_premiere_xml
 _ORIG_WRITE_MARKERS_JSON = write_markers_json
 
@@ -86,11 +95,14 @@ class PipelineDeps:
     download_section: Callable[..., Path] | None = None
     download_section_aligned: Callable[..., tuple[Path, float, float] | None] | None = None
     cut_exact: Callable[..., Path] | None = None
+    cut_smart: Callable[..., Path | None] | None = None
     split_copy: Callable[..., dict[int, tuple[Path, float, float]]] | None = None
     finalize_part: Callable[..., Path] | None = None
     finalize_audio_part: Callable[..., Path] | None = None
     ensure_tdcli: Callable[..., str] | None = None
+    detect_hw_encoder: Callable[..., str] | None = None
     probe_video: Callable[..., tuple[float, int, int] | None] | None = None
+    probe_keyframes: Callable[..., list[float]] | None = None
     write_premiere_xml: Callable[..., Path] | None = None
     write_markers_json: Callable[..., Path] | None = None
     load_chapters: Callable[..., list[Chapter]] | None = None
@@ -595,6 +607,255 @@ def split_copy(
     return result
 
 
+VIDEO_ENCODER_ARGS: dict[str, list[str]] = {
+    "libx264": ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18"],
+    "h264_nvenc": ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20"],
+    "h264_qsv": ["-c:v", "h264_qsv", "-preset", "faster", "-global_quality", "20"],
+    "h264_amf": ["-c:v", "h264_amf", "-quality", "balanced", "-rc", "cqp", "-qp_i", "20", "-qp_p", "20"],
+    "h264_videotoolbox": ["-c:v", "h264_videotoolbox", "-q:v", "65"],
+}
+
+_ENCODER_ALIASES: dict[str, str] = {
+    "cpu": "libx264",
+    "libx264": "libx264",
+    "nvenc": "h264_nvenc",
+    "h264_nvenc": "h264_nvenc",
+    "qsv": "h264_qsv",
+    "h264_qsv": "h264_qsv",
+    "amf": "h264_amf",
+    "h264_amf": "h264_amf",
+    "videotoolbox": "h264_videotoolbox",
+    "h264_videotoolbox": "h264_videotoolbox",
+}
+
+
+def resolve_video_encoder(
+    video_encoder: str = "auto",
+    ffmpeg_path: str | None = None,
+    *,
+    detect_fn: Callable[..., str] | None = None,
+) -> str:
+    """Resolve user video_encoder preference to an ffmpeg H.264 encoder name."""
+    choice = (video_encoder or "auto").strip().lower()
+    if choice in _ENCODER_ALIASES:
+        return _ENCODER_ALIASES[choice]
+    _detect = detect_fn or resolve_dep("detect_hw_encoder", _ORIG_DETECT_HW_ENCODER, detect_hw_encoder)
+    detected = _detect(ffmpeg_path) if _detect else "libx264"
+    return detected if detected in VIDEO_ENCODER_ARGS else "libx264"
+
+
+def _fmt_ts(val: float) -> str:
+    return f"{val:.3f}" if abs(val - round(val, 3)) < 1e-6 else f"{val:.6f}"
+
+
+def _encode_segment_with_fallback(
+    ctx: Ctx,
+    run_ff_fn: Callable[..., Any],
+    src_path: Path,
+    start_sec: float,
+    duration_sec: float,
+    out_path: Path,
+    container: str,
+    encoder: str,
+    *,
+    extra_video_args: list[str] | None = None,
+    announce: bool = True,
+) -> str:
+    """Encode a video segment with `encoder`, falling back to libx264 if hardware encoding fails."""
+    active = encoder if encoder in VIDEO_ENCODER_ARGS else "libx264"
+    if announce:
+        ctx.log(t("Encoding with {encoder}…", encoder=active))
+
+    def _build_args(enc: str) -> list[str]:
+        v_args = list(VIDEO_ENCODER_ARGS[enc])
+        if extra_video_args:
+            v_args.extend(extra_video_args)
+        return [
+            "-ss", _fmt_ts(start_sec),
+            "-i", str(src_path),
+            "-t", _fmt_ts(duration_sec),
+            "-map", "0:v:0",
+            "-map", "0:a?",
+            *v_args,
+            "-c:a", "aac", "-b:a", "192k",
+            *mp4_flags(container),
+            str(out_path),
+        ]
+
+    try:
+        run_ff_fn(ctx, _build_args(active), total=duration_sec)
+        return active
+    except Cancelled:
+        raise
+    except EngineError:
+        if active == "libx264":
+            raise
+        ctx.log(t("Hardware encoder {encoder} failed, falling back to libx264…", encoder=active))
+        run_ff_fn(ctx, _build_args("libx264"), total=duration_sec)
+        return "libx264"
+
+
+def cut_smart(
+    ctx: Ctx,
+    full: Path,
+    part: Part,
+    container: str,
+    workdir: Path,
+    offset: float | None = None,
+    *,
+    video_encoder: str = "auto",
+    deps: PipelineDeps | None = None,
+) -> Path | None:
+    """
+    Smart Cut: re-encode only boundary GOP stubs around keyframes and stream-copy the interior.
+    Returns output Path on success, or None to fall back to full `cut_exact()`.
+    """
+    if part.duration <= 20.0:
+        return None
+
+    _probe_sig = resolve_dep("probe_stream_signature", _ORIG_PROBE_STREAM_SIGNATURE, probe_stream_signature)
+    sig = _probe_sig(full) if _probe_sig else None
+    if isinstance(sig, dict):
+        codec = str(sig.get("codec_name") or "").lower()
+        if codec and codec not in ("h264", "avc", "avc1"):
+            ctx.log(t("Smart Cut skipped ({codec}): using full re-encode.", codec=codec))
+            return None
+
+    eff_start = part.start if offset is None else offset
+    eff_end = eff_start + part.duration
+    _probe_kf = getattr(deps, "probe_keyframes", None) or resolve_dep(
+        "probe_keyframes", _ORIG_PROBE_KEYFRAMES, probe_keyframes
+    )
+    keyframes = _probe_kf(full, [eff_start, eff_end]) if _probe_kf else []
+    first_candidates = [k for k in keyframes if eff_start <= k <= eff_start + 15.0 + 1e-3]
+    last_candidates = [k for k in keyframes if eff_end - 15.0 - 1e-3 <= k <= eff_end]
+    if not first_candidates or not last_candidates:
+        return None
+    first_kf = min(first_candidates)
+    last_kf = max(last_candidates)
+    if last_kf - first_kf < 1.0:
+        return None
+
+    extra_video_args: list[str] = []
+    if isinstance(sig, dict):
+        prof = str(sig.get("profile") or "").strip().lower()
+        if prof in ("main", "high"):
+            extra_video_args.extend(["-profile:v", prof])
+        pix_fmt = str(sig.get("pix_fmt") or "").strip()
+        if pix_fmt:
+            extra_video_args.extend(["-pix_fmt", pix_fmt])
+        if container.lower().lstrip(".") == "mp4":
+            tb = str(sig.get("time_base") or "").strip()
+            m_tb = re.fullmatch(r"1/(\d+)", tb)
+            if m_tb:
+                extra_video_args.extend(["-video_track_timescale", m_tb.group(1)])
+
+    _find = getattr(deps, "find_tool", None) or resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
+    _detect = getattr(deps, "detect_hw_encoder", None) or resolve_dep(
+        "detect_hw_encoder", _ORIG_DETECT_HW_ENCODER, detect_hw_encoder
+    )
+    _run_ff = getattr(deps, "run_ffmpeg", None) or resolve_dep("run_ffmpeg", _ORIG_RUN_FFMPEG, run_ffmpeg)
+
+    ffmpeg_path = _find("ffmpeg") if _find else None
+    active_enc = resolve_video_encoder(video_encoder, ffmpeg_path, detect_fn=_detect)
+    sdir = workdir / f"smart_{part.index}"
+    if sdir.exists():
+        shutil.rmtree(sdir, ignore_errors=True)
+    sdir.mkdir(parents=True, exist_ok=True)
+    out = workdir / f"exact_{part.index}.{container}"
+
+    ctx.log(t("Smart Cut: re-encoding boundary GOP stubs and copying interior…"))
+    try:
+        pieces: list[Path] = []
+        announced = False
+        head_dur = first_kf - eff_start
+        if head_dur > 1e-3:
+            head_path = sdir / f"head.{container}"
+            active_enc = _encode_segment_with_fallback(
+                ctx,
+                _run_ff,
+                full,
+                eff_start,
+                head_dur,
+                head_path,
+                container,
+                active_enc,
+                extra_video_args=extra_video_args or None,
+                announce=not announced,
+            )
+            announced = True
+            pieces.append(head_path)
+
+        mid_dur = last_kf - first_kf
+        mid_path = sdir / f"mid.{container}"
+        _run_ff(
+            ctx,
+            [
+                "-ss", _fmt_ts(first_kf),
+                "-i", str(full),
+                "-t", _fmt_ts(mid_dur),
+                "-map", "0:v:0",
+                "-map", "0:a?",
+                "-c", "copy",
+                "-avoid_negative_ts", "make_zero",
+                *mp4_flags(container),
+                str(mid_path),
+            ],
+            total=mid_dur,
+        )
+        pieces.append(mid_path)
+
+        tail_dur = eff_end - last_kf
+        if tail_dur > 1e-3:
+            tail_path = sdir / f"tail.{container}"
+            active_enc = _encode_segment_with_fallback(
+                ctx,
+                _run_ff,
+                full,
+                last_kf,
+                tail_dur,
+                tail_path,
+                container,
+                active_enc,
+                extra_video_args=extra_video_args or None,
+                announce=not announced,
+            )
+            announced = True
+            pieces.append(tail_path)
+
+        concat_list = sdir / "concat.txt"
+        concat_lines = [
+            "file '" + p.resolve().as_posix().replace("'", r"'\''") + "'"
+            for p in pieces
+        ]
+        concat_list.write_text("\n".join(concat_lines) + "\n", encoding="utf-8")
+        _run_ff(
+            ctx,
+            [
+                "-f", "concat",
+                "-safe", "0",
+                "-i", str(concat_list),
+                "-map", "0:v:0",
+                "-map", "0:a?",
+                "-c", "copy",
+                *mp4_flags(container),
+                str(out),
+            ],
+            total=part.duration,
+        )
+        return out
+    except Cancelled:
+        raise
+    except EngineError:
+        out.unlink(missing_ok=True)
+        return None
+    finally:
+        shutil.rmtree(sdir, ignore_errors=True)
+
+
+_ORIG_CUT_SMART = cut_smart
+
+
 def cut_exact(
     ctx: Ctx,
     full: Path,
@@ -603,26 +864,44 @@ def cut_exact(
     workdir: Path,
     offset: float | None = None,
     *,
+    video_encoder: str = "auto",
+    smart: bool = True,
     deps: PipelineDeps | None = None,
 ) -> Path:
     """
-    Frame-exact cut (re-encodes video).
+    Frame-exact cut (uses Smart Cut GOP boundary splice for > 20s parts, else re-encodes).
     `offset`: where the part starts inside `full` (default: part.start, i.e. `full` is the whole VOD).
     """
+    if smart and part.duration > 20.0:
+        _smart = getattr(deps, "cut_smart", None) or resolve_dep("cut_smart", _ORIG_CUT_SMART, cut_smart)
+        if _smart:
+            smart_kw = {"deps": deps} if (deps is not None and "deps" in inspect.signature(_smart).parameters) else {}
+            smart_out = _smart(
+                ctx, full, part, container, workdir, offset=offset, video_encoder=video_encoder, **smart_kw
+            )
+            if smart_out is not None:
+                return smart_out
+
+    _find = getattr(deps, "find_tool", None) or resolve_dep("find_tool", _ORIG_FIND_TOOL, find_tool)
+    _detect = getattr(deps, "detect_hw_encoder", None) or resolve_dep(
+        "detect_hw_encoder", _ORIG_DETECT_HW_ENCODER, detect_hw_encoder
+    )
     _run_ff = getattr(deps, "run_ffmpeg", None) or resolve_dep("run_ffmpeg", _ORIG_RUN_FFMPEG, run_ffmpeg)
 
+    ffmpeg_path = _find("ffmpeg") if _find else None
+    encoder = resolve_video_encoder(video_encoder, ffmpeg_path, detect_fn=_detect)
+    eff_start = part.start if offset is None else offset
     out = workdir / f"exact_{part.index}.{container}"
-    _run_ff(
+    _encode_segment_with_fallback(
         ctx,
-        [
-            "-ss", f"{part.start if offset is None else offset:.3f}", "-i", str(full), "-t", f"{part.duration:.3f}",
-            "-map", "0:v:0", "-map", "0:a?",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-            "-c:a", "aac", "-b:a", "192k",
-            *mp4_flags(container),
-            str(out),
-        ],
-        total=part.duration,
+        _run_ff,
+        full,
+        eff_start,
+        part.duration,
+        out,
+        container,
+        encoder,
+        announce=True,
     )
     return out
 
@@ -923,7 +1202,10 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
             if opts.exact:
                 for i, p in enumerate(plan.parts):
                     ctx.stage(0.85 + 0.15 * i / total_parts, 0.85 + 0.15 * (i + 1) / total_parts, t("Re-encoding part {part}/{total}", part=p.index, total=total_parts))
-                    cut = _cut(ctx, full, p, opts.container, workdir)
+                    cut_kw = {"video_encoder": opts.video_encoder} if _supports_kw(_cut, "video_encoder") else {}
+                    if deps is not None and _supports_kw(_cut, "deps"):
+                        cut_kw["deps"] = deps
+                    cut = _cut(ctx, full, p, opts.container, workdir, **cut_kw)
                     finish(p, cut, p.start, p.end)
             else:
                 split_container = "m4a" if audio_only else opts.container
@@ -951,7 +1233,8 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
                     and getattr(src, "twitch_vod_id", None)
                     and src.has_capability(Capability.TIMELINE)
                 )
-                aligned = _dl_align(ctx, src.url, p, workdir, **dl_kw) if use_aligned else None
+                aligned_cookies_kw = cookies_kw if _supports_kw(_dl_align, "cookies_browser") else {}
+                aligned = _dl_align(ctx, src.url, p, workdir, **dl_kw, **aligned_cookies_kw) if use_aligned else None
                 if aligned:
                     f, real_start, real_end = aligned
                     early = p.start - real_start
@@ -959,7 +1242,10 @@ def run_job(job: Job, ctx: Ctx, *, deps: PipelineDeps | None = None) -> list[Pat
                     ctx.log(t("Part {part} starts at {start} (asked {asked}{early}) and ends at {end}", part=p.index, start=fmt_hms(real_start), asked=fmt_hms(p.start), early=_early, end=fmt_hms(real_end)))
                     if opts.exact:
                         ctx.stage(lo + (hi - lo) * 0.9, hi, t("Re-encoding part {part}/{total}", part=p.index, total=total_parts))
-                        f = _cut(ctx, f, p, opts.container, workdir, offset=max(0.0, p.start - real_start))
+                        cut_kw = {"video_encoder": opts.video_encoder} if _supports_kw(_cut, "video_encoder") else {}
+                        if deps is not None and _supports_kw(_cut, "deps"):
+                            cut_kw["deps"] = deps
+                        f = _cut(ctx, f, p, opts.container, workdir, offset=max(0.0, p.start - real_start), **cut_kw)
                         real_start, real_end = p.start, p.end
                 else:
                     try:

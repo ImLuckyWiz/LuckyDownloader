@@ -173,6 +173,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Re-encode cut points for frame-exact trimming (slower).",
     )
     parser.add_argument(
+        "--video-encoder",
+        choices=["auto", "cpu", "nvenc", "qsv", "amf", "videotoolbox"],
+        default="auto",
+        help='Video encoder for --exact cuts: "auto", "cpu", "nvenc", "qsv", "amf", or "videotoolbox" (default: auto).',
+    )
+    parser.add_argument(
         "--format",
         "--container",
         dest="container",
@@ -374,6 +380,7 @@ def _build_job_options(args: argparse.Namespace, cut_text: str) -> JobOptions:
         cookies_browser=args.cookies_browser or "",
         subfolders=args.subfolders,
         download_archive=args.download_archive or "",
+        video_encoder=getattr(args, "video_encoder", "auto") or "auto",
         **opts_kwargs,
     )
 
@@ -419,8 +426,9 @@ def _run_local_cut(args: argparse.Namespace, ctx: Ctx, reporter: ConsoleReporter
     with tempfile.TemporaryDirectory(prefix=".lucky_cut_", dir=str(out_dir)) as tmp:
         workdir = Path(tmp)
         if args.exact:
+            enc = getattr(args, "video_encoder", "auto") or "auto"
             for part in plan.parts:
-                seg_path = cut_exact(ctx, local_path, part, ext, workdir)
+                seg_path = cut_exact(ctx, local_path, part, ext, workdir, video_encoder=enc)
                 dest = out_dir / f"{local_path.stem} - part{part.index}.{ext}"
                 part_dest = dest.with_name(dest.name + ".part")
                 shutil.move(str(seg_path), str(part_dest))

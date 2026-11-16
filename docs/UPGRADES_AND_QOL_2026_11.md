@@ -1,6 +1,6 @@
 # LuckyDownloader — Upgrades & Quality-of-Life Plan (2026-11)
 
-> Status: **COMPLETE** (2026-11-13). Baseline HEAD `4fb1877`.
+> Status: **PHASE 4A IMPLEMENTED** (`U-DL-01`, `U-DL-02` completed 2026-11-15; Wave 1 + `U-CLI-01..03` shipped in `v2.17.0`; remaining Wave 2 `U-DATA-01`/`02`, `U-UI-01`/`02`/`07`, `U-CEP-02` and Wave 3 pending). Baseline HEAD `4fb1877`.
 > Scope: meaningful UX, feature and architecture upgrades only. Bugs, security issues and regressions live in
 > [`REVIEW_2026_11_V2.md`](REVIEW_2026_11_V2.md); where an upgrade depends on a bug fix, the finding ID is cited.
 
@@ -17,6 +17,12 @@ Template per proposal: ID / Title / Impact (`High`/`Medium`/`Low`) / Effort (`S`
 - [x] **5. Developer Workflow, CI & Release** (`U-DEV-*`) (`U-DEV-01..03`).
 - [x] **6. Headless CLI & Automation** (`U-CLI-*`) (`U-CLI-01..03`).
 - [x] **7. Recommended Implementation Order** — quick wins vs. larger high-impact upgrades.
+
+### Release Cadence & Publishing
+After completing any meaningful phase or upgrade batch (once `pytest` and `python tools/i18n.py check` pass cleanly):
+1. Add a new `## vX.Y.Z` section at the top of [`RELEASE_NOTES.md`](../RELEASE_NOTES.md) (must match the tag name on line 1, or `.github/workflows/build.yml` `init-release` will fail).
+2. Commit and push to `main` so GitHub Actions runs `test` + cross-platform Nuitka/CEP builds (`windows`, `macos-arm64`, `linux-x86_64`).
+3. Create and push the matching `vX.Y.Z` tag (`git tag vX.Y.Z && git push origin vX.Y.Z`) to create the draft release, compile all GUI/CLI/CEP artifacts, generate `SHA256SUMS.txt`, and publish the GitHub Release atomically.
 
 ---
 
@@ -40,8 +46,8 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 
 | Order | Proposal ID | Title | Impact | Effort | Why Now |
 |---|---|---|---|---|---|
-| 8 | `U-DL-01` | Hardware-accelerated video encoding (`NVENC` / `QSV` / `AMF` / `VideoToolbox`) | High | M | 5–10× faster `cut_exact()` re-encoding with automatic `libx264` fallback. |
-| 9 | `U-DL-02` | Smart Cut (keyframe-aligned GOP boundary splice) | High | M | Turns multi-minute exact VOD trims into multi-second boundary splices without quality loss in interior footage. |
+| 8 | `U-DL-01` | Hardware-accelerated video encoding (`NVENC` / `QSV` / `AMF` / `VideoToolbox`) | High | M | **DONE (Phase 4A, 2026-11-15)** — `detect_hw_encoder()`, `video_encoder` option/UI/CLI, and `libx264` fallback. |
+| 9 | `U-DL-02` | Smart Cut (keyframe-aligned GOP boundary splice) | High | M | **DONE (Phase 4A, 2026-11-15)** — `probe_keyframes()`, `probe_stream_signature()`, `cut_smart()` boundary splice + concat. |
 | 10 | `U-CLI-02` | Full engine parity in `cli.py` (Twitch `--chapters`, playlists, archives) | High | M | Unlocks automated CLI/headless pipelines with full feature parity (`M-05`). |
 | 11 | `U-CLI-01` | Unified parameterized `cli.py` (`cut-local`, `batch`) replacing root Colab scripts | High | M | Retires hardcoded `Vexoria` scripts (`M-01`) while bringing single-pass `split_copy` to local files. |
 | 12 | `U-DATA-01` | OS Keyring / Windows DPAPI protection for Twitch OAuth & secrets | High | M | Removes plaintext OAuth tokens from `config.json` on disk (`C-06` follow-up). |
@@ -76,7 +82,7 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 
 ## Theme 1 — Download & Queue Engine (`U-DL-*`)
 
-### [U-DL-01] Hardware-Accelerated Video Encoding (`NVENC` / `QSV` / `AMF` / `VideoToolbox`) for Frame-Exact Cuts
+### [U-DL-01] Hardware-Accelerated Video Encoding (`NVENC` / `QSV` / `AMF` / `VideoToolbox`) for Frame-Exact Cuts — **DONE (Phase 4A, 2026-11-15)**
 - **Impact:** High | **Effort:** M
 - **Current Limitation:** `cut_exact()` (`core/finalize.py:568-578`) hardcodes CPU software encoding (`-c:v libx264 -preset veryfast -crf 18`). On 1080p60 or 1440p60 VODs, frame-exact cutting of long parts is CPU-bound, saturates all cores, and can take tens of minutes.
 - **Proposed Upgrade:**
@@ -89,7 +95,7 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 
 ---
 
-### [U-DL-02] Smart Cut (Keyframe-Aligned GOP Boundary Splice) for Near-Instant Frame-Exact Trimming
+### [U-DL-02] Smart Cut (Keyframe-Aligned GOP Boundary Splice) for Near-Instant Frame-Exact Trimming — **DONE (Phase 4A, 2026-11-15)**
 - **Impact:** High | **Effort:** M
 - **Current Limitation:** `compute_job_workdir()` (`core/finalize.py:129`) already references `keyframe_align`, yet the pipeline only offers coarse stream-copy (`split_copy` / `download_section_aligned`, which snaps to GOP/HLS boundaries up to 2–10 s away) or full re-encoding of 100% of frames (`cut_exact`).
 - **Proposed Upgrade:**

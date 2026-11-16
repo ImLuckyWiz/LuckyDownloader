@@ -56,9 +56,9 @@ def test_resource_path_points_into_the_project():
 # ------------------------------------------------------------------ settings
 def test_defaults_are_the_42_documented_keys_with_the_documented_types():
     d = settings.DEFAULTS
-    assert len(d) == 49
+    assert len(d) == 50
     assert sum(isinstance(v, bool) for v in d.values()) == 18
-    assert sum(isinstance(v, str) for v in d.values()) == 30
+    assert sum(isinstance(v, str) for v in d.values()) == 31
     assert sum(isinstance(v, dict) for v in d.values()) == 1
     expected_bools = {
         "exact", "keep_full", "chapters", "sidecar", "premiere_xml",

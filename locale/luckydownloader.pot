@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LuckyDownloader\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-13 17:56-0300\n"
+"POT-Creation-Date: 2026-11-15 22:14-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -305,12 +305,22 @@ msgid "Downloading part {part}/{total}"
 msgstr ""
 
 #: core/finalize.py
+#, python-brace-format
+msgid "Encoding with {encoder}…"
+msgstr ""
+
+#: core/finalize.py
 msgid "Fetching clips for chapters…"
 msgstr ""
 
 #: core/finalize.py
 #, python-brace-format
 msgid "Finishing part {part}/{total}"
+msgstr ""
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Hardware encoder {encoder} failed, falling back to libx264…"
 msgstr ""
 
 #: core/finalize.py
@@ -344,6 +354,15 @@ msgstr ""
 #: core/finalize.py
 #, python-brace-format
 msgid "Saving {name}…"
+msgstr ""
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Smart Cut skipped ({codec}): using full re-encode."
+msgstr ""
+
+#: core/finalize.py
+msgid "Smart Cut: re-encoding boundary GOP stubs and copying interior…"
 msgstr ""
 
 #: core/finalize.py
@@ -1752,6 +1771,10 @@ msgid "Group by provider subfolder"
 msgstr ""
 
 #: qt_ui/tabs/options.py
+msgid "Hardware or software encoder used for frame-exact cuts."
+msgstr ""
+
+#: qt_ui/tabs/options.py
 msgid "How a single downloaded clip is called."
 msgstr ""
 
@@ -2162,6 +2185,10 @@ msgid "Version"
 msgstr ""
 
 #: qt_ui/tabs/options.py
+msgid "Video encoder"
+msgstr ""
+
+#: qt_ui/tabs/options.py
 msgid "View version info or export a redacted diagnostics bundle."
 msgstr ""
 
@@ -2194,6 +2221,12 @@ msgstr ""
 msgid ""
 "Windows did not accept the setting:\n"
 "{error}"
+msgstr ""
+
+#: qt_ui/tabs/options.py
+msgid ""
+"auto probes for GPU hardware encoding (NVENC, QSV, AMF, VideoToolbox) and falls back to CPU "
+"(libx264)."
 msgstr ""
 
 #: qt_ui/tabs/options.py

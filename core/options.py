@@ -43,6 +43,20 @@ COOKIES_SCOPE_CHOICES = {
     "All supported sites": "all",
 }
 COOKIES_SCOPE_NAMES = list(COOKIES_SCOPE_CHOICES)
+VIDEO_ENCODER_CHOICES = {
+    "auto": "auto",
+    "cpu": "cpu",
+    "nvenc": "nvenc",
+    "qsv": "qsv",
+    "amf": "amf",
+    "videotoolbox": "videotoolbox",
+    "libx264": "cpu",
+    "h264_nvenc": "nvenc",
+    "h264_qsv": "qsv",
+    "h264_amf": "amf",
+    "h264_videotoolbox": "videotoolbox",
+}
+VIDEO_ENCODER_NAMES = ["auto", "cpu", "nvenc", "qsv", "amf", "videotoolbox"]
 
 STRATEGY_NAMES = list(STRATEGIES)
 QUALITY_NAMES = list(QUALITY_CHOICES)
@@ -135,4 +149,5 @@ def build_options(settings: dict, cut_text: str = "", quality: str | None = None
         audio_format=AUDIO_FORMAT_CHOICES.get(text(s, "audio_format"), "m4a"),
         cookies_browser="" if text(s, "cookies_from_browser").strip().lower() in ("none", "disabled", "") else text(s, "cookies_from_browser").strip().lower(),
         cookies_scope=COOKIES_SCOPE_CHOICES.get(text(s, "cookies_scope"), text(s, "cookies_scope").strip().lower() if text(s, "cookies_scope").strip().lower() in ("known_only", "all") else "known_only"),
+        video_encoder=VIDEO_ENCODER_CHOICES.get(text(s, "video_encoder").strip().lower(), "auto"),
     )

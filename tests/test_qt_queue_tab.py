@@ -705,11 +705,12 @@ def test_delegate_paints_rich_row_progress_and_inline_open_button(tab, qtbot, mo
     opened = []
     monkeypatch.setattr(queue_tab, "open_in_file_manager", lambda p, select=False: opened.append((p, select)))
 
-    pos = QPointF(btn_rect.center())
+    local_pos = QPointF(btn_rect.center())
+    global_pos = QPointF(tab.table.viewport().mapToGlobal(btn_rect.center()))
     ev = QMouseEvent(
         QEvent.Type.MouseButtonRelease,
-        pos,
-        pos,
+        local_pos,
+        global_pos,
         Qt.MouseButton.LeftButton,
         Qt.MouseButton.LeftButton,
         Qt.KeyboardModifier.NoModifier,

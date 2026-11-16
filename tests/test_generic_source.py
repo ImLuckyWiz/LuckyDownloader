@@ -16,7 +16,6 @@ from core.planning import Part
 from core.providers import Capability, GenericProvider
 from core.source_info import (
     VideoFormat,
-    build_generic_download_args,
     build_generic_format_string,
     parse_generic_formats,
     parse_generic_source_info,
@@ -206,68 +205,87 @@ def test_build_generic_format_string_with_source_info():
 
 
 # --------------------------------------------------------------------------- #
-# Download arguments builder
+# Production run_ytdlp download command assembly
 # --------------------------------------------------------------------------- #
-def test_build_generic_download_args_defaults():
-    args = build_generic_download_args("https://example.com/video")
-    assert "-f" in args
-    assert "bv*+ba/b" in args
-    assert "--merge-output-format" in args
-    assert "mp4" in args
-    assert "--concurrent-fragments" in args
-    assert "4" in args
-    assert "--remote-components" not in args
-    assert args[-2] == "--"
-    assert args[-1] == "https://example.com/video"
+def _capture_ytdlp_cmd(monkeypatch, fn):
+    import luckytwitch_engine as eng
+    from core.runtime import Ctx
 
-    args_yt = build_generic_download_args("https://youtube.com/watch?v=123")
-    assert "--remote-components" in args_yt
-    assert args_yt[-2] == "--"
-    assert args_yt[-1] == "https://youtube.com/watch?v=123"
+    recorded = []
+    monkeypatch.setattr(eng, "find_tool", lambda name: "fake_ytdlp" if name == "yt-dlp" else None)
+
+    class FakeProc:
+        def __init__(self, cmd, **kw):
+            self.cmd = cmd
+            self.stdout = iter([])
+            self.returncode = 0
+
+        def wait(self):
+            return 0
+
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(eng.subprocess, "Popen", lambda cmd, **kw: (recorded.append(cmd), FakeProc(cmd))[1])
+    fn(Ctx())
+    assert len(recorded) == 1
+    return recorded[0]
 
 
-def test_build_generic_download_args_custom_container_and_rate_limit():
-    args = build_generic_download_args(
-        "https://example.com/video",
-        quality="720p",
-        container="mkv",
-        rate_limit="2.5M",
-        threads=8,
-        out_template="D:/out/%(title)s.%(ext)s",
+def test_run_ytdlp_defaults_and_youtube_args(monkeypatch):
+    from core.download import run_ytdlp
+
+    cmd = _capture_ytdlp_cmd(
+        monkeypatch,
+        lambda ctx: run_ytdlp(ctx, ["https://example.com/video"], threads=4),
     )
-    assert "-f" in args
-    assert "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b" in args
-    assert "--merge-output-format" in args
-    assert "mkv" in args
-    assert "--limit-rate" in args
-    assert "2.5M" in args
-    assert "--concurrent-fragments" in args
-    assert "8" in args
-    assert "-o" in args
-    assert "D:/out/%(title)s.%(ext)s" in args
+    assert "-S" in cmd and "res,fps,tbr" in cmd
+    assert "--no-playlist" in cmd
+    assert "--concurrent-fragments" in cmd and "4" in cmd
+    assert "--remote-components" not in cmd
+    assert cmd[-2] == "--"
+    assert cmd[-1] == "https://example.com/video"
 
-
-def test_build_generic_download_args_audio_only():
-    args_mp3 = build_generic_download_args(
-        "https://example.com/video",
-        audio_only=True,
-        container="mp3",
+    cmd_yt = _capture_ytdlp_cmd(
+        monkeypatch,
+        lambda ctx: run_ytdlp(ctx, ["https://youtube.com/watch?v=123"], threads=4),
     )
-    assert "-f" in args_mp3
-    assert "ba/b" in args_mp3
-    assert "-x" in args_mp3
-    assert "--audio-format" in args_mp3
-    assert "mp3" in args_mp3
-    assert "--merge-output-format" not in args_mp3
+    assert "--remote-components" in cmd_yt
+    assert cmd_yt[-2] == "--"
+    assert cmd_yt[-1] == "https://youtube.com/watch?v=123"
 
-    args_m4a = build_generic_download_args(
-        "https://example.com/video",
-        audio_only=True,
-        audio_format="m4a",
+
+def test_run_ytdlp_custom_format_rate_limit_and_template(monkeypatch):
+    from core.download import run_ytdlp
+
+    fmt_str = build_generic_format_string(quality="720p")
+    cmd = _capture_ytdlp_cmd(
+        monkeypatch,
+        lambda ctx: run_ytdlp(
+            ctx,
+            ["-o", "D:/out/%(title)s.%(ext)s", "https://example.com/video"],
+            threads=8,
+            format_id=fmt_str,
+            rate_limit="2.5M",
+        ),
     )
-    assert "-x" in args_m4a
-    assert "--audio-format" in args_m4a
-    assert "m4a" in args_m4a
+    assert "-f" in cmd
+    assert "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b" in cmd
+    assert "--limit-rate" in cmd and "2.5M" in cmd
+    assert "--concurrent-fragments" in cmd and "8" in cmd
+    assert "-o" in cmd and "D:/out/%(title)s.%(ext)s" in cmd
+
+
+def test_run_ytdlp_audio_only_format_string(monkeypatch):
+    from core.download import run_ytdlp
+
+    fmt_str = build_generic_format_string(audio_only=True)
+    cmd = _capture_ytdlp_cmd(
+        monkeypatch,
+        lambda ctx: run_ytdlp(ctx, ["https://example.com/video"], threads=4, format_id=fmt_str),
+    )
+    assert "-f" in cmd
+    assert "ba/b" in cmd
 
 
 # --------------------------------------------------------------------------- #
@@ -424,24 +442,37 @@ def test_map_generic_error_samples():
     assert "Video unavailable" in msg
 
 
-def test_build_generic_download_args_cookies():
-    from core.source_info import build_generic_download_args
+def test_run_ytdlp_cookies(monkeypatch):
+    from core.download import run_ytdlp
 
-    args_no_cookies = build_generic_download_args("https://youtube.com/watch?v=123")
-    assert "--cookies-from-browser" not in args_no_cookies
+    cmd_no_cookies = _capture_ytdlp_cmd(
+        monkeypatch,
+        lambda ctx: run_ytdlp(ctx, ["https://youtube.com/watch?v=123"], threads=4),
+    )
+    assert "--cookies-from-browser" not in cmd_no_cookies
 
-    args_chrome = build_generic_download_args("https://youtube.com/watch?v=123", cookies_browser="chrome")
-    assert "--cookies-from-browser" in args_chrome
-    idx = args_chrome.index("--cookies-from-browser")
-    assert args_chrome[idx + 1] == "chrome"
+    cmd_chrome = _capture_ytdlp_cmd(
+        monkeypatch,
+        lambda ctx: run_ytdlp(ctx, ["https://youtube.com/watch?v=123"], threads=4, cookies_browser="chrome"),
+    )
+    assert "--cookies-from-browser" in cmd_chrome
+    idx = cmd_chrome.index("--cookies-from-browser")
+    assert cmd_chrome[idx + 1] == "chrome"
 
-    args_none = build_generic_download_args("https://youtube.com/watch?v=123", cookies_browser="None")
-    assert "--cookies-from-browser" not in args_none
+    cmd_none = _capture_ytdlp_cmd(
+        monkeypatch,
+        lambda ctx: run_ytdlp(ctx, ["https://youtube.com/watch?v=123"], threads=4, cookies_browser="None"),
+    )
+    assert "--cookies-from-browser" not in cmd_none
 
 
-def test_generic_provider_build_download_args_cookies():
-    prov = GenericProvider("youtube")
+def test_run_job_passes_cookies_to_ytdlp_subprocess(monkeypatch, tmp_path):
+    from core.finalize import run_job
+    from core.job import Job, JobOptions
+    from core.runtime import Ctx
     from core.source_info import SourceInfo
+    import luckytwitch_engine as eng
+
     src = SourceInfo(
         url="https://youtube.com/watch?v=123",
         id="123",
@@ -451,11 +482,40 @@ def test_generic_provider_build_download_args_cookies():
         date="2026-01-01",
         site="youtube",
     )
-    opts = JobOptions(cut_text="", out_dir="", cookies_browser="firefox")
-    args = prov.build_download_args(src, opts)
-    assert "--cookies-from-browser" in args
-    idx = args.index("--cookies-from-browser")
-    assert args[idx + 1] == "firefox"
+    opts = JobOptions(cut_text="", out_dir=str(tmp_path / "out"), strategy="full", cookies_browser="firefox")
+
+    recorded = []
+    monkeypatch.setattr(eng, "find_tool", lambda name: "fake_ytdlp" if name == "yt-dlp" else "fake_ffmpeg")
+    monkeypatch.setattr("core.finalize.check_disk_space", lambda *a, **kw: None)
+
+    class FakeProc:
+        def __init__(self, cmd, **kw):
+            self.cmd = cmd
+            self.stdout = iter([])
+            self.returncode = 0
+
+        def wait(self):
+            return 0
+
+        def poll(self):
+            return 0
+
+    def fake_popen(cmd, **kw):
+        recorded.append(cmd)
+        out_idx = cmd.index("-o")
+        out_tpl = cmd[out_idx + 1]
+        out_file = Path(out_tpl.replace("%(ext)s", "mp4").replace("%%", "%"))
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        out_file.write_bytes(b"video")
+        return FakeProc(cmd)
+
+    monkeypatch.setattr(eng.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(eng, "finalize_part", lambda *a, **kw: tmp_path / "out" / "final.mp4")
+    run_job(Job(source=src, opts=opts), Ctx())
+    assert recorded
+    assert "--cookies-from-browser" in recorded[0]
+    idx = recorded[0].index("--cookies-from-browser")
+    assert recorded[0][idx + 1] == "firefox"
 
 
 def test_generic_provider_get_source_info_passes_cookies(monkeypatch):

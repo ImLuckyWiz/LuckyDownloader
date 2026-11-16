@@ -1,3 +1,13 @@
+## v2.19.0
+
+LuckyDownloader **v2.19.0** introduces hardware-accelerated video encoding and Smart Cut keyframe splicing, dramatically speeding up frame-exact (`--exact`) video trimming while preserving visual quality:
+
+- **Hardware-Accelerated Video Encoding:** Frame-exact cuts now automatically detect and use GPU hardware encoders—**NVIDIA NVENC**, **Intel Quick Sync (QSV)**, **AMD AMF**, or **Apple VideoToolbox**—when available, with automatic fallback to CPU (`libx264`) if a hardware encoder is unavailable or fails. You can also choose a specific encoder under **Options → Cuts → Advanced → Video encoder** or via `--video-encoder` in the CLI.
+- **Smart Cut (Keyframe-Aligned Boundary Splicing):** When frame-exact trimming is enabled on parts longer than 20 seconds (H.264), LuckyDownloader now re-encodes only the short boundary segments around the start and end keyframes, stream-copies the untouched interior without quality loss, and stitches everything together cleanly for Premiere Pro (`movie_timescale = 1000`).
+- **Fixes & Reliability:** Improved browser cookie forwarding for aligned Twitch HLS section downloads and cleaned up legacy compatibility/module handling under the hood.
+
+---
+
 ## v2.18.0
 
 LuckyDownloader **v2.18.0** adds a **Favorites** streamer list and quick per-row hover actions in the Search tab:

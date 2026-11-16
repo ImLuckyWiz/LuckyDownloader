@@ -21,6 +21,7 @@ import requests
 from core.errors import ArchiveSkippedError, Cancelled, EngineError
 from core.i18n import t, tn
 from core.planning import Part
+from core.premiere_export import probe_keyframes
 from core.runtime import Ctx, _NO_WINDOW, _tool_env, find_tool, resolve_dep
 from core.source_info import YTDLP_MISSING
 from core.timeutil import fmt_hms

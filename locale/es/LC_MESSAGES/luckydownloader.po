@@ -4001,3 +4001,38 @@ msgstr "Quitar de favoritos"
 msgid "Your saved streamers"
 msgstr "Tus streamers guardados"
 
+#: core/finalize.py
+#, python-brace-format
+msgid "Encoding with {encoder}…"
+msgstr "Codificando con {encoder}…"
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Hardware encoder {encoder} failed, falling back to libx264…"
+msgstr "El codificador de hardware {encoder} falló; volviendo a libx264…"
+
+#: core/finalize.py
+#, python-brace-format
+msgid "Smart Cut skipped ({codec}): using full re-encode."
+msgstr "Smart Cut omitido ({codec}): usando recodificación completa."
+
+#: core/finalize.py
+msgid "Smart Cut: re-encoding boundary GOP stubs and copying interior…"
+msgstr "Smart Cut: recodificando los extremos de GOP y copiando el interior…"
+
+#: qt_ui/tabs/options.py
+msgid "Hardware or software encoder used for frame-exact cuts."
+msgstr "Codificador de hardware o software usado para cortes exactos por fotograma."
+
+#: qt_ui/tabs/options.py
+msgid "Video encoder"
+msgstr "Codificador de video"
+
+#: qt_ui/tabs/options.py
+msgid ""
+"auto probes for GPU hardware encoding (NVENC, QSV, AMF, VideoToolbox) and falls back to CPU "
+"(libx264)."
+msgstr ""
+"auto busca codificación por hardware de GPU (NVENC, QSV, AMF, VideoToolbox) y usa CPU (libx264) si"
+" no hay."
+

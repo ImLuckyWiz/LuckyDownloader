@@ -112,7 +112,6 @@ class SourceInfo:
     duration: float
     date: str  # YYYY-MM-DD or ""
     twitch_vod_id: str | None = None
-    is_age_restricted: bool = False
     segments: list[GameSegment] = field(default_factory=list)  # game changes; [] when yt-dlp gives none
     storyboard: Storyboard | None = None  # None when the site has no preview thumbnails
     # Stretches Twitch silenced, in VOD seconds. [] = checked, none; None = not checked or could not be told.
@@ -121,6 +120,7 @@ class SourceInfo:
     thumbnail: str = ""
     site: str = "twitch"
     provider: Any | None = None
+    is_age_restricted: bool = False
 
     def has_capability(self, cap: Any) -> bool:
         from core.providers.base import Capability
@@ -747,56 +747,6 @@ def build_generic_format_string(
         return f"{quality}/best"
     return q
 
-
-def build_generic_download_args(
-    url: str,
-    *,
-    quality: str = QUALITY_BEST,
-    container: str = "mp4",
-    audio_only: bool = False,
-    audio_format: str | None = None,
-    out_template: str | None = None,
-    rate_limit: str | None = None,
-    threads: int = 4,
-    cookies_browser: str | None = None,
-    download_archive: str | None = None,
-    is_age_restricted: bool = False,
-) -> list[str]:
-    format_str = build_generic_format_string(quality=quality, audio_only=audio_only)
-    args = [
-        "-f", format_str,
-        "--no-playlist",
-        "--retries", "10",
-        "--fragment-retries", "10",
-        "--continue",
-    ]
-    if bool(re.search(r"(?:youtube\.com|youtu\.be)", url or "", re.I)):
-        has_cookies = bool(cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""))
-        args += youtube_extra_args(age_restricted=bool(is_age_restricted and has_cookies))
-    if threads > 1:
-        args += ["--concurrent-fragments", str(max(1, threads))]
-    if rate_limit and str(rate_limit).strip():
-        args += ["--limit-rate", str(rate_limit).strip()]
-    if cookies_browser and str(cookies_browser).strip().lower() not in ("none", "disabled", ""):
-        args += ["--cookies-from-browser", str(cookies_browser).strip().lower()]
-    if download_archive and str(download_archive).strip():
-        args += ["--download-archive", str(download_archive).strip()]
-    if audio_only or (quality or "").strip().lower() in ("audio", "audio only", "audio_only"):
-        if audio_format and audio_format.lower() in ("mp3", "m4a", "opus", "wav", "flac"):
-            afmt = audio_format.lower()
-        elif container and container.lower().lstrip(".") in ("mp3", "m4a", "opus", "wav", "flac"):
-            afmt = container.lower().lstrip(".")
-        else:
-            afmt = "m4a"
-        args += ["-x", "--audio-format", afmt]
-    else:
-        cnt = container.lower().lstrip(".")
-        if cnt in ("mp4", "mkv", "webm", "mov"):
-            args += ["--merge-output-format", cnt]
-    if out_template:
-        args += ["-o", out_template]
-    args += ["--", url]
-    return args
 
 
 

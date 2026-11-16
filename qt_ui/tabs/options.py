@@ -36,7 +36,7 @@ from core import examples
 from core.files import open_in_file_manager
 from core.options import (
     COOKIES_BROWSER_NAMES, COOKIES_SCOPE_NAMES, AUDIO_FORMAT_NAMES, CHAT_RENDER_FPS_NAMES, CHAT_RENDER_LOOK_NAMES, CHAT_RENDER_TYPE_NAMES, QUALITY_NAMES,
-    STRATEGY_NAMES, flag,
+    STRATEGY_NAMES, VIDEO_ENCODER_NAMES, flag,
 )
 from core.settings import DEFAULTS
 from core.i18n import N_, t, tn
@@ -580,13 +580,21 @@ class OptionsTab(QWidget):
 
         adv = self._advanced("cuts", card, N_("auto threshold"))
         row = self._add_setting_row(
-            adv, "threshold", N_("Auto threshold"), N_("Auto uses the full VOD above this share."), "cuts", card, adv, divider=False,
+            adv, "threshold", N_("Auto threshold"), N_("Auto uses the full VOD above this share."), "cuts", card, adv, divider=True,
             info=N_("Auto downloads the full VOD (and splits it) when the parts cover at least this "
                  "percentage of it; below that it downloads only the parts."))
         spin = self._spin("threshold", 1, 100, 5)
         spin.valueChanged.connect(self.preview_requested)
         row.add_control(spin)
         self._unit(row, "%")
+
+        row = self._add_setting_row(
+            adv, "video_encoder", N_("Video encoder"),
+            N_("Hardware or software encoder used for frame-exact cuts."),
+            "cuts", card, adv, divider=False,
+            info=N_("auto probes for GPU hardware encoding (NVENC, QSV, AMF, VideoToolbox) and falls back to CPU (libx264)."),
+        )
+        row.add_control(self._combo("video_encoder", VIDEO_ENCODER_NAMES, 14))
 
     # ------------------------------------------------------------------ Chapters
     def _section_chapters(self, f: QWidget) -> None:

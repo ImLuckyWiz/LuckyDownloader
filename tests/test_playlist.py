@@ -11,7 +11,6 @@ from core.providers import Capability, GenericProvider
 from core.source_info import (
     PlaylistInfo,
     PlaylistItem,
-    build_generic_download_args,
     is_playlist_dict,
     parse_playlist_info,
 )
@@ -132,14 +131,26 @@ def test_expand_playlist_jobs(tmp_path):
     assert jobs_archive[1].opts.download_archive == expected_archive
 
 
-def test_build_generic_download_args_with_archive():
-    args = build_generic_download_args(
+def test_download_full_forwards_download_archive(monkeypatch, tmp_path):
+    import luckytwitch_engine as eng
+    from core.download import download_full
+
+    seen = {}
+
+    def fake_run_ytdlp(ctx, args, threads, **kw):
+        seen.update(kw)
+        out = tmp_path / "full.mp4"
+        out.write_bytes(b"video")
+
+    monkeypatch.setattr(eng, "run_ytdlp", fake_run_ytdlp)
+    download_full(
+        eng.Ctx(),
         "https://www.youtube.com/watch?v=sample",
+        tmp_path,
+        threads=4,
         download_archive="/path/to/archive.txt",
     )
-    assert "--download-archive" in args
-    idx = args.index("--download-archive")
-    assert args[idx + 1] == "/path/to/archive.txt"
+    assert seen["download_archive"] == "/path/to/archive.txt"
 
 
 def test_parse_playlist_info_youtubetab_extractor_normalized():
