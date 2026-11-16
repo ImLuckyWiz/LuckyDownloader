@@ -1,3 +1,13 @@
+## v2.20.0
+
+LuckyDownloader **v2.20.0** strengthens credential protection and data persistence reliability across your configuration, history, watchlist, and download queue:
+
+- **Encrypted & Keyring-Protected Twitch Credentials:** Twitch account sign-in tokens and custom app secrets are no longer stored in plain text in `config.json`. On Windows, secrets are now encrypted using Windows Data Protection (DPAPI) tied to your user account; on macOS and Linux, secrets are stored in your system keyring when available (falling back cleanly to restricted user-only `0600` file permissions in headless environments). Existing plain-text credentials are migrated automatically on first load while keeping non-secret fields like Client ID and username intact.
+- **Safer Settings, History, Watchlist & Queue Persistence:** Unified JSON storage across settings, download history, channel watchlist, recent searches, favorites, UI state, update state, and the saved download queue with per-file locking and atomic writes, preventing concurrent updates from dropping entries.
+- **Timestamped Corrupt-File Backup Rotation:** If a local data file ever becomes unreadable, LuckyDownloader now rotates timestamped `.corrupt` backups (keeping the 3 newest copies) instead of overwriting a single backup file, and supports seamless future data format upgrades without losing existing data.
+
+---
+
 ## v2.19.0
 
 LuckyDownloader **v2.19.0** introduces hardware-accelerated video encoding and Smart Cut keyframe splicing, dramatically speeding up frame-exact (`--exact`) video trimming while preserving visual quality:

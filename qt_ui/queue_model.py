@@ -9,7 +9,6 @@ retry of waiting/failed/cancelled jobs (F4).
 
 from __future__ import annotations
 
-import json
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,7 +18,7 @@ from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor
 
 from core import paths
-from core.files import atomic_write_json
+from core.files import JsonStore, backup_corrupt_json
 from core.i18n import N_, t, tn
 from core.job import Job, deserialize_job, serialize_job
 from core.status import FINISHED, STATUS_COLOURS, queue_summary, status_label, status_word
@@ -97,6 +96,17 @@ class QueueItem:
             progress_text="",
             thumb=None,
         )
+
+
+def _queue_state_file(path: Path | None = None) -> Path:
+    return path or getattr(paths, "QUEUE_STATE_FILE", paths.DATA_DIR / "queue_state.json")
+
+
+_QUEUE_STATE_STORE: JsonStore[dict[str, Any]] = JsonStore(
+    lambda: _queue_state_file(),
+    dict,
+    expected_type=dict,
+)
 
 
 class QueueModel(QAbstractTableModel):
@@ -318,35 +328,22 @@ class QueueModel(QAbstractTableModel):
 
     def save_state(self, path: Path | None = None) -> None:
         """Persist real Job items to disk so unfinished downloads survive app restarts or updates."""
-        target = path or getattr(paths, "QUEUE_STATE_FILE", paths.DATA_DIR / "queue_state.json")
+        target = _queue_state_file(path)
         with self._lock:
             serializable = [it.to_dict() for it in self.items if isinstance(it.job, Job)]
             counter = self._counter
-        try:
-            atomic_write_json(target, {"version": 1, "counter": counter, "items": serializable})
-        except Exception:  # noqa: BLE001
-            pass
+        _QUEUE_STATE_STORE.save({"version": 1, "counter": counter, "items": serializable}, path=target)
 
     def load_state(self, path: Path | None = None, client: Any = None, only_unfinished: bool = False) -> list[QueueItem]:
         """Restore saved QueueItems from disk into the model. Running items are recovered as 'queued'."""
-        target = path or getattr(paths, "QUEUE_STATE_FILE", paths.DATA_DIR / "queue_state.json")
+        target = _queue_state_file(path)
         if not target.is_file():
             return []
-        try:
-            raw = json.loads(target.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            from core.files import backup_corrupt_json
-            backup_corrupt_json(target)
-            return []
-        except Exception:  # noqa: BLE001
-            return []
-        if not isinstance(raw, dict):
-            from core.files import backup_corrupt_json
-            backup_corrupt_json(target)
+        raw = _QUEUE_STATE_STORE.load(path=target)
+        if not raw and not target.is_file():
             return []
         items_raw = raw.get("items")
         if not isinstance(items_raw, list):
-            from core.files import backup_corrupt_json
             backup_corrupt_json(target)
             return []
         restored: list[QueueItem] = []

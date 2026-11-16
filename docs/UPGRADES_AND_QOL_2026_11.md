@@ -1,6 +1,6 @@
 # LuckyDownloader — Upgrades & Quality-of-Life Plan (2026-11)
 
-> Status: **PHASE 4A IMPLEMENTED** (`U-DL-01`, `U-DL-02` completed 2026-11-15; Wave 1 + `U-CLI-01..03` shipped in `v2.17.0`; remaining Wave 2 `U-DATA-01`/`02`, `U-UI-01`/`02`/`07`, `U-CEP-02` and Wave 3 pending). Baseline HEAD `4fb1877`.
+> Status: **PHASE 4B IMPLEMENTED** (`U-DATA-01`, `U-DATA-02` completed 2026-11-16; Phase 4A `U-DL-01`/`02` shipped in `v2.19.0`; Wave 1 + `U-CLI-01..03` shipped in `v2.17.0`; remaining Wave 2 `U-UI-01`/`02`/`07`, `U-CEP-02` and Wave 3 pending). Baseline HEAD `4fb1877`.
 > Scope: meaningful UX, feature and architecture upgrades only. Bugs, security issues and regressions live in
 > [`REVIEW_2026_11_V2.md`](REVIEW_2026_11_V2.md); where an upgrade depends on a bug fix, the finding ID is cited.
 
@@ -50,8 +50,8 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 | 9 | `U-DL-02` | Smart Cut (keyframe-aligned GOP boundary splice) | High | M | **DONE (Phase 4A, 2026-11-15)** — `probe_keyframes()`, `probe_stream_signature()`, `cut_smart()` boundary splice + concat. |
 | 10 | `U-CLI-02` | Full engine parity in `cli.py` (Twitch `--chapters`, playlists, archives) | High | M | Unlocks automated CLI/headless pipelines with full feature parity (`M-05`). |
 | 11 | `U-CLI-01` | Unified parameterized `cli.py` (`cut-local`, `batch`) replacing root Colab scripts | High | M | Retires hardcoded `Vexoria` scripts (`M-01`) while bringing single-pass `split_copy` to local files. |
-| 12 | `U-DATA-01` | OS Keyring / Windows DPAPI protection for Twitch OAuth & secrets | High | M | Removes plaintext OAuth tokens from `config.json` on disk (`C-06` follow-up). |
-| 13 | `U-DATA-02` | Unified `JsonStore` with schema migrations, locks & rotated `.corrupt` backups | High | M | Eliminates per-module JSON boilerplate bugs (`G-01`..`G-04`). |
+| 12 | `U-DATA-01` | OS Keyring / Windows DPAPI protection for Twitch OAuth & secrets | High | M | **DONE (Phase 4B, 2026-11-16)** — Windows DPAPI encryption & OS keyring storage with transparent legacy migration and `0o600` headless fallback. |
+| 13 | `U-DATA-02` | Unified `JsonStore` with schema migrations, locks & rotated `.corrupt` backups | High | M | **DONE (Phase 4B, 2026-11-16)** — Typed `JsonStore[T]` with per-path `RLock`, `schema_version` migrations, and 3-copy `<name>.corrupt.<YYYYMMDD-HHMMSS>` rotation. |
 | 14 | `U-UI-01` | Per-row live speed, ETA & byte counters + aggregate status bar telemetry | High | M | Makes 2–4 concurrent downloads transparent and easy to monitor. |
 | 15 | `U-UI-02` | Per-item log filtering & «Edit / Inspect Job» drawer in `QueueTab` | High | M | Stops interleaved parallel logs and lets users adjust failed jobs in place. |
 | 16 | `U-UI-07` | Global Command Palette (`Ctrl+K`) & accessible About/Diagnostics entry point | Medium | M | Exposes `AboutDialog` / `export_diagnostics_bundle` (`D-04`) and speeds up power-user navigation. |
@@ -160,7 +160,7 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 
 ## Theme 2 — Persistence, Privacy, Updates & Diagnostics (`U-DATA-*`)
 
-### [U-DATA-01] Store Twitch OAuth Tokens and `client_secret` in OS Keyring / Windows DPAPI with Automatic Migration
+### [U-DATA-01] Store Twitch OAuth Tokens and `client_secret` in OS Keyring / Windows DPAPI with Automatic Migration — **DONE (Phase 4B, 2026-11-16)**
 - **Impact:** High | **Effort:** M
 - **Current Limitation:** `core/config.py:25-34` stores `access_token`, `refresh_token`, and `client_secret` in plaintext inside `config.json`. On Windows (`core/files.py:33`), `chmod_mode=0o600` is a no-op, and `migrate_from_legacy()` (`core/paths.py:114`) copies `config.json` without `0o600` on POSIX (V2 `G-02`).
 - **Proposed Upgrade:**
@@ -172,7 +172,7 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 
 ---
 
-### [U-DATA-02] Unified `JsonStore` Abstraction with `schema_version` Migrations, Locks & Timestamped `.corrupt` Rotation
+### [U-DATA-02] Unified `JsonStore` Abstraction with `schema_version` Migrations, Locks & Timestamped `.corrupt` Rotation — **DONE (Phase 4B, 2026-11-16)**
 - **Impact:** High | **Effort:** M
 - **Current Limitation:** Nine modules hand-roll JSON load/save logic (`settings.py`, `config.py`, `history.py`, `watchlist.py`, `recent.py`, `ui_state.py`, `updates.py`, `tools.py`, `queue_model.py`). Three omit `backup_corrupt_json()` (`G-03`), `backup_corrupt_json()` overwrites one static `.corrupt` file (`core/files.py:55`), `history.record_download()` has an unlocked read-modify-write race (`G-04`), and `_save_ui_state()` drops fields (`G-01`).
 - **Proposed Upgrade:**

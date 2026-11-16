@@ -52,6 +52,13 @@ class TwitchClient:
         self.user_refresh: str | None = refresh_token
         self.on_tokens = on_tokens
 
+    def __repr__(self) -> str:
+        return (
+            f"TwitchClient(client_id={self.client_id!r}, "
+            f"uses_login={self.uses_login!r}, "
+            f"has_token={bool(self.token)!r})"
+        )
+
     @property
     def uses_login(self) -> bool:
         return not self.client_secret

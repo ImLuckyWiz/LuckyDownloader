@@ -7,10 +7,11 @@ switches as JSON booleans. There is no variable binding yet: Phase 5 adds the Se
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
+from typing import Any
 
 from core import paths
+from core.files import JsonStore
 from core.runtime import APP_DIR
 
 DEFAULTS = {
@@ -67,30 +68,20 @@ DEFAULTS = {
 }
 
 
+_SETTINGS_STORE: JsonStore[dict[str, Any]] = JsonStore(
+    lambda: paths.SETTINGS_PATH,
+    lambda: dict(DEFAULTS),
+    expected_type=dict,
+    deserializer=lambda saved: {**DEFAULTS, **{k: v for k, v in saved.items() if k in DEFAULTS}},
+)
+
+
 def load_settings() -> dict:
     """DEFAULTS overlaid with the saved keys that exist in DEFAULTS. Unknown keys are dropped; a missing or
     broken file (or one that is not a JSON object) gives the defaults."""
-    saved = {}
-    if paths.SETTINGS_PATH.exists():
-        try:
-            loaded = json.loads(paths.SETTINGS_PATH.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                saved = loaded
-            else:
-                from core.files import backup_corrupt_json
-                backup_corrupt_json(paths.SETTINGS_PATH)
-        except json.JSONDecodeError:
-            from core.files import backup_corrupt_json
-            backup_corrupt_json(paths.SETTINGS_PATH)
-        except OSError:
-            pass
-    return {**DEFAULTS, **{k: v for k, v in saved.items() if k in DEFAULTS}}
+    return _SETTINGS_STORE.load()
 
 
 def save_settings(data: dict) -> None:
     """Write ``data`` as indented JSON; an OSError is ignored, like in the tkinter app."""
-    try:
-        from core.files import atomic_write_json
-        atomic_write_json(paths.SETTINGS_PATH, data)
-    except OSError:
-        pass
+    _SETTINGS_STORE.save(data)

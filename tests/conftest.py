@@ -54,6 +54,7 @@ def _data_folder_in_tmp(request, tmp_path, monkeypatch):
     try:
         import core.config
         monkeypatch.setattr(core.config, "CONFIG_PATH", data_dir / "config.json")
+        monkeypatch.setattr(core.config, "keyring", None)
     except Exception:
         pass
     try:

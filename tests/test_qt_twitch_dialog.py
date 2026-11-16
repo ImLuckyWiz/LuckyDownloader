@@ -90,7 +90,7 @@ def dlg(qtbot, themed, boxes, browser, host):
 
 
 def config_file() -> dict:
-    return json.loads(paths.CONFIG_PATH.read_text(encoding="utf-8")) if paths.CONFIG_PATH.exists() else {}
+    return config.read_config() if paths.CONFIG_PATH.exists() else {}
 
 
 def fake_api(monkeypatch, start=None, tokens=("ACCESS", "REFRESH"), gate=None):

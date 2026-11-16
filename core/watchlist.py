@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from core import paths
+from core.files import JsonStore
 
 
 @dataclass
@@ -54,38 +53,28 @@ def _watchlist_file(path: Path | None = None) -> Path:
     return getattr(paths, "WATCHLIST_PATH", paths.DATA_DIR / "luckytwitch_watchlist.json")
 
 
+_WATCHLIST_STORE: JsonStore[list[WatchedChannel]] = JsonStore(
+    lambda: _watchlist_file(),
+    list,
+    expected_type=list,
+    ensure_ascii=False,
+    serializer=lambda watchers: [asdict(w) for w in watchers],
+    deserializer=lambda data: [
+        WatchedChannel.from_dict(d)
+        for d in data
+        if isinstance(d, dict) and (d.get("login") or d.get("channel_id") or d.get("id") or d.get("url"))
+    ],
+)
+
+
 def load_watchlist(path: Path | None = None) -> list[WatchedChannel]:
     """Read watch list from JSON. Silent on missing/corrupt file."""
-    f = _watchlist_file(path)
-    if not f.is_file():
-        return []
-    try:
-        data = json.loads(f.read_text(encoding="utf-8"))
-        if isinstance(data, list):
-            return [
-                WatchedChannel.from_dict(d)
-                for d in data
-                if isinstance(d, dict) and (d.get("login") or d.get("id") or d.get("url"))
-            ]
-        from core.files import backup_corrupt_json
-        backup_corrupt_json(f)
-    except json.JSONDecodeError:
-        from core.files import backup_corrupt_json
-        backup_corrupt_json(f)
-    except Exception:
-        pass
-    return []
+    return _WATCHLIST_STORE.load(path=_watchlist_file(path))
 
 
 def save_watchlist(watchers: list[WatchedChannel], path: Path | None = None) -> None:
     """Save watch list to JSON safely."""
-    f = _watchlist_file(path)
-    try:
-        raw = [asdict(w) for w in watchers]
-        from core.files import atomic_write_json
-        atomic_write_json(f, raw, ensure_ascii=False)
-    except OSError:
-        pass
+    _WATCHLIST_STORE.save(watchers, path=_watchlist_file(path))
 
 
 def add_to_watchlist(
@@ -100,30 +89,32 @@ def add_to_watchlist(
     clean_prov = provider.lower().strip()
     if clean_prov == "twitch":
         clean_login = clean_login.lower()
+    target = _watchlist_file(path)
     if not clean_login and not url:
-        return load_watchlist(path)
+        return load_watchlist(target)
     if not url and clean_login:
         if clean_prov == "twitch":
             url = f"https://www.twitch.tv/{clean_login}"
         elif clean_prov == "youtube":
             url = f"https://www.youtube.com/{clean_login}" if clean_login.startswith("@") else f"https://www.youtube.com/@{clean_login}"
 
-    watchers = load_watchlist(path)
-    for w in watchers:
-        if (clean_login and w.login == clean_login and w.provider == clean_prov) or (url and w.url == url):
-            if name and not w.name:
-                w.name = name
-                save_watchlist(watchers, path)
-            return watchers
+    with _WATCHLIST_STORE.lock(target):
+        watchers = load_watchlist(target)
+        for w in watchers:
+            if (clean_login and w.login == clean_login and w.provider == clean_prov) or (url and w.url == url):
+                if name and not w.name:
+                    w.name = name
+                    save_watchlist(watchers, target)
+                return watchers
 
-    watchers.append(WatchedChannel(
-        login=clean_login,
-        name=name or clean_login,
-        provider=clean_prov,
-        url=url,
-    ))
-    save_watchlist(watchers, path)
-    return watchers
+        watchers.append(WatchedChannel(
+            login=clean_login,
+            name=name or clean_login,
+            provider=clean_prov,
+            url=url,
+        ))
+        save_watchlist(watchers, target)
+        return watchers
 
 
 def remove_from_watchlist(
@@ -133,21 +124,24 @@ def remove_from_watchlist(
 ) -> list[WatchedChannel]:
     """Unpin a channel from the watch list."""
     clean_login = (login or "").strip()
+    target = _watchlist_file(path)
     if not clean_login:
-        return load_watchlist(path)
+        return load_watchlist(target)
     clean_prov = provider.lower().strip()
     if clean_prov == "twitch":
         clean_login = clean_login.lower()
     clean_url = clean_login.rstrip("/").lower()
-    watchers = [
-        w for w in load_watchlist(path)
-        if not (
-            (w.login == clean_login or (w.url and w.url.rstrip("/").lower() == clean_url))
-            and (not clean_prov or w.provider == clean_prov)
-        )
-    ]
-    save_watchlist(watchers, path)
-    return watchers
+
+    def _filter(watchers: list[WatchedChannel]) -> list[WatchedChannel]:
+        return [
+            w for w in watchers
+            if not (
+                (w.login == clean_login or (w.url and w.url.rstrip("/").lower() == clean_url))
+                and (not clean_prov or w.provider == clean_prov)
+            )
+        ]
+
+    return _WATCHLIST_STORE.update(_filter, path=target)
 
 
 def is_watched(
@@ -163,11 +157,13 @@ def is_watched(
     if clean_prov == "twitch":
         clean_login = clean_login.lower()
     clean_url = clean_login.rstrip("/").lower()
-    for w in load_watchlist(path):
-        if clean_prov and w.provider != clean_prov:
-            continue
-        if w.login == clean_login or (w.url and w.url.rstrip("/").lower() == clean_url):
-            return True
+    target = _watchlist_file(path)
+    with _WATCHLIST_STORE.lock(target):
+        for w in load_watchlist(target):
+            if clean_prov and w.provider != clean_prov:
+                continue
+            if w.login == clean_login or (w.url and w.url.rstrip("/").lower() == clean_url):
+                return True
     return False
 
 
@@ -245,21 +241,32 @@ def check_all_watchers(
     throttle_seconds: int = 300,
 ) -> dict[str, list[dict]]:
     """Check all watched channels/streamers for new items and update the watch list."""
-    watchers = load_watchlist(path)
+    target = _watchlist_file(path)
+    watchers = load_watchlist(target)
     results: dict[str, list[dict]] = {}
-    changed = False
+    updates_by_key: dict[tuple[str, str, str], WatchedChannel] = {}
 
-    for idx, w in enumerate(watchers):
+    for w in watchers:
         prev_state = (w.last_checked_at, w.last_vod_id, w.last_seen_date)
         updated, new_items = check_channel_new_items(client, w, throttle_seconds=throttle_seconds)
-        watchers[idx] = updated
         if (updated.last_checked_at, updated.last_vod_id, updated.last_seen_date) != prev_state:
-            changed = True
+            updates_by_key[(updated.provider, updated.login, updated.url)] = updated
         if new_items:
             key = f"{updated.provider}:{updated.login}" if updated.provider != "twitch" else updated.login
             results[key] = new_items
 
-    if changed:
-        save_watchlist(watchers, path)
+    if updates_by_key:
+        def _merge(current: list[WatchedChannel]) -> list[WatchedChannel]:
+            merged: list[WatchedChannel] = []
+            for cur in current:
+                upd = updates_by_key.get((cur.provider, cur.login, cur.url))
+                if upd is not None:
+                    cur.last_checked_at = upd.last_checked_at
+                    cur.last_vod_id = upd.last_vod_id
+                    cur.last_seen_date = upd.last_seen_date
+                merged.append(cur)
+            return merged
+
+        _WATCHLIST_STORE.update(_merge, path=target)
 
     return results

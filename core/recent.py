@@ -2,24 +2,26 @@
 
 from __future__ import annotations
 
-import json
-
 from core import paths
+from core.files import JsonStore
+
+_CHANNELS_STORE: JsonStore[list[dict]] = JsonStore(
+    lambda: paths.RECENT_PATH,
+    list,
+    expected_type=list,
+    ensure_ascii=False,
+)
+
+_RECENT_SEARCHES_STORE: JsonStore[list[dict]] = JsonStore(
+    lambda: paths.RECENT_SEARCHES_PATH,
+    list,
+    expected_type=list,
+    ensure_ascii=False,
+)
 
 
 def _load_channels(path, limit: int | None = None) -> list[dict]:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        from core.files import backup_corrupt_json
-        backup_corrupt_json(path)
-        return []
-    except OSError:
-        return []
-    if not isinstance(data, list):
-        from core.files import backup_corrupt_json
-        backup_corrupt_json(path)
-        return []
+    data = _CHANNELS_STORE.load(path=path)
     out = []
     for c in data:
         if isinstance(c, dict) and c.get("id"):
@@ -29,11 +31,7 @@ def _load_channels(path, limit: int | None = None) -> list[dict]:
 
 
 def _save_channels(path, items: list[dict]) -> None:
-    try:
-        from core.files import atomic_write_json
-        atomic_write_json(path, items, ensure_ascii=False)
-    except OSError:
-        pass
+    _CHANNELS_STORE.save(items, path=path)
 
 
 def load_recent() -> list[dict]:
@@ -56,18 +54,7 @@ def save_favorites(items: list[dict]) -> None:
 
 def load_recent_searches() -> list[dict]:
     """Recent generic/YouTube searches or channels: [{id, login, name}]."""
-    try:
-        data = json.loads(paths.RECENT_SEARCHES_PATH.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        from core.files import backup_corrupt_json
-        backup_corrupt_json(paths.RECENT_SEARCHES_PATH)
-        return []
-    except OSError:
-        return []
-    if not isinstance(data, list):
-        from core.files import backup_corrupt_json
-        backup_corrupt_json(paths.RECENT_SEARCHES_PATH)
-        return []
+    data = _RECENT_SEARCHES_STORE.load(path=paths.RECENT_SEARCHES_PATH)
     out = []
     for c in data:
         if isinstance(c, dict) and c.get("name"):
@@ -77,8 +64,4 @@ def load_recent_searches() -> list[dict]:
 
 
 def save_recent_searches(items: list[dict]) -> None:
-    try:
-        from core.files import atomic_write_json
-        atomic_write_json(paths.RECENT_SEARCHES_PATH, items, ensure_ascii=False)
-    except OSError:
-        pass
+    _RECENT_SEARCHES_STORE.save(items, path=paths.RECENT_SEARCHES_PATH)

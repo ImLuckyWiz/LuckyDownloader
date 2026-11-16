@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import json
-import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from core import paths
-
-_HISTORY_LOCK = threading.RLock()
+from core.files import JsonStore
 
 
 @dataclass
@@ -49,40 +46,28 @@ def _history_file(path: Path | None = None) -> Path:
     return getattr(paths, "HISTORY_PATH", paths.DATA_DIR / "luckytwitch_history.json")
 
 
+_HISTORY_STORE: JsonStore[list[HistoryEntry]] = JsonStore(
+    lambda: _history_file(),
+    list,
+    expected_type=list,
+    ensure_ascii=False,
+    serializer=lambda entries: [asdict(e) for e in entries],
+    deserializer=lambda data: [
+        HistoryEntry.from_dict(item)
+        for item in data
+        if isinstance(item, dict) and (item.get("vod_id") or item.get("url"))
+    ],
+)
+
+
 def load_history(path: Path | None = None) -> list[HistoryEntry]:
     """Read history from JSON; returns empty list on any error or missing file."""
-    with _HISTORY_LOCK:
-        f = _history_file(path)
-        if not f.is_file():
-            return []
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                return [
-                    HistoryEntry.from_dict(item)
-                    for item in data
-                    if isinstance(item, dict) and (item.get("vod_id") or item.get("url"))
-                ]
-            from core.files import backup_corrupt_json
-            backup_corrupt_json(f)
-        except json.JSONDecodeError:
-            from core.files import backup_corrupt_json
-            backup_corrupt_json(f)
-        except Exception:
-            pass
-        return []
+    return _HISTORY_STORE.load(path=_history_file(path))
 
 
 def save_history(entries: list[HistoryEntry], path: Path | None = None) -> None:
     """Save history entries to JSON safely."""
-    with _HISTORY_LOCK:
-        f = _history_file(path)
-        try:
-            raw = [asdict(e) for e in entries]
-            from core.files import atomic_write_json
-            atomic_write_json(f, raw, ensure_ascii=False)
-        except OSError:
-            pass
+    _HISTORY_STORE.save(entries, path=_history_file(path))
 
 
 def record_download(
@@ -92,17 +77,16 @@ def record_download(
     max_entries: int = 500,
 ) -> list[HistoryEntry]:
     """Record a finished download. If enabled is False, does not write anything."""
-    with _HISTORY_LOCK:
+    target = _history_file(path)
+    with _HISTORY_STORE.lock(target):
         if not enabled:
-            return load_history(path)
+            return load_history(target)
         item = entry if isinstance(entry, HistoryEntry) else HistoryEntry.from_dict(entry)
         if not item.vod_id and not item.url:
-            return load_history(path)
+            return load_history(target)
         if not item.downloaded_at:
             item.downloaded_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
-        entries = load_history(path)
-        # Deduplicate: if (vod_id or url) and folder match, remove existing
         def _matches(a: HistoryEntry, b: HistoryEntry) -> bool:
             if a.folder != b.folder:
                 return False
@@ -112,23 +96,19 @@ def record_download(
                 return True
             return False
 
-        entries = [e for e in entries if not _matches(e, item)]
-        entries.insert(0, item)
-        if len(entries) > max_entries:
-            entries = entries[:max_entries]
-        save_history(entries, path)
-        return entries
+        def _apply(entries: list[HistoryEntry]) -> list[HistoryEntry]:
+            filtered = [e for e in entries if not _matches(e, item)]
+            filtered.insert(0, item)
+            if len(filtered) > max_entries:
+                filtered = filtered[:max_entries]
+            return filtered
+
+        return _HISTORY_STORE.update(_apply, path=target)
 
 
 def clear_history(path: Path | None = None) -> None:
     """Clear all recorded download history."""
-    with _HISTORY_LOCK:
-        f = _history_file(path)
-        try:
-            if f.is_file():
-                f.unlink()
-        except OSError:
-            pass
+    _HISTORY_STORE.clear(path=_history_file(path))
 
 
 def is_downloaded(
@@ -142,8 +122,9 @@ def is_downloaded(
     target_url = str(url).strip() if url else ""
     if not target_id and not target_url:
         return None
-    with _HISTORY_LOCK:
-        for e in load_history(path):
+    target = _history_file(path)
+    with _HISTORY_STORE.lock(target):
+        for e in load_history(target):
             if target_id and (e.vod_id == target_id or (e.url and e.url == target_id)):
                 return e
             if target_url and (e.url == target_url or (e.vod_id and e.vod_id == target_url)):

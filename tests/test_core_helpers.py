@@ -491,3 +491,269 @@ def test_mac_ffmpeg_sources_have_pinned_sha256_and_verify(tmp_path, monkeypatch)
     tools._install_ffmpeg_macos(Ctx())
     assert (tmp_path / "ffmpeg").read_text(encoding="utf-8") == "fake-ffmpeg-binary"
     assert (tmp_path / "ffprobe").read_text(encoding="utf-8") == "fake-ffprobe-binary"
+
+
+# ------------------------------------------------------------------ U-DATA-01 & U-DATA-02
+def test_dpapi_secrets_and_legacy_migration(data_dir, monkeypatch):
+    import base64
+    import sys
+
+    if sys.platform != "win32":
+        monkeypatch.setattr(config.sys, "platform", "win32")
+        monkeypatch.setattr(
+            config,
+            "_dpapi_encrypt",
+            lambda s: config.DPAPI_PREFIX + base64.b64encode(s.encode("utf-8")).decode("ascii"),
+        )
+        monkeypatch.setattr(
+            config,
+            "_dpapi_decrypt",
+            lambda t: base64.b64decode(t[len(config.DPAPI_PREFIX):]).decode("utf-8"),
+        )
+
+    config.save_credentials("cid-123", "my-client-secret")
+    config.save_login_tokens("acc-tok", "ref-tok", user_login="lucky")
+
+    raw_text = paths.CONFIG_PATH.read_text(encoding="utf-8")
+    raw = json.loads(raw_text)
+    assert raw["client_id"] == "cid-123"
+    assert raw["user_login"] == "lucky"
+    for key, plain in (("client_secret", "my-client-secret"), ("access_token", "acc-tok"), ("refresh_token", "ref-tok")):
+        assert raw[key].startswith(config.DPAPI_PREFIX)
+        assert plain not in raw_text
+
+    loaded = config.load_config()
+    assert loaded == {
+        "client_id": "cid-123",
+        "user_login": "lucky",
+        "client_secret": "my-client-secret",
+        "access_token": "acc-tok",
+        "refresh_token": "ref-tok",
+    }
+
+    # Legacy plaintext config.json migrates transparently on first load_config()
+    legacy_payload = {
+        "client_id": "legacy-cid",
+        "user_login": "legacy_user",
+        "access_token": "legacy-acc",
+        "refresh_token": "legacy-ref",
+        "client_secret": "legacy-sec",
+    }
+    paths.CONFIG_PATH.write_text(json.dumps(legacy_payload), encoding="utf-8")
+
+    migrated = config.load_config()
+    assert migrated == legacy_payload
+
+    migrated_raw_text = paths.CONFIG_PATH.read_text(encoding="utf-8")
+    migrated_raw = json.loads(migrated_raw_text)
+    assert migrated_raw["client_id"] == "legacy-cid"
+    assert migrated_raw["user_login"] == "legacy_user"
+    for key, plain in (("access_token", "legacy-acc"), ("refresh_token", "legacy-ref"), ("client_secret", "legacy-sec")):
+        assert migrated_raw[key].startswith(config.DPAPI_PREFIX)
+        assert plain not in migrated_raw_text
+
+    assert config.load_config() == legacy_payload
+
+
+def test_keyring_storage_migration_and_headless_fallback(data_dir, monkeypatch):
+    import os
+    import sys
+    from core import files
+
+    monkeypatch.setattr(config.sys, "platform", "linux")
+
+    class FakeKeyring:
+        def __init__(self):
+            self.store: dict[tuple[str, str], str] = {}
+
+        def get_password(self, service: str, key: str):
+            return self.store.get((service, key))
+
+        def set_password(self, service: str, key: str, val: str):
+            self.store[(service, key)] = val
+
+        def delete_password(self, service: str, key: str):
+            self.store.pop((service, key), None)
+
+    kr = FakeKeyring()
+    monkeypatch.setattr(config, "keyring", kr)
+
+    config.save_credentials("cid-kr", "sec-kr")
+    config.save_login_tokens("acc-kr", "ref-kr", user_login="lucky_kr")
+
+    assert kr.store == {
+        (config.KEYRING_SERVICE, "client_secret"): "sec-kr",
+        (config.KEYRING_SERVICE, "access_token"): "acc-kr",
+        (config.KEYRING_SERVICE, "refresh_token"): "ref-kr",
+    }
+    raw_disk = json.loads(paths.CONFIG_PATH.read_text(encoding="utf-8"))
+    assert raw_disk == {"client_id": "cid-kr", "user_login": "lucky_kr", "_keyring": True}
+    assert config.load_config() == {
+        "client_id": "cid-kr",
+        "user_login": "lucky_kr",
+        "client_secret": "sec-kr",
+        "access_token": "acc-kr",
+        "refresh_token": "ref-kr",
+    }
+
+    # Legacy plaintext migration into keyring on first load_config()
+    kr.store.clear()
+    legacy = {
+        "client_id": "leg-cid",
+        "user_login": "leg-user",
+        "access_token": "leg-acc",
+        "refresh_token": "leg-ref",
+        "client_secret": "leg-sec",
+    }
+    paths.CONFIG_PATH.write_text(json.dumps(legacy), encoding="utf-8")
+    assert config.load_config() == legacy
+    assert kr.store == {
+        (config.KEYRING_SERVICE, "access_token"): "leg-acc",
+        (config.KEYRING_SERVICE, "refresh_token"): "leg-ref",
+        (config.KEYRING_SERVICE, "client_secret"): "leg-sec",
+    }
+    migrated_disk = json.loads(paths.CONFIG_PATH.read_text(encoding="utf-8"))
+    assert migrated_disk == {"client_id": "leg-cid", "user_login": "leg-user", "_keyring": True}
+
+    # Headless fallback to 0o600 JSON when keyring errors out
+    class BrokenKeyring:
+        def get_password(self, service: str, key: str):
+            raise RuntimeError("No keyring backend available")
+
+        def set_password(self, service: str, key: str, val: str):
+            raise RuntimeError("No keyring backend available")
+
+        def delete_password(self, service: str, key: str):
+            raise RuntimeError("No keyring backend available")
+
+    chmod_calls = []
+    orig_atomic = files.atomic_write_json
+
+    def spy_atomic(path, data, **kwargs):
+        chmod_calls.append(kwargs.get("chmod_mode"))
+        return orig_atomic(path, data, **kwargs)
+
+    monkeypatch.setattr(config, "keyring", BrokenKeyring())
+    monkeypatch.setattr(files, "atomic_write_json", spy_atomic)
+
+    config.write_config({"client_id": "hl-cid", "client_secret": "hl-sec", "access_token": "hl-acc", "refresh_token": "hl-ref"})
+    assert 0o600 in chmod_calls
+    fallback_disk = json.loads(paths.CONFIG_PATH.read_text(encoding="utf-8"))
+    assert fallback_disk == {"client_id": "hl-cid", "client_secret": "hl-sec", "access_token": "hl-acc", "refresh_token": "hl-ref"}
+    assert config.load_config() == fallback_disk
+    if os.name == "posix":
+        assert (paths.CONFIG_PATH.stat().st_mode & 0o777) == 0o600
+
+
+def test_backup_corrupt_json_rotation_keeps_3_newest(tmp_path):
+    import os
+    from core.files import backup_corrupt_json
+
+    target = tmp_path / "sample.json"
+    created: list[Path] = []
+    base_ts = 1_700_000_000.0
+    for idx in range(5):
+        target.write_text(f"bad-{idx}", encoding="utf-8")
+        bak = backup_corrupt_json(target, max_backups=3)
+        assert bak is not None
+        assert re.match(r"^sample\.json\.corrupt\.\d{8}-\d{6}(?:_\d+)?$", bak.name)
+        mtime = base_ts + idx * 10.0
+        os.utime(bak, (mtime, mtime))
+        created.append(bak)
+
+    # Trigger one more rotation after setting distinct mtimes so newest-3 pruning is deterministic
+    target.write_text("bad-5", encoding="utf-8")
+    newest = backup_corrupt_json(target, max_backups=3)
+    assert newest is not None
+    os.utime(newest, (base_ts + 50.0, base_ts + 50.0))
+
+    remaining = sorted(tmp_path.glob("sample.json.corrupt*"), key=lambda p: p.stat().st_mtime)
+    assert len(remaining) == 3
+    assert [p.read_text(encoding="utf-8") for p in remaining] == ["bad-3", "bad-4", "bad-5"]
+
+
+def test_concurrent_4_thread_history_record_download_preserves_all_entries(tmp_path):
+    import threading
+    from core import history
+
+    target = tmp_path / "luckytwitch_history.json"
+    barrier = threading.Barrier(4, timeout=5.0)
+    errors: list[Exception] = []
+
+    def worker(tid: int) -> None:
+        try:
+            barrier.wait()
+            for j in range(10):
+                history.record_download(
+                    {
+                        "vod_id": f"vod-{tid}-{j}",
+                        "title": f"Stream {tid}-{j}",
+                        "folder": str(tmp_path / f"f-{tid}"),
+                    },
+                    path=target,
+                )
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(timeout=10.0)
+
+    assert not errors
+    entries = history.load_history(path=target)
+    assert len(entries) == 40
+    assert {e.vod_id for e in entries} == {f"vod-{t}-{j}" for t in range(4) for j in range(10)}
+
+
+def test_json_store_schema_migrations_and_update(tmp_path):
+    from core.files import JsonStore
+
+    # 1. Bare list -> version 2 dict migration
+    list_file = tmp_path / "list_migrated.json"
+    list_file.write_text(json.dumps(["a", "b"]), encoding="utf-8")
+    list_store: JsonStore[dict] = JsonStore(
+        list_file,
+        lambda: {"items": [], "step": 0},
+        expected_type=dict,
+        schema_version=2,
+        migrations={
+            0: lambda items: {"items": list(items), "step": 1},
+            1: lambda d: {**d, "step": 2},
+        },
+    )
+    loaded = list_store.load()
+    assert loaded == {"items": ["a", "b"], "step": 2}
+    disk = json.loads(list_file.read_text(encoding="utf-8"))
+    assert disk == {"schema_version": 2, "items": ["a", "b"], "step": 2}
+
+    # 2. Unversioned dict -> version 2 migration + atomic update(fn)
+    dict_file = tmp_path / "dict_migrated.json"
+    dict_file.write_text(json.dumps({"count": 5}), encoding="utf-8")
+    dict_store: JsonStore[dict] = JsonStore(
+        dict_file,
+        lambda: {"count": 0, "migrated": True},
+        expected_type=dict,
+        schema_version=2,
+        migrations={1: lambda d: {"count": d["count"] * 10, "migrated": True}},
+    )
+    assert dict_store.load() == {"count": 50, "migrated": True}
+    updated = dict_store.update(lambda d: {**d, "count": d["count"] + 7})
+    assert updated == {"count": 57, "migrated": True}
+    assert json.loads(dict_file.read_text(encoding="utf-8")) == {"schema_version": 2, "count": 57, "migrated": True}
+
+    # 3. Versioned v1 envelope -> v2 migration
+    v1_file = tmp_path / "v1_env.json"
+    v1_file.write_text(json.dumps({"schema_version": 1, "count": 3}), encoding="utf-8")
+    assert dict_store.load(path=v1_file) == {"count": 30, "migrated": True}
+    assert json.loads(v1_file.read_text(encoding="utf-8"))["schema_version"] == 2
+
+    # 4. TwitchClient repr hides secrets
+    from core.twitch_api import TwitchClient
+    client = TwitchClient("pub_cid", "top_secret", access_token="acc_secret", refresh_token="ref_secret")
+    rep = repr(client)
+    assert "pub_cid" in rep
+    assert "top_secret" not in rep
+    assert "acc_secret" not in rep
+    assert "ref_secret" not in rep

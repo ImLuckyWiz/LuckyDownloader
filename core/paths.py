@@ -112,7 +112,7 @@ def migrate_from_legacy(src: Path | None = None, dest: Path | None = None) -> li
         if src_file.is_file() and not dest_file.exists():
             try:
                 shutil.copy2(src_file, dest_file)
-                if name == "config.json" and os.name == "posix":
+                if name == "config.json" and sys.platform != "win32":
                     os.chmod(dest_file, 0o600)
                 migrated.append(name)
             except OSError:

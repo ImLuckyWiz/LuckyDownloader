@@ -8,7 +8,6 @@ from __future__ import annotations
 from core.i18n import t
 
 import hashlib
-import json
 import platform
 import re
 import shutil
@@ -22,6 +21,7 @@ from pathlib import Path
 import requests
 
 from core import paths
+from core.files import JsonStore
 from core.runtime import USER_AGENT, resolve_dep
 from core.tools import _download_file
 
@@ -295,20 +295,7 @@ def should_check(state: dict, now: datetime | None = None) -> bool:
         return True
 
 
-def load_state() -> dict:
-    """Load update state from UPDATE_STATE_PATH."""
-    try:
-        text = paths.UPDATE_STATE_PATH.read_text(encoding="utf-8")
-        data = json.loads(text)
-        if isinstance(data, dict):
-            return data
-        from core.files import backup_corrupt_json
-        backup_corrupt_json(paths.UPDATE_STATE_PATH)
-    except json.JSONDecodeError:
-        from core.files import backup_corrupt_json
-        backup_corrupt_json(paths.UPDATE_STATE_PATH)
-    except OSError:
-        pass
+def _default_state() -> dict:
     return {
         "last_check": "",
         "latest_tag": "",
@@ -319,13 +306,21 @@ def load_state() -> dict:
     }
 
 
+_UPDATE_STATE_STORE: JsonStore[dict] = JsonStore(
+    lambda: paths.UPDATE_STATE_PATH,
+    _default_state,
+    expected_type=dict,
+)
+
+
+def load_state() -> dict:
+    """Load update state from UPDATE_STATE_PATH."""
+    return _UPDATE_STATE_STORE.load()
+
+
 def save_state(state: dict) -> None:
     """Save update state to UPDATE_STATE_PATH."""
-    try:
-        from core.files import atomic_write_json
-        atomic_write_json(paths.UPDATE_STATE_PATH, state)
-    except OSError:
-        pass
+    _UPDATE_STATE_STORE.save(state)
 
 
 def download_installer(ctx, info: UpdateInfo, dest: Path) -> Path:
