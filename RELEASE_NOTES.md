@@ -1,3 +1,13 @@
+## v2.22.0
+
+LuckyDownloader **v2.22.0** adds opt-in multi-track and chat overlay support to the Premiere Pro CEP panel so you can auto-cut multi-track OBS recordings and rendered chat overlays in one pass:
+
+- **Opt-In Synced Track Cutting (`V2` & `A2..AN`):** Added a new **Cut synced tracks (V2, A2..AN)** option under **Settings → What to cut** in the Premiere Pro panel (saved automatically between sessions). Leave it unchecked to keep the strict single-track (`V1`/`A1`) safety guard, or turn it on when your timeline includes a synced chat overlay on `V2` or separate audio stems on `A2..AN`.
+- **Synced Pre-Flight Validation & Lockstep Editing:** When synced-track mode is enabled, pre-flight checks verify that every populated `V2` and `A2..AN` clip matches `V1`'s timeline and source range (rejecting unsynced clips, mismatched piece counts, or clips on `V3+`), then cuts and ripple-deletes all synced tracks alongside `V1` and `A1` with zero frame drift.
+- **Multi-Track Group Relinking:** After gap deletion, every surviving highlight group (`V1`, `A1`, and any populated `V2` and `A2..AN` clips) is re-linked together automatically so timeline pieces continue moving as one unit during editing.
+
+---
+
 ## v2.21.0
 
 LuckyDownloader **v2.21.0** enhances queue monitoring, per-job troubleshooting, job editing, and keyboard-first navigation across the desktop app:

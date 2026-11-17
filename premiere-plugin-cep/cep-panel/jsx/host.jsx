@@ -63,10 +63,18 @@ function ltGScan() {
   L.push(["proj", ltTabSafe(projPath)].join("\t"));
   for (i = 0; i < seq.videoTracks.numTracks; i++) L.push(["vt", i, seq.videoTracks[i].clips.numItems].join("\t"));
   for (i = 0; i < seq.audioTracks.numTracks; i++) L.push(["at", i, seq.audioTracks[i].clips.numItems].join("\t"));
-  var v = seq.videoTracks.numTracks > 0 ? seq.videoTracks[0] : null, a = seq.audioTracks.numTracks > 0 ? seq.audioTracks[0] : null;
-  var first = null;
-  if (v) for (i = 0; i < v.clips.numItems && i < 3; i++) { L.push(ltGClipLine("V", 0, v.clips[i])); if (!first) first = v.clips[i]; }
-  if (a) for (i = 0; i < a.clips.numItems && i < 3; i++) L.push(ltGClipLine("A", 0, a.clips[i]));
+  var first = null, ti, tr;
+  for (ti = 0; ti < seq.videoTracks.numTracks; ti++) {
+    tr = seq.videoTracks[ti];
+    for (i = 0; i < tr.clips.numItems && i < 3; i++) {
+      L.push(ltGClipLine("V", ti, tr.clips[i]));
+      if (ti === 0 && !first) first = tr.clips[i];
+    }
+  }
+  for (ti = 0; ti < seq.audioTracks.numTracks; ti++) {
+    tr = seq.audioTracks[ti];
+    for (i = 0; i < tr.clips.numItems && i < 3; i++) L.push(ltGClipLine("A", ti, tr.clips[i]));
+  }
   if (first && first.projectItem) {
     var list = ltMarkerList(first.projectItem.getMarkers()), n = 0;
     for (i = 0; i < list.length; i++) if (ltIsProbe(list[i])) n++;
@@ -174,7 +182,7 @@ function ltCSnap() {
   L.push(["proj", ltTabSafe(projPath)].join("\t"));
   for (i = 0; i < seq.videoTracks.numTracks; i++) L.push(["vt", i, seq.videoTracks[i].clips.numItems].join("\t"));
   for (i = 0; i < seq.audioTracks.numTracks; i++) L.push(["at", i, seq.audioTracks[i].clips.numItems].join("\t"));
-  var v = seq.videoTracks.numTracks > 0 ? seq.videoTracks[0] : null, a = seq.audioTracks.numTracks > 0 ? seq.audioTracks[0] : null, c;
+  var v = seq.videoTracks.numTracks > 0 ? seq.videoTracks[0] : null, a = seq.audioTracks.numTracks > 0 ? seq.audioTracks[0] : null, c, ti, tr;
   if (v) {
     for (i = 0; i < v.clips.numItems; i++) {
       c = v.clips[i];
@@ -191,17 +199,53 @@ function ltCSnap() {
       L.push(["pa", c.start.seconds, c.end.seconds, c.inPoint.seconds, c.outPoint.seconds].join("\t"));
     }
   }
+  if (seq.videoTracks.numTracks > 1) {
+    tr = seq.videoTracks[1];
+    for (i = 0; i < tr.clips.numItems; i++) {
+      c = tr.clips[i];
+      L.push(["pvt", 1, c.start.seconds, c.end.seconds, c.inPoint.seconds, c.outPoint.seconds].join("\t"));
+    }
+  }
+  for (ti = 1; ti < seq.audioTracks.numTracks; ti++) {
+    tr = seq.audioTracks[ti];
+    for (i = 0; i < tr.clips.numItems; i++) {
+      c = tr.clips[i];
+      L.push(["pat", ti, c.start.seconds, c.end.seconds, c.inPoint.seconds, c.outPoint.seconds].join("\t"));
+    }
+  }
   return "ok|" + L.join("\n");
 }
 function LT_c_snap() { return ltRun(ltCSnap); }
 
-function ltCOthers(seq) {
-  var n = 0, i;
-  for (i = 1; i < seq.videoTracks.numTracks; i++) n += seq.videoTracks[i].clips.numItems;
-  for (i = 1; i < seq.audioTracks.numTracks; i++) n += seq.audioTracks[i].clips.numItems;
+function ltSyncedTracksMeta(seq) {
+  var out = [], i;
+  if (seq.videoTracks.numTracks > 1 && seq.videoTracks[1].clips.numItems > 0) out.push({ name: "V2", track: seq.videoTracks[1] });
+  for (i = 1; i < seq.audioTracks.numTracks; i++) {
+    if (seq.audioTracks[i].clips.numItems > 0) out.push({ name: "A" + (i + 1), track: seq.audioTracks[i] });
+  }
+  return out;
+}
+function ltSyncedDomTracks(seq) {
+  var meta = ltSyncedTracksMeta(seq), out = [], i;
+  for (i = 0; i < meta.length; i++) out.push(meta[i].track);
+  return out;
+}
+function ltCOthers(seq, sync) {
+  var n = 0, i, nV1, extra;
+  if (!sync) {
+    for (i = 1; i < seq.videoTracks.numTracks; i++) n += seq.videoTracks[i].clips.numItems;
+    for (i = 1; i < seq.audioTracks.numTracks; i++) n += seq.audioTracks[i].clips.numItems;
+    return n;
+  }
+  for (i = 2; i < seq.videoTracks.numTracks; i++) n += seq.videoTracks[i].clips.numItems;
+  nV1 = seq.videoTracks.numTracks > 0 ? seq.videoTracks[0].clips.numItems : 0;
+  extra = ltSyncedDomTracks(seq);
+  for (i = 0; i < extra.length; i++) {
+    if (extra[i].clips.numItems !== nV1) n += Math.abs(extra[i].clips.numItems - nV1) || 1;
+  }
   return n;
 }
-function ltCCut(frames) {
+function ltCCut(frames, sync) {
   if (typeof LTTime === "undefined") return "FAIL|LTTime is not loaded in ExtendScript (shared/timecode.js did not load).";
   var seq = ltSeq();
   if (!seq) return "FAIL|No active sequence.";
@@ -213,18 +257,34 @@ function ltCCut(frames) {
   if (!q) return "FAIL|Could not access the active sequence in Premiere (QE).";
   var qtV = q.getVideoTrackAt(0), qtA = q.getAudioTrackAt(0);
   if (!qtV || !qtA) return "FAIL|Could not access V1/A1 tracks in Premiere (QE).";
-  var t0 = ltNow(), i, f, tc, n = 0;
+  var extraQ = [], ti, qt;
+  if (sync) {
+    if (seq.videoTracks.numTracks > 1 && seq.videoTracks[1].clips.numItems > 0) {
+      qt = q.getVideoTrackAt(1);
+      if (!qt) return "FAIL|Could not access V2 track in Premiere (QE).";
+      extraQ.push(qt);
+    }
+    for (ti = 1; ti < seq.audioTracks.numTracks; ti++) {
+      if (seq.audioTracks[ti].clips.numItems > 0) {
+        qt = q.getAudioTrackAt(ti);
+        if (!qt) return "FAIL|Could not access A" + (ti + 1) + " track in Premiere (QE).";
+        extraQ.push(qt);
+      }
+    }
+  }
+  var t0 = ltNow(), i, j, f, tc, n = 0;
   for (i = 0; i < frames.length; i++) {
     f = Number(frames[i]);
     if (!(f >= 0) || Math.floor(f) !== f) return "FAIL|Bad cut frame " + frames[i] + " (not a whole number). " + n + " cut(s) were done before it.";
     tc = LTTime.framesToTimecode(f, fps, start);
     qtV.razor(tc);
     qtA.razor(tc);
+    for (j = 0; j < extraQ.length; j++) extraQ[j].razor(tc);
     n++;
   }
-  return "ok|" + n + "|" + (ltNow() - t0) + "|" + seq.videoTracks[0].clips.numItems + "|" + seq.audioTracks[0].clips.numItems + "|" + ltCOthers(seq);
+  return "ok|" + n + "|" + (ltNow() - t0) + "|" + seq.videoTracks[0].clips.numItems + "|" + seq.audioTracks[0].clips.numItems + "|" + ltCOthers(seq, sync);
 }
-function LT_c_cut(frames) { return ltRun(function () { return ltCCut(frames); }); }
+function LT_c_cut(frames, sync) { return ltRun(function () { return ltCCut(frames, sync); }); }
 
 
 
@@ -233,101 +293,141 @@ function LT_c_cut(frames) { return ltRun(function () { return ltCCut(frames); })
 // getLinkedItems(). Never call linkSelection twice on a detected pair.
 // Specs are {i,s,e,si}: piece index and expected timeline/source-in frames.
 // =====================================================================================================
-function ltLLinkedState(v, a) {
-  var items, i, x, tol = 0.00001;
+function ltItemMatches(x, peer) {
+  var tol = 0.00001;
+  if (x === peer) return true;
+  try {
+    if (x && peer && String(x.mediaType || "") === String(peer.mediaType || "") &&
+        Math.abs(x.start.seconds - peer.start.seconds) < tol && Math.abs(x.end.seconds - peer.end.seconds) < tol &&
+        Math.abs(x.inPoint.seconds - peer.inPoint.seconds) < tol) return true;
+  } catch (ignore) {}
+  return false;
+}
+function ltGroupLinkedState(v, peers) {
+  var items, i, p, used = {}, matched = {}, hit;
   if (!v || typeof v.getLinkedItems !== "function") return -1;
   try { items = v.getLinkedItems(); } catch (e) { return -1; }
   if (!items) return 0;
   for (i = 0; i < items.length; i++) {
-    x = items[i];
-    if (x === a) return 1;
-    // ExtendScript may return a different wrapper for the same TrackItem; compare timing too.
-    try {
-      if (x && x.mediaType === "Audio" && a.mediaType === "Audio" &&
-          Math.abs(x.start.seconds - a.start.seconds) < tol && Math.abs(x.end.seconds - a.end.seconds) < tol &&
-          Math.abs(x.inPoint.seconds - a.inPoint.seconds) < tol) return 1;
-    } catch (ignore) {}
+    if (items[i] === v) { used[i] = true; continue; }
+    for (p = 0; p < peers.length; p++) {
+      if (!matched[p] && items[i] === peers[p]) { matched[p] = true; used[i] = true; break; }
+    }
   }
-  return 0;
+  for (p = 0; p < peers.length; p++) {
+    if (matched[p]) continue;
+    hit = false;
+    for (i = 0; i < items.length; i++) {
+      if (used[i]) continue;
+      if (ltItemMatches(items[i], peers[p])) { used[i] = true; matched[p] = true; hit = true; break; }
+    }
+    if (!hit) return 0;
+  }
+  return 1;
 }
-function ltLLink(specs) {
+function ltLLinkedState(v, a) {
+  return ltGroupLinkedState(v, [a]);
+}
+function ltCollectPieceGroup(vt, at, extra, sp, fps) {
+  if (sp.i < 0 || sp.i >= vt.clips.numItems || sp.i >= at.clips.numItems) return { error: "range", name: "V1/A1" };
+  var v = vt.clips[sp.i], a = at.clips[sp.i], j, ec, peers, err;
+  if (!v || !a) return { error: "missing", name: !v ? "V1" : "A1" };
+  err = Math.max(
+    Math.abs(v.start.seconds * fps - sp.s), Math.abs(v.end.seconds * fps - sp.e), Math.abs(v.inPoint.seconds * fps - sp.si),
+    Math.abs(a.start.seconds * fps - sp.s), Math.abs(a.end.seconds * fps - sp.e), Math.abs(a.inPoint.seconds * fps - sp.si)
+  );
+  peers = [a];
+  for (j = 0; j < extra.length; j++) {
+    if (sp.i >= extra[j].track.clips.numItems || !extra[j].track.clips[sp.i]) return { error: "range", name: extra[j].name };
+    ec = extra[j].track.clips[sp.i];
+    err = Math.max(err,
+      Math.abs(ec.start.seconds * fps - sp.s), Math.abs(ec.end.seconds * fps - sp.e), Math.abs(ec.inPoint.seconds * fps - sp.si));
+    peers.push(ec);
+  }
+  return { v: v, a: a, peers: peers, err: err };
+}
+function ltLink(specs, sync) {
   var seq = ltSeq();
   if (!seq) return "FAIL|No active sequence.";
   if (!specs || !specs.length) return "FAIL|No pairs were given.";
   var tb = Number(seq.timebase), fps = tb > 0 ? LT_TICKS / tb : 0;
   if (!(fps > 0)) return "FAIL|The frame rate could not be read.";
-  var vt = seq.videoTracks[0], at = seq.audioTracks[0], done = 0, linked = 0, skipped = 0, i, sp, v, a, err, sel, state;
-  if (ltCOthers(seq) !== 0) return "FAIL|Clips exist on tracks other than V1/A1.";
+  var vt = seq.videoTracks[0], at = seq.audioTracks[0], extra = sync ? ltSyncedTracksMeta(seq) : [];
+  var done = 0, linked = 0, skipped = 0, i, j, sp, g, sel, state, wantSel;
+  if (ltCOthers(seq, sync) !== 0) return "FAIL|" + (sync ? "Synced track piece counts mismatch or clips exist on V3+." : "Clips exist on tracks other than V1/A1.");
   for (i = 0; i < specs.length; i++) {
     sp = specs[i];
-    if (sp.i < 0 || sp.i >= vt.clips.numItems || sp.i >= at.clips.numItems) return "FAIL|Pair index " + sp.i + " is outside the current timeline.";
-    v = vt.clips[sp.i]; a = at.clips[sp.i];
-    err = Math.max(
-      Math.abs(v.start.seconds * fps - sp.s), Math.abs(v.end.seconds * fps - sp.e), Math.abs(v.inPoint.seconds * fps - sp.si),
-      Math.abs(a.start.seconds * fps - sp.s), Math.abs(a.end.seconds * fps - sp.e), Math.abs(a.inPoint.seconds * fps - sp.si)
-    );
-    if (err > 0.01) return "FAIL|Pair " + (sp.i + 1) + " no longer matches the checked timeline (worst difference " + err.toFixed(3) + " frames). No link call was made for this pair.";
-    state = ltLLinkedState(v, a);
+    g = ltCollectPieceGroup(vt, at, extra, sp, fps);
+    if (g.error) return "FAIL|Pair index " + sp.i + " is outside " + g.name + ".";
+    if (g.err > 0.01) return "FAIL|Pair " + (sp.i + 1) + " no longer matches the checked timeline (worst difference " + g.err.toFixed(3) + " frames). No link call was made for this pair.";
+    state = ltGroupLinkedState(g.v, g.peers);
     if (state === 1) { skipped++; done++; continue; }
     if (state < 0) return "FAIL|Pair " + (sp.i + 1) + ": Premiere does not expose getLinkedItems() here, so existing link state cannot be determined safely. No link call was made for this pair.";
     ltClear(seq);
-    a.setSelected(1, 0);
-    v.setSelected(1, 1);
+    for (j = 0; j < g.peers.length; j++) g.peers[j].setSelected(1, 0);
+    g.v.setSelected(1, 1);
     sel = seq.getSelection();
-    if (!sel || sel.length !== 2) {
+    wantSel = 1 + g.peers.length;
+    if (!sel || sel.length !== wantSel) {
       ltClear(seq);
-      return "FAIL|Pair " + (sp.i + 1) + ": could not confirm exactly the audio and video are selected (" + (sel ? sel.length : 0) + " selected). No link call was made for this pair; " + done + " pair(s) handled before it.";
+      return "FAIL|Pair " + (sp.i + 1) + ": could not confirm all " + wantSel + " track items are selected (" + (sel ? sel.length : 0) + " selected). No link call was made for this pair; " + done + " pair(s) handled before it.";
     }
     seq.linkSelection(); // toggle: exactly once; do not infer link state from post-link selection count
     linked++;
     ltClear(seq);
     done++;
   }
-  return "ok|" + done + "|" + linked + "|" + skipped + "|" + vt.clips.numItems + "|" + at.clips.numItems + "|" + ltCOthers(seq);
+  return "ok|" + done + "|" + linked + "|" + skipped + "|" + vt.clips.numItems + "|" + at.clips.numItems + "|" + ltCOthers(seq, sync);
 }
-function LT_l_link(specs) { return ltRun(function () { return ltLLink(specs); }); }
+function ltLLink(specs, sync) { return ltLink(specs, sync); }
+function LT_l_link(specs, sync) { return ltRun(function () { return ltLink(specs, sync); }); }
 
-function ltLVerify(specs) {
+function ltLVerify(specs, sync) {
   var seq = ltSeq();
   if (!seq) return "FAIL|No active sequence.";
-  var vt = seq.videoTracks[0], at = seq.audioTracks[0], i, sp, v, a, fps, tb, err, bad = [], state;
+  var vt = seq.videoTracks[0], at = seq.audioTracks[0], extra = sync ? ltSyncedTracksMeta(seq) : [];
+  var i, j, sp, g, fps, tb, bad = [], state;
   if (!specs || vt.clips.numItems !== specs.length || at.clips.numItems !== specs.length) return "FAIL|The remaining piece counts do not match the relink plan.";
+  for (j = 0; j < extra.length; j++) {
+    if (extra[j].track.clips.numItems !== specs.length) return "FAIL|The remaining piece counts on " + extra[j].name + " do not match the relink plan.";
+  }
   tb = Number(seq.timebase); fps = tb > 0 ? LT_TICKS / tb : 0;
   if (!(fps > 0)) return "FAIL|The frame rate could not be read.";
   for (i = 0; i < specs.length; i++) {
-    sp = specs[i]; v = vt.clips[sp.i]; a = at.clips[sp.i];
-    if (!v || !a) { bad.push("pair " + (i + 1) + " is missing"); continue; }
-    err = Math.max(
-      Math.abs(v.start.seconds * fps - sp.s), Math.abs(v.end.seconds * fps - sp.e), Math.abs(v.inPoint.seconds * fps - sp.si),
-      Math.abs(a.start.seconds * fps - sp.s), Math.abs(a.end.seconds * fps - sp.e), Math.abs(a.inPoint.seconds * fps - sp.si)
-    );
-    if (err > 0.01) bad.push("pair " + (i + 1) + " timeline/source timing changed by " + err.toFixed(3) + " frames");
-    state = ltLLinkedState(v, a);
+    sp = specs[i];
+    g = ltCollectPieceGroup(vt, at, extra, sp, fps);
+    if (g.error) { bad.push("pair " + (i + 1) + " is missing (" + g.name + ")"); continue; }
+    if (g.err > 0.01) bad.push("pair " + (i + 1) + " timeline/source timing changed by " + g.err.toFixed(3) + " frames");
+    state = ltGroupLinkedState(g.v, g.peers);
     if (state === 0) bad.push("pair " + (i + 1) + " is not linked");
     else if (state < 0) bad.push("pair " + (i + 1) + " link state cannot be verified by getLinkedItems()");
   }
-  if (ltCOthers(seq) !== 0) bad.push("clips exist on tracks other than V1/A1");
+  if (ltCOthers(seq, sync) !== 0) bad.push(sync ? "synced track counts mismatch or clips exist on V3+" : "clips exist on tracks other than V1/A1");
   if (bad.length) return "FAIL|" + bad.slice(0, 5).join("; ") + (bad.length > 5 ? "; and " + (bad.length - 5) + " more" : "");
   return "ok|" + specs.length;
 }
-function LT_l_verify(specs) { return ltRun(function () { return ltLVerify(specs); }); }
+function LT_l_verify(specs, sync) { return ltRun(function () { return ltLVerify(specs, sync); }); }
 
-// READ-ONLY: how many of the V1/A1 pairs are linked right now (used to resume a combined run). Changes nothing.
+// READ-ONLY: how many of the V1/A1 pairs (and synced tracks) are linked right now (used to resume a combined run). Changes nothing.
 // ok|pairs|linked|unlinked|unknown   (unknown = getLinkedItems() unavailable or the piece did not match the spec)
-function ltLCount(specs) {
+function ltLCount(specs, sync) {
   var seq = ltSeq();
   if (!seq) return "FAIL|No active sequence.";
-  var vt = seq.videoTracks[0], at = seq.audioTracks[0], i, sp, v, a, st, linked = 0, unlinked = 0, unknown = 0;
+  var vt = seq.videoTracks[0], at = seq.audioTracks[0], extra = sync ? ltSyncedTracksMeta(seq) : [];
+  var i, j, g, st, linked = 0, unlinked = 0, unknown = 0;
   if (!specs || vt.clips.numItems !== specs.length || at.clips.numItems !== specs.length) return "FAIL|The piece counts do not match the pairs given.";
+  for (j = 0; j < extra.length; j++) {
+    if (extra[j].track.clips.numItems !== specs.length) return "FAIL|The piece counts on " + extra[j].name + " do not match the pairs given.";
+  }
   for (i = 0; i < specs.length; i++) {
-    sp = specs[i]; v = vt.clips[sp.i]; a = at.clips[sp.i];
-    if (!v || !a) { unknown++; continue; }
-    st = ltLLinkedState(v, a);
+    g = ltCollectPieceGroup(vt, at, extra, specs[i], 1);
+    if (g.error) { unknown++; continue; }
+    st = ltGroupLinkedState(g.v, g.peers);
     if (st === 1) linked++; else if (st === 0) unlinked++; else unknown++;
   }
   return "ok|" + specs.length + "|" + linked + "|" + unlinked + "|" + unknown;
 }
-function LT_l_count(specs) { return ltRun(function () { return ltLCount(specs); }); }
+function LT_l_count(specs, sync) { return ltRun(function () { return ltLCount(specs, sync); }); }
 
 
 // =====================================================================================================
@@ -350,41 +450,67 @@ function ltDFind(track, fps, s, e, si) {
   }
   return null;
 }
-function ltDDel(specs) {
+function ltDDel(specs, sync) {
   var seq = ltSeq();
   if (!seq) return "FAIL|No active sequence.";
   if (!specs || !specs.length) return "FAIL|No gaps were given.";
   var tb = Number(seq.timebase), fps = tb > 0 ? LT_TICKS / tb : 0;
   if (!(fps > 0)) return "FAIL|The frame rate could not be read.";
-  var vt = seq.videoTracks[0], at = seq.audioTracks[0], t0 = ltNow(), done = 0, worst = 0, i, sp, fv, fa, nv, na, pv, pa, bad, tp0;
+  var vt = seq.videoTracks[0], at = seq.audioTracks[0], extra = sync ? ltSyncedTracksMeta(seq) : [];
+  var t0 = ltNow(), done = 0, worst = 0, i, j, sp, fv, fa, fe, nv, na, ne, pv, pa, pe, bad, tp0;
   for (i = 0; i < specs.length; i++) {
     sp = specs[i]; tp0 = ltNow();
-    var nV0 = vt.clips.numItems, nA0 = at.clips.numItems;
+    var nV0 = vt.clips.numItems, nA0 = at.clips.numItems, nE0 = [];
+    for (j = 0; j < extra.length; j++) nE0.push(extra[j].track.clips.numItems);
     fv = ltDFind(vt, fps, sp.s, sp.e, sp.si);
     if (!fv) return "FAIL|gap at frame " + sp.s + ": the V1 piece is not where it was planned (" + done + " pair(s) done before it).";
-    fv.clip.remove(true, true);
+    fe = [];
+    for (j = 0; j < extra.length; j++) {
+      var hit = ltDFind(extra[j].track, fps, sp.s, sp.e, sp.si);
+      if (!hit) return "FAIL|gap at frame " + sp.s + ": the " + extra[j].name + " piece is not where it was planned (" + done + " pair(s) done before it).";
+      fe.push(hit);
+    }
     fa = ltDFind(at, fps, sp.s, sp.e, sp.si);
-    if (!fa) return "FAIL|gap at frame " + sp.s + ": the A1 piece was not found after the V1 delete (V1 is already missing it: undo with Ctrl+Z).";
+    if (!fa) return "FAIL|gap at frame " + sp.s + ": the A1 piece is not where it was planned (" + done + " pair(s) done before it).";
+    fv.clip.remove(true, true);
+    for (j = 0; j < fe.length; j++) fe[j].clip.remove(true, true);
     fa.clip.remove(true, true);
     if (vt.clips.numItems !== nV0 - 1 || at.clips.numItems !== nA0 - 1) return "FAIL|gap at frame " + sp.s + ": piece counts V1 " + vt.clips.numItems + " / A1 " + at.clips.numItems + ", expected " + (nV0 - 1) + " / " + (nA0 - 1) + ".";
+    for (j = 0; j < extra.length; j++) {
+      if (extra[j].track.clips.numItems !== nE0[j] - 1) return "FAIL|gap at frame " + sp.s + ": piece count " + extra[j].name + " " + extra[j].track.clips.numItems + ", expected " + (nE0[j] - 1) + ".";
+    }
     bad = "";
     if (fv.idx < vt.clips.numItems && fv.idx < at.clips.numItems) {
       nv = vt.clips[fv.idx]; na = at.clips[fv.idx];
       var dv = nv.start.seconds * fps - sp.s, da = na.start.seconds * fps - sp.s;
       if (Math.abs(dv) > 0.01 || Math.abs(da) > 0.01) bad = "the next piece starts " + dv.toFixed(3) + " frames (V1) / " + da.toFixed(3) + " frames (A1) from where the gap began (a hole or a drift)";
       else if (Math.abs(nv.start.seconds - na.start.seconds) * fps > 0.01) bad = "V1 and A1 are out of sync after the delete";
+      for (j = 0; !bad && j < extra.length; j++) {
+        if (fe[j].idx < extra[j].track.clips.numItems) {
+          ne = extra[j].track.clips[fe[j].idx];
+          var de = ne.start.seconds * fps - sp.s;
+          if (Math.abs(de) > 0.01) bad = "the next piece on " + extra[j].name + " starts " + de.toFixed(3) + " frames from where the gap began (a hole or a drift)";
+          else if (Math.abs(nv.start.seconds - ne.start.seconds) * fps > 0.01) bad = "V1 and " + extra[j].name + " are out of sync after the delete";
+        }
+      }
     }
     if (!bad && fv.idx > 0) {
       pv = vt.clips[fv.idx - 1]; pa = at.clips[fv.idx - 1];
       if (Math.abs(pv.end.seconds * fps - sp.s) > 0.01 || Math.abs(pa.end.seconds * fps - sp.s) > 0.01) bad = "the piece before the gap no longer ends where the gap began";
+      for (j = 0; !bad && j < extra.length; j++) {
+        if (fe[j].idx > 0) {
+          pe = extra[j].track.clips[fe[j].idx - 1];
+          if (Math.abs(pe.end.seconds * fps - sp.s) > 0.01) bad = "the piece before the gap on " + extra[j].name + " no longer ends where the gap began";
+        }
+      }
     }
     if (bad) return "FAIL|gap at frame " + sp.s + ": " + bad + ". Stopped here (" + done + " pair(s) done before it); timeline left as is.";
     done++;
     sp = ltNow() - tp0; if (sp > worst) worst = sp;
   }
-  return "ok|" + done + "|" + (ltNow() - t0) + "|" + vt.clips.numItems + "|" + at.clips.numItems + "|" + ltCOthers(seq) + "|" + worst;
+  return "ok|" + done + "|" + (ltNow() - t0) + "|" + vt.clips.numItems + "|" + at.clips.numItems + "|" + ltCOthers(seq, sync) + "|" + worst;
 }
-function LT_d_del(specs) { return ltRun(function () { return ltDDel(specs); }); }
+function LT_d_del(specs, sync) { return ltRun(function () { return ltDDel(specs, sync); }); }
 
 function ltBClone() {
   var seq = ltSeq();

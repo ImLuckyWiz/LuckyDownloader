@@ -219,3 +219,114 @@ test("F-04: unreadable QE timecode (tcValid === false) is refused in evaluate, e
   const fd = delFacts(PCS, { seq: { fps: 60, dropFrame: false, tcValid: false } });
   assert.equal(G.evaluateDeletes(fd).ok, false);
 });
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// U-CEP-02: opt-in synced tracks (V2 chat overlay & A2..AN multi-track audio)
+// ---------------------------------------------------------------------------------------------------------------------------------
+test("U-CEP-02: synced-track mode disabled still refuses matching V2 / A2 clips", () => {
+  const f = good({ video: [1, 1, 0], audio: [1, 1, 0], v2: [clip({ media: "E:\\v\\chat.mp4" })], a2: [clip()] });
+  const r = G.evaluate(f);
+  assert.equal(r.ok, false);
+  assert.ok(has(r, /V2 \(1 clip\)/) && has(r, /A2 \(1 clip\)/));
+});
+
+test("U-CEP-02: synced-track mode enabled allows matching V2 overlay and A2/A3 audio", () => {
+  const f = good({
+    syncedTracks: true,
+    video: [1, 1, 0],
+    audio: [1, 1, 1],
+    v2: [clip({ media: "E:\\v\\chat_overlay.mp4", name: "chat_overlay.mp4" })],
+    a2: [clip({ media: "E:\\v\\vod_audio.wav", name: "vod_audio.wav" })],
+    a3: [clip({ media: "E:\\v\\mic.wav", name: "mic.wav" })],
+  });
+  const r = G.evaluate(f);
+  assert.equal(r.ok, true, r.hard.join(" | "));
+});
+
+test("U-CEP-02: synced-track mode rejects mismatched timings, missing clip info, multiple clips on V2/A2, and V3+", () => {
+  const badLen = G.evaluate(good({ syncedTracks: true, video: [1, 1, 0], v2: [clip({ end: 1800 })] }));
+  assert.equal(badLen.ok, false);
+  assert.ok(has(badLen, /V2 does not match V1/));
+
+  const badStart = G.evaluate(good({ syncedTracks: true, audio: [1, 1, 0], a2: [clip({ start: 2, end: 3602 })] }));
+  assert.equal(badStart.ok, false);
+  assert.ok(has(badStart, /A2 does not match V1/));
+
+  const badMissing = G.evaluate(good({ syncedTracks: true, video: [1, 1, 0] }));
+  assert.equal(badMissing.ok, false);
+  assert.ok(has(badMissing, /V2 clip timing could not be read/));
+
+  const badMulti = G.evaluate(good({ syncedTracks: true, audio: [1, 2, 0] }));
+  assert.equal(badMulti.ok, false);
+  assert.ok(has(badMulti, /A2 holds 2 clips/));
+
+  const badV3 = G.evaluate(good({ syncedTracks: true, video: [1, 1, 1], v2: [clip()] }));
+  assert.equal(badV3.ok, false);
+  assert.ok(has(badV3, /V3 \(1 clip\)/));
+});
+
+test("U-CEP-02: evaluateCuts checks V2 and A2..AN piece counts and piece-by-piece sync", () => {
+  const pcs = piecesFor(EDGES);
+  const ok = G.evaluateCuts(cutFacts(EDGES, {
+    syncedTracks: true,
+    mode: "complete",
+    video: [pcs.length, pcs.length, 0],
+    audio: [pcs.length, pcs.length, pcs.length],
+    v2: pcs.map((p) => Object.assign({}, p)),
+    a2: pcs.map((p) => Object.assign({}, p)),
+    a3: pcs.map((p) => Object.assign({}, p)),
+  }));
+  assert.equal(ok.ok, true, ok.hard.join(" | "));
+
+  const badCnt = G.evaluateCuts(cutFacts(EDGES, {
+    syncedTracks: true,
+    video: [pcs.length, pcs.length - 1, 0],
+    v2: pcs.slice(0, -1),
+  }));
+  assert.equal(badCnt.ok, false);
+  assert.ok(badCnt.hard.some((h) => /V1 has \d+ pieces but V2 has \d+/.test(h)));
+
+  const driftA2 = pcs.map((p) => Object.assign({}, p));
+  driftA2[1] = Object.assign({}, driftA2[1], { start: driftA2[1].start + 1 / FPS });
+  const badDrift = G.evaluateCuts(cutFacts(EDGES, {
+    syncedTracks: true,
+    audio: [pcs.length, pcs.length, 0],
+    a2: driftA2,
+  }));
+  assert.equal(badDrift.ok, false);
+  assert.ok(badDrift.hard.some((h) => /differ between V1 and A2/.test(h)));
+});
+
+test("U-CEP-02: evaluateDeletes checks V2 and A2..AN piece counts and piece-by-piece sync", () => {
+  const e = G.expectAfterDeletes(PCS, GAPS);
+  const ok = G.evaluateDeletes(delFacts(e, {
+    syncedTracks: true,
+    mode: "complete",
+    expect: e,
+    expectKeep: 3,
+    gaps: { ok: true, deleteCount: 0, keepCount: 3, problems: [], text: "0 pieces" },
+    video: [3, 3, 0],
+    audio: [3, 3, 3],
+    v2: e.map((p) => Object.assign({}, p)),
+    a2: e.map((p) => Object.assign({}, p)),
+    a3: e.map((p) => Object.assign({}, p)),
+  }));
+  assert.equal(ok.ok, true, ok.hard.join(" | "));
+
+  const badCnt = G.evaluateDeletes(delFacts(e, {
+    syncedTracks: true,
+    audio: [3, 4, 0],
+  }));
+  assert.equal(badCnt.ok, false);
+  assert.ok(badCnt.hard.some((h) => /V1 has 3 pieces but A2 has 4/.test(h)));
+
+  const driftV2 = e.map((p) => Object.assign({}, p));
+  driftV2[1] = Object.assign({}, driftV2[1], { end: driftV2[1].end + 1 / FPS });
+  const badDrift = G.evaluateDeletes(delFacts(e, {
+    syncedTracks: true,
+    video: [3, 3, 0],
+    v2: driftV2,
+  }));
+  assert.equal(badDrift.ok, false);
+  assert.ok(badDrift.hard.some((h) => /differ between V1 and V2/.test(h)));
+});

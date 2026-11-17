@@ -39,22 +39,29 @@ function build(o) {
     getFirstMarker: () => list[0] || null, getNextMarker: (m) => list[list.indexOf(m) + 1] || null, deleteMarker(m) { list.splice(list.indexOf(m), 1); } };
   for (let i = 0; i < (o.existing || 0); i++) { const m = markers.createMarker(5 + i); m.name = "mine " + i; m.comments = "keep me"; }
   const pi = { name: "v", getMarkers: () => markers, getMediaPath: () => media };
+  const piV2 = o.v2Media ? { name: "chat", getMarkers: () => ({ numMarkers: 0 }), getMediaPath: () => o.v2Media } : pi;
   // timeline
-  const tracks = {}, calls = { v: 0, a: 0, vr: 0, ar: 0, link: 0 }, ctl = { handlers: null }, selected = new Set(), links = new Map();
+  const tracks = {}, calls = { v: 0, a: 0, vr: 0, ar: 0, link: 0 }, ctl = { handlers: null }, selected = new Set(), links = new Map(), linkGroups = new Map();
   const mkClip = (t, s, e, i) => {
     const c = { s, e, i, t };
     for (const [k, f] of [["start", "s"], ["end", "e"], ["inPoint", "i"]]) Object.defineProperty(c, k, { get: () => ({ seconds: c[f] / FPS }) });
     Object.defineProperty(c, "outPoint", { get: () => ({ seconds: (c.i + c.e - c.s) / FPS }) });
-    c.projectItem = pi; c.name = "v"; c.mediaType = t === tracks.V1 ? "Video" : "Audio";
+    c.projectItem = t === tracks.V2 ? piV2 : pi;
+    c.name = t === tracks.V2 && o.v2Media ? "chat" : "v";
+    c.mediaType = (t === tracks.V1 || t === tracks.V2 || t === tracks.V3) ? "Video" : "Audio";
     c.setSelected = (v) => { v ? selected.add(c) : selected.delete(c); };
-    c.getLinkedItems = () => (links.has(c) ? [links.get(c)] : []);
+    c.getLinkedItems = () => {
+      if (linkGroups.has(c)) return Array.from(linkGroups.get(c)).filter((x) => x !== c);
+      return links.has(c) ? [links.get(c)] : [];
+    };
     c.remove = (ripple) => {
       const isV = t === tracks.V1; calls[isV ? "vr" : "ar"]++;
       if (isV && o.stopAtRemove && calls.vr === o.stopAtRemove) ctl.handlers.rStop();
       t.arr.splice(t.arr.indexOf(c), 1);
       if (!ripple) return;
-      const partner = isV ? tracks.A1 : t === tracks.A1 ? tracks.V1 : null;
-      if (partner && partner.arr.some((x) => x.s < c.e - 0.5 && x.e > c.s + 0.5)) return;
+      for (const tt of Object.values(tracks)) {
+        if (tt.arr.some((x) => x.s < c.e - 0.5 && x.e > c.s + 0.5)) return;
+      }
       const shift = c.e - c.s;
       for (const tt of Object.values(tracks)) tt.arr.forEach((x) => { if (x.s >= c.e - 0.5) { x.s -= shift; x.e -= shift; } });
     };
@@ -62,10 +69,11 @@ function build(o) {
   };
   const mkTrack = (spec) => { const t = { arr: [] }; Object.defineProperty(t.arr, "numItems", { get: () => t.arr.length }); t.clips = t.arr; spec.forEach(([s, e, i]) => t.arr.push(mkClip(t, s, e, i))); return t; };
   tracks.V1 = mkTrack([[0, END, 0]]); tracks.A1 = mkTrack([[0, END, 0]]);
-  tracks.V2 = mkTrack(o.v2 ? [[600, 1200, 0]] : []); tracks.V3 = mkTrack([]); tracks.A2 = mkTrack([]); tracks.A3 = mkTrack([]);
+  tracks.V2 = mkTrack(o.v2Synced ? [[0, END, 0]] : (o.v2 ? [[600, 1200, 0]] : [])); tracks.V3 = mkTrack(o.v3 ? [[0, END, 0]] : []);
+  tracks.A2 = mkTrack(o.a2Synced ? [[0, END, 0]] : []); tracks.A3 = mkTrack(o.a3Synced ? [[0, END, 0]] : []);
   const split = (t, f) => { const k = t.arr.findIndex((c) => f > c.s && f < c.e); if (k < 0) return; const c = t.arr[k]; t.arr.splice(k, 1, mkClip(t, c.s, f, c.i), mkClip(t, f, c.e, c.i + f - c.s)); };
   const razor = (t, kind) => (tc) => {
-    const n = ++calls[kind];
+    const n = calls[kind] = (calls[kind] || 0) + 1;
     if (o.missAt && kind === "v" && n === o.missAt) return;
     if (o.stopAtRazor && kind === "v" && n === o.stopAtRazor) ctl.handlers.rStop();
     split(t, T.timecodeToFrames(tc, FPS, 0));
@@ -76,11 +84,24 @@ function build(o) {
     linkSelection() {
       const s = Array.from(selected); const n = ++calls.link;
       if (o.linkSilentAt && n === o.linkSilentAt) return;
-      if (s.length !== 2) return;
-      if (links.get(s[0]) === s[1]) { links.delete(s[0]); links.delete(s[1]); calls.unlinked = (calls.unlinked || 0) + 1; return; }   // a TOGGLE: a second call unlinks
-      links.set(s[0], s[1]); links.set(s[1], s[0]); if (o.linkMoves) s[0].s += 1;
+      if (s.length < 2) return;
+      const g0 = linkGroups.get(s[0]);
+      const alreadyGroup = g0 && g0.size === s.length && s.every((x) => g0.has(x));
+      const alreadyPair = s.length === 2 && links.get(s[0]) === s[1];
+      if (alreadyGroup || alreadyPair) {
+        s.forEach((x) => { linkGroups.delete(x); links.delete(x); });
+        calls.unlinked = (calls.unlinked || 0) + 1;
+        return; // a TOGGLE: a second call unlinks
+      }
+      const grp = new Set(s);
+      s.forEach((x) => linkGroups.set(x, grp));
+      if (s.length === 2) { links.set(s[0], s[1]); links.set(s[1], s[0]); }
+      if (o.linkMoves) s[0].s += 1;
     } };
-  const q = { CTI: { timecode: "00:00:00:00" }, getVideoTrackAt: () => ({ razor: razor(tracks.V1, "v") }), getAudioTrackAt: () => ({ razor: razor(tracks.A1, "a") }) };
+  const vList = [tracks.V1, tracks.V2, tracks.V3], aList = [tracks.A1, tracks.A2, tracks.A3];
+  const q = { CTI: { timecode: "00:00:00:00" },
+    getVideoTrackAt: (idx) => { const i = idx || 0; return vList[i] ? { razor: razor(vList[i], i === 0 ? "v" : "v" + (i + 1)) } : null; },
+    getAudioTrackAt: (idx) => { const i = idx || 0; return aList[i] ? { razor: razor(aList[i], i === 0 ? "a" : "a" + (i + 1)) } : null; } };
   const host = { app: { project: { activeSequence: seq, path: path.join(dir, "Untitled.prproj") }, enableQE() {}, version: "mock" }, qe: { project: { getActiveSequence: () => q } } };
   vm.createContext(host);
   if (!o.extUrl) vm.runInContext(fs.readFileSync(path.join(root, "src/timecode.js"), "utf8"), host);
@@ -323,6 +344,29 @@ const setField = (S, id, v) => { S.els[id] = Object.assign(S.els[id] || { style:
     r = await press(S, "rCuts", "yes");
     check(label + ": the panel built the right path, loaded timecode.js and the cuts ran", /CUTS DONE/.test(r.log) && S.tracks.V1.arr.length > 100, r.log.split("\n").filter((l) => /could not be loaded|PANEL ERROR|REFUSED|STOPPED/.test(l)).join(" | "));
   }
+
+  console.log("\n==== 25. U-CEP-02: synced tracks (V2 chat overlay + A2/A3 audio) refused when setting off, cut/deleted/linked in lockstep when setting on ====");
+  S = build({ v2Synced: true, a2Synced: true, a3Synced: true, v2Media: "E:\\chat\\overlay.mp4" });
+  r = await press(S, "rAll", "yes"); show(r);
+  check("synced tracks disabled: V2/A2/A3 refused before changing anything", /REFUSED/.test(r.log) && r.asks === 0 && S.tracks.V1.arr.length === 1 && S.tracks.V2.arr.length === 1 && S.calls.v === 0);
+
+  S = build({ v2Synced: true, a2Synced: true, a3Synced: true, v2Media: "E:\\chat\\overlay.mp4" });
+  setField(S, "syncedTracks", { checked: true });
+  r = await press(S, "rAll", "yes"); show(r);
+  const trackSynced = (tr) => tr.arr.length === S.tracks.V1.arr.length && S.tracks.V1.arr.every((c, i) => c.s === tr.arr[i].s && c.e === tr.arr[i].e && c.i === tr.arr[i].i);
+  const groupLinkedAll = S.tracks.V1.arr.every((c, i) => {
+    const got = new Set(c.getLinkedItems());
+    return got.has(S.tracks.A1.arr[i]) && got.has(S.tracks.V2.arr[i]) && got.has(S.tracks.A2.arr[i]) && got.has(S.tracks.A3.arr[i]) && got.size === 4;
+  });
+  check("synced tracks enabled: DO IT ALL DONE with 108 pieces across V1/V2/A1/A2/A3 in lockstep",
+    /DO IT ALL DONE/.test(r.log) && S.tracks.V1.arr.length === 108 && contiguous(S.tracks.V1) && synced(S) && trackSynced(S.tracks.V2) && trackSynced(S.tracks.A2) && trackSynced(S.tracks.A3),
+    "counts=" + [S.tracks.V1.arr.length, S.tracks.V2.arr.length, S.tracks.A1.arr.length, S.tracks.A2.arr.length, S.tracks.A3.arr.length].join("/"));
+  check("synced tracks enabled: every surviving 5-clip piece group is linked together", groupLinkedAll && S.calls.link === 108 && !S.calls.unlinked, "links=" + S.calls.link + ", unlinks=" + (S.calls.unlinked || 0));
+
+  S = build({ v2: true });
+  setField(S, "syncedTracks", { checked: true });
+  r = await press(S, "rAll", "yes"); show(r);
+  check("synced tracks enabled: unsynced V2 clip is still REFUSED", /REFUSED/.test(r.log) && /V2 does not match V1/.test(r.log) && r.asks === 0 && S.calls.v === 0);
 
   console.log(failures.length ? "\n" + failures.length + " CHECK(S) FAILED: " + failures.join("; ") : "\nALL CHECKS PASSED");
   process.exit(failures.length ? 1 : 0);

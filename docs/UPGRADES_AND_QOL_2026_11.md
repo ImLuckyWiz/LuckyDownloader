@@ -1,6 +1,6 @@
 # LuckyDownloader — Upgrades & Quality-of-Life Plan (2026-11)
 
-> Status: **PHASE 4C IMPLEMENTED** (`U-UI-01`, `U-UI-02`, `U-UI-07` completed 2026-11-16 and shipping in `v2.21.0`; Phase 4B `U-DATA-01`/`02` shipped in `v2.20.0`; Phase 4A `U-DL-01`/`02` shipped in `v2.19.0`; Wave 1 + `U-CLI-01..03` shipped in `v2.17.0`; remaining Wave 2 `U-CEP-02` and Wave 3 pending). Baseline HEAD `4fb1877`.
+> Status: **PHASE 4D IMPLEMENTED (WAVE 2 COMPLETE)** (`U-CEP-02` completed 2026-11-16 and shipping in `v2.22.0`; Phase 4C `U-UI-01`/`02`/`07` shipped in `v2.21.0`; Phase 4B `U-DATA-01`/`02` shipped in `v2.20.0`; Phase 4A `U-DL-01`/`02` shipped in `v2.19.0`; Wave 1 + `U-CLI-01..03` shipped in `v2.17.0`; Wave 3 pending). Baseline HEAD `4fb1877`.
 > Scope: meaningful UX, feature and architecture upgrades only. Bugs, security issues and regressions live in
 > [`REVIEW_2026_11_V2.md`](REVIEW_2026_11_V2.md); where an upgrade depends on a bug fix, the finding ID is cited.
 
@@ -55,7 +55,7 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 | 14 | `U-UI-01` | Per-row live speed, ETA & byte counters + aggregate status bar telemetry | High | M | **DONE (Phase 4C, 2026-11-16)** — `ProgressTelemetry` / `parse_progress_telemetry()`, per-row speed/ETA pills (`QueueRowDelegate`), and `StatusBar` aggregate throughput pill. |
 | 15 | `U-UI-02` | Per-item log filtering & «Edit / Inspect Job» drawer in `QueueTab` | High | M | **DONE (Phase 4C, 2026-11-16)** — Bounded per-item `deque` log buffer, `Selected item` / `All jobs` filter toggle, **Change Output Folder…**, and **Load into Cut & Plan**. |
 | 16 | `U-UI-07` | Global Command Palette (`Ctrl+K`) & accessible About/Diagnostics entry point | Medium | M | **DONE (Phase 4C, 2026-11-16)** — `Ctrl+K` `CommandPaletteDialog` fuzzy search across commands, Options, watchlist, and recent streamers, plus `NavRail` / `OptionsTab` About & Diagnostics triggers. |
-| 17 | `U-CEP-02` | Multi-track / linked overlay support (`V2` Chat Overlay & `A2..AN` Audio) | High | M | Unblocks Premiere auto-cutting for multi-track OBS recordings and rendered chat overlays. |
+| 17 | `U-CEP-02` | Multi-track / linked overlay support (`V2` Chat Overlay & `A2..AN` Audio) | High | M | **DONE (Phase 4D, 2026-11-16)** — Opt-in `"Cut synced tracks (V2, A2..AN)"` toggle, synced preflight/cut/delete guard checks, lockstep cutting/ripple-deleting, and multi-track group relinking. |
 
 ### Wave 3 — Flagship Editing, Capture & Polish Upgrades (`Effort: M–L`)
 
@@ -321,7 +321,7 @@ The 30 upgrade proposals below are sequenced into three delivery waves balancing
 
 ---
 
-### [U-CEP-02] Multi-Track / Linked Overlay Support (`V2` Chat Overlay & `A2..AN` Multi-Track Audio)
+### [U-CEP-02] Multi-Track / Linked Overlay Support (`V2` Chat Overlay & `A2..AN` Multi-Track Audio) — **DONE (Phase 4D, 2026-11-16)**
 - **Impact:** High | **Effort:** M
 - **Current Limitation:** `LTGuard.evaluate()` (`premiere-plugin-cep/src/guard.js:130-149`) rejects any sequence containing clips on `V2..VN` or `A2..AN`. Editors who import LuckyDownloader's rendered Chat Overlay onto `V2` or record multi-track OBS audio (`A1` mix, `A2` VOD audio, `A3` mic) cannot cut or ripple-delete via the CEP panel.
 - **Proposed Upgrade:** Add an opt-in **"Cut synced tracks (`V2`, `A2..AN`)"** setting in Settings; update `LTGuard.evaluate()` (`src/guard.js`), `ltCCut` (`host.jsx`), `ltDDel` (`host.jsx`), and `ltLink` to verify matching source ranges across all populated synced tracks, cut/ripple-delete them together in `runner.js`, and link surviving per-piece groups.

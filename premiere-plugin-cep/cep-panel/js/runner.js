@@ -32,7 +32,7 @@
 
   // ---- facts ----
   function parseScan(body) {
-    var f = { seq: null, proj: "", video: [], audio: [], v1: [], a1: [], markers: null }, lines = body.split("\n"), i;
+    var f = { seq: null, proj: "", video: [], audio: [], v1: [], a1: [], v2: [], videoClips: [], audioClips: [], markers: null }, lines = body.split("\n"), i;
     for (i = 0; i < lines.length; i++) {
       var p = lines[i].split("\t");
       if (p[0] === "seq") {
@@ -42,7 +42,17 @@
       else if (p[0] === "proj") f.proj = p[1] || "";
       else if (p[0] === "vt") f.video[num(p[1])] = num(p[2]);
       else if (p[0] === "at") f.audio[num(p[1])] = num(p[2]);
-      else if (p[0] === "clip") (p[1] === "V" ? f.v1 : f.a1).push({ start: num(p[3]), end: num(p[4]), inPoint: num(p[5]), outPoint: num(p[6]), media: p[7], name: p[8] });
+      else if (p[0] === "clip") {
+        var ti = num(p[2]), cl = { start: num(p[3]), end: num(p[4]), inPoint: num(p[5]), outPoint: num(p[6]), media: p[7], name: p[8] };
+        if (p[1] === "V") {
+          (f.videoClips[ti] = f.videoClips[ti] || []).push(cl);
+          if (ti === 0) f.v1.push(cl);
+          else if (ti === 1) f.v2.push(cl);
+        } else {
+          (f.audioClips[ti] = f.audioClips[ti] || []).push(cl);
+          if (ti === 0) f.a1.push(cl);
+        }
+      }
       else if (p[0] === "mk") f.markers = { existing: num(p[1]), probes: num(p[2]) };
     }
     return f;
@@ -145,17 +155,19 @@
       raw[id] = n;
     }
     var ch = fieldEl("recipeCutChapters"); raw.recipeCutChapters = !!(ch && ch.checked);
+    var st = fieldEl("syncedTracks"); raw.syncedTracks = !!(st && st.checked);
     var lc = fieldEl("limitChapter"); if (lc && lc.value !== "") raw.limitChapter = lc.value;
     return C.normalizeSettings(raw);
   }
   function describeSettings(s) {
-    return "keep " + s.padBefore + " s before and " + s.padAfter + " s after each clip, merge clips closer than " + s.mergeGap + " s, " + (s.recipeCutChapters ? "also cut at game changes" : "clips only") + "; delete limit " + s.maxDeletePct + "%, keep at least " + s.minKeepPieces + " piece(s)" + (s.limitChapter !== null ? " (limited to chapter)" : "");
+    return "keep " + s.padBefore + " s before and " + s.padAfter + " s after each clip, merge clips closer than " + s.mergeGap + " s, " + (s.recipeCutChapters ? "also cut at game changes" : "clips only") + "; delete limit " + s.maxDeletePct + "%, keep at least " + s.minKeepPieces + " piece(s)" + (s.limitChapter !== null ? " (limited to chapter)" : "") + (s.syncedTracks ? ", synced tracks (V2, A2..AN)" : "");
   }
   function loadSavedSettings() {
     try {
       var saved = JSON.parse(window.localStorage.getItem("ltSettings") || "{}"), i, e;
       for (i = 0; i < NUM_FIELDS.length; i++) { e = fieldEl(NUM_FIELDS[i][0]); if (e && saved[NUM_FIELDS[i][0]] !== undefined) e.value = String(saved[NUM_FIELDS[i][0]]); }
       e = fieldEl("recipeCutChapters"); if (e && saved.recipeCutChapters !== undefined) e.checked = !!saved.recipeCutChapters;
+      e = fieldEl("syncedTracks"); if (e && saved.syncedTracks !== undefined) e.checked = !!saved.syncedTracks;
       e = fieldEl("recipeMarkers"); if (e && saved.recipeMarkers !== undefined) e.checked = !!saved.recipeMarkers;
       e = fieldEl("recipeDeleteGaps"); if (e && saved.recipeDeleteGaps !== undefined) e.checked = saved.recipeDeleteGaps !== false;
       e = fieldEl("recipeRelink"); if (e && saved.recipeRelink !== undefined) e.checked = saved.recipeRelink !== false;
@@ -169,6 +181,7 @@
       var o = {}, i, e;
       for (i = 0; i < NUM_FIELDS.length; i++) o[NUM_FIELDS[i][0]] = fieldText(NUM_FIELDS[i][0]);
       e = fieldEl("recipeCutChapters"); o.recipeCutChapters = !!(e && e.checked);
+      e = fieldEl("syncedTracks"); o.syncedTracks = !!(e && e.checked);
       e = fieldEl("recipeMarkers"); o.recipeMarkers = !(e && e.checked === false);
       e = fieldEl("recipeDeleteGaps"); o.recipeDeleteGaps = !(e && e.checked === false);
       e = fieldEl("recipeRelink"); o.recipeRelink = !(e && e.checked === false);
@@ -211,10 +224,19 @@
   }
 
   // ---- the failsafe, gathered fresh every time it is asked ----
+  function syncedTracksWanted() { var e = fieldEl("syncedTracks"); return !!(e && e.checked); }
+  function syncedExtraCount(facts) {
+    if (!syncedTracksWanted() || !facts) return 0;
+    var n = 0, i;
+    if (facts.video && facts.video[1] > 0) n++;
+    if (facts.audio) for (i = 1; i < facts.audio.length; i++) if (facts.audio[i] > 0) n++;
+    return n;
+  }
   async function gather() {
     var sc = await scan(), facts;
-    if (sc.error) return { facts: { seq: null, video: [], audio: [], v1: [], a1: [], markers: null, file: null, plan: null }, scanError: sc.error };
+    if (sc.error) return { facts: { seq: null, video: [], audio: [], v1: [], a1: [], v2: [], videoClips: [], audioClips: [], syncedTracks: syncedTracksWanted(), markers: null, file: null, plan: null }, scanError: sc.error };
     facts = sc.facts;
+    facts.syncedTracks = syncedTracksWanted();
     var media = facts.v1.length ? facts.v1[0].media : "";
     var fr = readFileFacts(media, facts.proj);
     facts.file = { loaded: fr.loaded, error: fr.error, name: fr.name, matchesMedia: fr.matchesMedia };
@@ -287,10 +309,10 @@
           return true;
         } },
       { name: "The plan", run: async function (c) {
-          var pl = c.facts.plan, g = pl.gaps, est = estimateSeconds(pl, g.deleteCount);
+          var pl = c.facts.plan, g = pl.gaps, est = estimateSeconds(pl, g.deleteCount), extra = syncedExtraCount(c.facts);
           log("    Settings: " + describeSettings(pl.settings));
           log("    1. add " + pl.markerCount + " markers to the clip (" + pl.items.filter(function (x) { return x.kind === "clip"; }).length + " clips, " + pl.items.filter(function (x) { return x.kind === "game"; }).length + " games)");
-          log("    2. cut at " + pl.pending.length + " points = " + (pl.pending.length * 2) + " razor calls (V1 + A1), in chunks, back to front, " + pl.ranges.length + " pieces to keep");
+          log("    2. cut at " + pl.pending.length + " points = " + (pl.pending.length * (2 + extra)) + " razor calls (V1 + A1" + (extra ? " + synced tracks" : "") + "), in chunks, back to front, " + pl.ranges.length + " pieces to keep");
           log("    3. delete " + g.deleteCount + " gap pieces (" + (g.deletePct !== undefined ? g.deletePct.toFixed(1) + "% of the timeline" : g.text) + "), keep " + g.keepCount);
           log("    4. relink " + g.keepCount + " video/audio pairs");
           log("    Rough time: " + fmt(est.total) + " (markers " + fmt(est.marks) + ", cuts " + fmt(est.cuts) + ", deletes " + fmt(est.dels) + ", relinks " + fmt(est.links) + "), scaled from your own logs.");
@@ -434,7 +456,7 @@
     return r === "object";
   }
   function parseSnap(body) {
-    var f = { seq: null, proj: "", video: [], audio: [], v1: [], a1: [], media: "", name: "" }, lines = body.split("\n"), i;
+    var f = { seq: null, proj: "", video: [], audio: [], v1: [], a1: [], v2: [], videoClips: [], audioClips: [], media: "", name: "" }, lines = body.split("\n"), i;
     for (i = 0; i < lines.length; i++) {
       var p = lines[i].split("\t");
       if (p[0] === "seq") {
@@ -444,8 +466,10 @@
       else if (p[0] === "proj") f.proj = p[1] || "";
       else if (p[0] === "vt") f.video[num(p[1])] = num(p[2]);
       else if (p[0] === "at") f.audio[num(p[1])] = num(p[2]);
-      else if (p[0] === "pv") f.v1.push({ start: num(p[1]), end: num(p[2]), inPoint: num(p[3]), outPoint: num(p[4]) });
-      else if (p[0] === "pa") f.a1.push({ start: num(p[1]), end: num(p[2]), inPoint: num(p[3]), outPoint: num(p[4]) });
+      else if (p[0] === "pv") { var vc = { start: num(p[1]), end: num(p[2]), inPoint: num(p[3]), outPoint: num(p[4]) }; f.v1.push(vc); (f.videoClips[0] = f.videoClips[0] || []).push(vc); }
+      else if (p[0] === "pa") { var ac = { start: num(p[1]), end: num(p[2]), inPoint: num(p[3]), outPoint: num(p[4]) }; f.a1.push(ac); (f.audioClips[0] = f.audioClips[0] || []).push(ac); }
+      else if (p[0] === "pvt") { var tiV = num(p[1]), cv = { start: num(p[2]), end: num(p[3]), inPoint: num(p[4]), outPoint: num(p[5]) }; (f.videoClips[tiV] = f.videoClips[tiV] || []).push(cv); if (tiV === 1) f.v2.push(cv); }
+      else if (p[0] === "pat") { var tiA = num(p[1]), ca = { start: num(p[2]), end: num(p[3]), inPoint: num(p[4]), outPoint: num(p[5]) }; (f.audioClips[tiA] = f.audioClips[tiA] || []).push(ca); }
       else if (p[0] === "media") { f.media = p[1] || ""; f.name = p[2] || ""; }
     }
     return f;
@@ -458,18 +482,41 @@
     return { snap: snap };
   }
   function originOf(arr) { return { start: arr[0].start, end: arr[arr.length - 1].end, inPoint: arr[0].inPoint, outPoint: arr[arr.length - 1].outPoint, speed: 1 }; }
+  function isContiguousPieces(arr, frame) {
+    if (!arr || !arr.length) return false;
+    for (var i = 1; i < arr.length; i++) {
+      if (Math.abs(arr[i].start - arr[i - 1].end) > frame || Math.abs(arr[i].inPoint - arr[i - 1].outPoint) > frame) return false;
+    }
+    return true;
+  }
 
   // Reads the timeline + the markers file and judges both guards. mode "partial" (may be half cut) or "complete" (every cut must be there).
   async function cutsCheck(mode) {
     var sn = await snapshot();
     if (sn.error) return { ok: false, hard: ["Could not read the timeline: " + sn.error], checks: [], cv: null, edges: [], remaining: [] };
-    var snap = sn.snap, C = window.LTCore, G = window.LTGuard, fps = snap.seq.fps;
+    var snap = sn.snap, C = window.LTCore, G = window.LTGuard, fps = snap.seq.fps, sync = syncedTracksWanted(), frame = fps > 0 ? 1 / fps : 0;
     var fr = readFileFacts(snap.media, snap.proj);
     // The strict start-of-run guard judges the ORIGINAL clip (the pieces, joined back together), so it works on a fresh and on a half-cut timeline.
-    var facts = { seq: snap.seq, video: snap.video.slice(), audio: snap.audio.slice(), v1: [], a1: [], markers: null, plan: null,
+    var facts = { seq: snap.seq, video: snap.video.slice(), audio: snap.audio.slice(), v1: [], a1: [], v2: [], videoClips: [], audioClips: [], syncedTracks: sync, markers: null, plan: null,
       file: { loaded: fr.loaded, error: fr.error, name: fr.name, matchesMedia: fr.matchesMedia } };
     if (snap.v1.length) { facts.video[0] = 1; facts.v1 = [Object.assign(originOf(snap.v1), { media: snap.media, name: snap.name })]; }
     if (snap.a1.length) { facts.audio[0] = 1; facts.a1 = [originOf(snap.a1)]; }
+    if (sync) {
+      if (snap.v1.length > 1 && snap.v2.length && isContiguousPieces(snap.v2, frame)) {
+        facts.video[1] = 1; facts.v2 = [originOf(snap.v2)]; facts.videoClips[1] = facts.v2;
+      } else if (snap.v2.length) {
+        facts.v2 = snap.v2.slice(); facts.videoClips[1] = facts.v2;
+      }
+      for (var ti = 1; ti < snap.audioClips.length; ti++) {
+        var acList = snap.audioClips[ti];
+        if (!acList || !acList.length) continue;
+        if (snap.v1.length > 1 && isContiguousPieces(acList, frame)) {
+          facts.audio[ti] = 1; facts.audioClips[ti] = [originOf(acList)];
+        } else {
+          facts.audioClips[ti] = acList.slice();
+        }
+      }
+    }
     var planError = "";
     if (fr.loaded && fps > 0 && facts.v1.length === 1) {
       try { facts.plan = buildPlan(fr.parsed, facts); } catch (e) { planError = e && e.message ? e.message : String(e); }
@@ -481,7 +528,7 @@
       var vo = facts.v1[0], edges = [Math.round(vo.start * fps)];
       facts.plan.pending.forEach(function (t) { edges.push(Math.round(t * fps)); });
       edges.push(Math.round(vo.end * fps));
-      var cf = { seq: snap.seq, video: snap.video, audio: snap.audio, v1: snap.v1, a1: snap.a1, mode: mode, expect: { origin: vo, edges: edges } };
+      var cf = { seq: snap.seq, video: snap.video, audio: snap.audio, v1: snap.v1, a1: snap.a1, v2: snap.v2, videoClips: snap.videoClips, audioClips: snap.audioClips, syncedTracks: sync, mode: mode, expect: { origin: vo, edges: edges } };
       if (mode === "complete") {
         var pieces = snap.v1.map(function (p) { return { start: p.start, end: p.end, inPoint: p.inPoint, outPoint: p.outPoint, speed: 1 }; }), s = facts.plan.settings;
         cf.gaps = C.planGapDelete(pieces, facts.plan.ranges, { frame: 1 / fps, maxDeletePct: s.maxDeletePct, minKeep: s.minKeepPieces, scope: facts.plan.scope });
@@ -512,14 +559,14 @@
           var r = await cutsCheck("partial");
           printChecks(r.checks);
           if (!r.ok) { log("    REFUSED. Nothing was cut:"); r.hard.forEach(function (h) { log("      - " + h); }); return false; }
-          var total = r.edges.length - 2, remaining = r.remaining, made = r.cv.boundaries;
+          var total = r.edges.length - 2, remaining = r.remaining, made = r.cv.boundaries, extra = syncedExtraCount(r.snap), mult = 2 + extra, trDesc = "V1 + A1" + (extra ? " + synced tracks" : "");
           c.edges = r.edges; c.total = total; c.startPieces = r.snap.v1.length; c.remaining = remaining; c.plan = r.plan;
           log("    settings: " + describeSettings(r.plan.settings));
-          log("    plan: " + total + " cuts (" + (total * 2) + " razor calls), " + r.plan.gaps.deleteCount + " gap pieces to delete later, " + r.plan.gaps.keepCount + " to keep." + (made ? " " + made + " cuts are already there from an earlier run." : ""));
+          log("    plan: " + total + " cuts (" + (total * mult) + " razor calls), " + r.plan.gaps.deleteCount + " gap pieces to delete later, " + r.plan.gaps.keepCount + " to keep." + (made ? " " + made + " cuts are already there from an earlier run." : ""));
           if (remaining.length === 0) { log("    Every planned cut is already there. Nothing to cut; the result is checked below."); return true; }
           if (o.noAsk) { log("    Already confirmed for the whole run: go."); return true; }
           var yes = await ask([
-            "About to CUT the timeline at " + remaining.length + " points (" + (remaining.length * 2) + " razor calls on V1 + A1), back to front, in short chunks.",
+            "About to CUT the timeline at " + remaining.length + " points (" + (remaining.length * mult) + " razor calls on " + trDesc + "), back to front, in short chunks.",
             "Settings: " + describeSettings(r.plan.settings) + ".",
             made ? made + " of " + total + " cuts are already there from an earlier run; only the missing ones are made." : "The clip becomes " + (total + 1) + " pieces. Nothing is deleted in this phase.",
             "",
@@ -536,12 +583,12 @@
           return true;
         } },
       { name: "Cut V1 + A1 (back to front, in chunks)", run: async function (c) {
-          var rem = c.remaining.slice(), done = 0, size = 10, worst = 0, t0 = Date.now(), chunks = 0, lastLog = 0;
+          var rem = c.remaining.slice(), done = 0, size = 10, worst = 0, t0 = Date.now(), chunks = 0, lastLog = 0, sync = syncedTracksWanted();
           if (!rem.length) { log("    nothing to cut."); return true; }
           while (done < rem.length) {
             if (stopFlag) { log("    Stopped by you after " + done + " of " + rem.length + " cuts. The timeline is part cut and consistent: press the cut button again to carry on (cuts already made are skipped)."); return false; }
             var b = Math.min(rem.length, done + size), w0 = Date.now();
-            var r = String(await evalJsx("LT_c_cut([" + rem.slice(done, b).join(",") + "])")), w = Date.now() - w0;
+            var r = String(await evalJsx("LT_c_cut([" + rem.slice(done, b).join(",") + "]" + (sync ? ",true" : "") + ")")), w = Date.now() - w0;
             if (r.indexOf("ok|") !== 0) { log("    FAIL at cuts " + (done + 1) + "-" + b + ": " + r.replace(/^(FAIL\||ERROR: )/, "") + "\n    The timeline may be part cut. Press the cut button again to see what the failsafe says, or undo (Ctrl+Z)."); return false; }
             var p = r.split("|"), want = c.startPieces + b;
             if (Number(p[3]) !== want || Number(p[4]) !== want || Number(p[5]) !== 0) {
@@ -600,7 +647,7 @@
         gaps = C.planGapDelete(pieces, ranges, { frame: 1 / fps, maxDeletePct: st.maxDeletePct, minKeep: st.minKeepPieces, scope: scope });
       } catch (e) { hard.push("The delete plan could not be worked out: " + (e && e.message ? e.message : String(e))); }
     }
-    var cv = G.evaluateDeletes({ seq: snap.seq, video: snap.video, audio: snap.audio, v1: snap.v1, a1: snap.a1, gaps: gaps, mode: mode,
+    var cv = G.evaluateDeletes({ seq: snap.seq, video: snap.video, audio: snap.audio, v1: snap.v1, a1: snap.a1, v2: snap.v2, videoClips: snap.videoClips, audioClips: snap.audioClips, syncedTracks: syncedTracksWanted(), gaps: gaps, mode: mode,
       expectKeep: pre ? pre.keepCount : null, expect: mode === "complete" && pre ? pre.expect : null });
     var checks = [];
     if (fr.loaded) checks.push({ ok: fr.matchesMedia !== false, text: "Markers file: " + fr.name + ".", problem: "" });
@@ -652,12 +699,12 @@
           return true;
         } },
       { name: "Delete the gap pieces (V1 then A1, last gap first, in chunks)", run: async function (c) {
-          var pre = c.pre, specs = pre.specs, done = 0, size = 5, worst = 0, t0 = Date.now(), chunks = 0, lastLog = 0;
+          var pre = c.pre, specs = pre.specs, done = 0, size = 5, worst = 0, t0 = Date.now(), chunks = 0, lastLog = 0, sync = syncedTracksWanted();
           if (!specs.length) { log("    nothing to delete."); return true; }
           while (done < specs.length) {
             if (stopFlag) { log("    Stopped by you after " + done + " of " + specs.length + " deletes. The timeline is part deleted and consistent: press the delete button again to carry on (it works out what is left)."); return false; }
             var b = Math.min(specs.length, done + size), w0 = Date.now();
-            var r = String(await evalJsx("LT_d_del(" + specLit(specs, done, b) + ")")), w = Date.now() - w0;
+            var r = String(await evalJsx("LT_d_del(" + specLit(specs, done, b) + (sync ? ",true" : "") + ")")), w = Date.now() - w0;
             if (r.indexOf("ok|") !== 0) { log("    FAIL at deletes " + (done + 1) + "-" + b + ": " + r.replace(/^(FAIL\||ERROR: )/, "") + "\n    The timeline may be part deleted. Press the delete button again to see what the failsafe says, or undo (Ctrl+Z)."); return false; }
             var p = r.split("|"), want = pre.startV - b;
             if (Number(p[1]) !== b - done || Number(p[3]) !== want || Number(p[4]) !== want || Number(p[5]) !== 0) {
@@ -706,11 +753,21 @@
     }
     return "[" + out.join(",") + "]";
   }
+  function sameClipList(la, lb) {
+    var i, k, keys = ["start", "end", "inPoint", "outPoint"];
+    la = la || []; lb = lb || [];
+    if (la.length !== lb.length) return false;
+    for (i = 0; i < la.length; i++) {
+      for (k = 0; k < keys.length; k++) if (Math.abs(la[i][keys[k]] - lb[i][keys[k]]) > 0.00001) return false;
+    }
+    return true;
+  }
   function sameTimeline(a, b) {
-    var i, keys = ["start", "end", "inPoint", "outPoint"];
-    if (!a || !b || a.v1.length !== b.v1.length || a.a1.length !== b.a1.length) return false;
-    for (i = 0; i < a.v1.length; i++) {
-      for (var k = 0; k < keys.length; k++) if (Math.abs(a.v1[i][keys[k]] - b.v1[i][keys[k]]) > 0.00001 || Math.abs(a.a1[i][keys[k]] - b.a1[i][keys[k]]) > 0.00001) return false;
+    if (!a || !b) return false;
+    if (!sameClipList(a.v1, b.v1) || !sameClipList(a.a1, b.a1) || !sameClipList(a.v2, b.v2)) return false;
+    var na = (a.audioClips || []).length, nb = (b.audioClips || []).length, n = Math.max(na, nb), ti;
+    for (ti = 1; ti < n; ti++) {
+      if (!sameClipList(a.audioClips && a.audioClips[ti], b.audioClips && b.audioClips[ti])) return false;
     }
     return true;
   }
@@ -742,7 +799,7 @@
           return true;
         } },
       { name: "Link the remaining V1/A1 pairs (in chunks)", run: async function (c) {
-          var done = 0, size = 4, worst = 0, chunks = 0, t0 = Date.now(), specs = c.specs;
+          var done = 0, size = 4, worst = 0, chunks = 0, t0 = Date.now(), specs = c.specs, sync = syncedTracksWanted();
           while (done < specs.length) {
             if (stopFlag) { log("    Stopped by you after " + done + " of " + specs.length + " pairs. Inspect the current timeline before resuming; the host uses getLinkedItems() to avoid toggling already-linked pairs."); return false; }
             var b = Math.min(specs.length, done + size), before = await snapshot();
@@ -750,7 +807,7 @@
               log("    FAIL before chunk " + (chunks + 1) + ": timeline positions changed. No more links attempted.");
               return false;
             }
-            var w0 = Date.now(), raw = String(await evalJsx("LT_l_link(" + relinkLit(specs, done, b) + ")")), w = Date.now() - w0;
+            var w0 = Date.now(), raw = String(await evalJsx("LT_l_link(" + relinkLit(specs, done, b) + (sync ? ",true" : "") + ")")), w = Date.now() - w0;
             if (raw.indexOf("ok|") !== 0) { log("    FAIL at pairs " + (done + 1) + "-" + b + ": " + raw.replace(/^(FAIL\||ERROR: )/, "") + "\n    Do not blindly retry: inspect these pairs first because linkSelection is a toggle."); return false; }
             var p = raw.split("|");
             if (Number(p[1]) !== b - done || Number(p[4]) !== specs.length || Number(p[5]) !== specs.length || Number(p[6]) !== 0) {
@@ -770,9 +827,9 @@
           return true;
         },
         verify: async function (c) {
-          var r = await deletesCheck("complete", null), sn = await snapshot();
+          var r = await deletesCheck("complete", null), sn = await snapshot(), sync = syncedTracksWanted();
           if (!r.ok || sn.error || !sameTimeline(c.before, sn.snap)) return { ok: false, text: (r.hard || []).join(" | ") || "Timeline changed during relinking." };
-          var v = String(await evalJsx("LT_l_verify(" + relinkLit(c.specs, 0, c.specs.length) + ")"));
+          var v = String(await evalJsx("LT_l_verify(" + relinkLit(c.specs, 0, c.specs.length) + (sync ? ",true" : "") + ")"));
           if (v.indexOf("ok|") !== 0) return { ok: false, text: v.replace(/^(FAIL\||ERROR: )/, "") };
           return { ok: true, text: c.specs.length + " pairs verified linked; timeline/source timings unchanged; V1/A1 remain synchronized; no clips on other tracks." };
         } }
@@ -804,7 +861,7 @@
     return { have: have, want: want };
   }
   async function linkCount(snap) {
-    var specs = relinkSpecs(snap), r = String(await evalJsx("LT_l_count(" + relinkLit(specs, 0, specs.length) + ")"));
+    var specs = relinkSpecs(snap), r = String(await evalJsx("LT_l_count(" + relinkLit(specs, 0, specs.length) + (syncedTracksWanted() ? ",true" : "") + ")"));
     if (r.indexOf("ok|") !== 0) return { error: r.replace(/^(FAIL\||ERROR: )/, "") };
     var p = r.split("|");
     return { pairs: Number(p[1]), linked: Number(p[2]), unlinked: Number(p[3]), unknown: Number(p[4]) };
@@ -837,7 +894,7 @@
     var cc = await cutsCheck("partial");
     if (cc.ok) {
       var fresh = cc.snap.v1.length === 1;
-      out.plan = cc.plan; out.snap = cc.snap; out.ranges = cc.plan.ranges; out.keepCount = cc.plan.gaps.keepCount; out.deleteCount = cc.plan.gaps.deleteCount;
+      out.plan = cc.plan; out.snap = cc.snap; out.ranges = cc.plan.ranges; out.keepCount = cc.plan.gaps.keepCount; out.deleteCount = cc.plan.gaps.deleteCount; out.syncedExtra = syncedExtraCount(cc.snap);
       out.outsideCount = cc.plan.gaps.outside ? cc.plan.gaps.outside.length : 0;
       out.outsideSeconds = (cc.plan.gaps.outside || []).reduce(function (a, c) { return a + c.seconds; }, 0);
       out.cutsTotal = cc.edges.length - 2; out.cutsLeft = cc.remaining.length;
@@ -886,8 +943,8 @@
     var expLen = sumRanges(d.ranges || cl.ranges) + (cl.outsideSeconds || 0), gotLen = n ? snap.v1[n - 1].end - snap.v1[0].start : 0, tol = (n + 2) / fps;
     if (Math.abs(gotLen - expLen) > tol) bad.push("the timeline is " + gotLen.toFixed(2) + " s long but the plan keeps " + expLen.toFixed(2) + " s (allowed rounding " + tol.toFixed(2) + " s)");
     if (n && Math.abs(snap.v1[0].start) > 0.00001) bad.push("the first piece does not start at 0");
-    bits.push(n + " pieces on V1 and A1, " + gotLen.toFixed(2) + " s long (plan " + expLen.toFixed(2) + " s), no gap pieces, no holes, nothing on other tracks");
-    var specs = relinkSpecs(snap), v = String(await evalJsx("LT_l_verify(" + relinkLit(specs, 0, specs.length) + ")"));
+    bits.push(n + " pieces on V1 and A1" + (syncedTracksWanted() && syncedExtraCount(snap) > 0 ? " (plus synced tracks)" : "") + ", " + gotLen.toFixed(2) + " s long (plan " + expLen.toFixed(2) + " s), no gap pieces, no holes, nothing on other tracks");
+    var specs = relinkSpecs(snap), v = String(await evalJsx("LT_l_verify(" + relinkLit(specs, 0, specs.length) + (syncedTracksWanted() ? ",true" : "") + ")"));
     if (v.indexOf("ok|") !== 0) bad.push("links: " + v.replace(/^(FAIL\||ERROR: )/, "")); else bits.push(specs.length + " pairs verified linked");
     if (wantMarkers) {
       var fr = d.fileData, sc = await scan(), have = sc.facts && sc.facts.markers ? sc.facts.markers.existing : -1, want = -1;
@@ -906,7 +963,7 @@
   function planTodo(cl) {
     var S = cl.steps, est = 0, todo = [], parts = { markers: 0, cuts: 0, deletes: 0, relink: 0 };
     if (S.markers) { todo.push("add " + cl.markerCount + " markers to the clip"); parts.markers = 3 + cl.markerCount * 0.075; }
-    if (S.cuts) { todo.push("cut at " + cl.cutsLeft + " points (" + (cl.cutsLeft * 2) + " razor calls on V1 + A1)"); parts.cuts = 4 + 15.7 * Math.pow(cl.cutsLeft / 199, 2); }
+    if (S.cuts) { todo.push("cut at " + cl.cutsLeft + " points (" + (cl.cutsLeft * (2 + (cl.syncedExtra || 0))) + " razor calls on V1 + A1" + (cl.syncedExtra ? " + synced tracks" : "") + ")"); parts.cuts = 4 + 15.7 * Math.pow(cl.cutsLeft / 199, 2); }
     if (S.deletes) { todo.push("ripple-delete " + cl.deleteCount + " gap pieces"); parts.deletes = 3 + 0.165 * cl.deleteCount; }
     if (S.relink) { todo.push("link " + cl.keepCount + " video/audio pairs"); parts.relink = 3 + 0.168 * cl.keepCount; }
     est = parts.markers + parts.cuts + parts.deletes + parts.relink + 4;
@@ -979,7 +1036,7 @@
 
   loadSavedSettings();
   (function () {
-    var ids = NUM_FIELDS.map(function (f) { return f[0]; }).concat(["recipeCutChapters", "recipeMarkers", "recipeDeleteGaps", "recipeRelink", "backupSeq"]), i, e;
+    var ids = NUM_FIELDS.map(function (f) { return f[0]; }).concat(["recipeCutChapters", "syncedTracks", "recipeMarkers", "recipeDeleteGaps", "recipeRelink", "backupSeq"]), i, e;
     for (i = 0; i < ids.length; i++) { e = fieldEl(ids[i]); if (e && e.addEventListener) e.addEventListener("change", saveSettings); }
   })();
   bindRun("rAll", async function () { stopFlag = false; return await doItAll(); });

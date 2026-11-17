@@ -35,6 +35,8 @@
     var s = [field("padBefore") + " s before", field("padAfter") + " s after", "merge " + field("mergeGap") + " s"];
     var ch = $("recipeCutChapters");
     if (ch && ch.checked) s.push("+ chapters");
+    var st = $("syncedTracks");
+    if (st && st.checked) s.push("+ synced tracks");
     text("setSum", " " + s.join(" \u00B7 "));
   }
   function settingsError() {

@@ -6,6 +6,8 @@
 //   seq:     {ok, name, fps, dropFrame} | null
 //   video:   [clip counts per video track, V1 first],  audio: [clip counts per audio track, A1 first]
 //   v1, a1:  [{start, end, inPoint, outPoint, media, name}]   (seconds; a few clips are enough, counts are in video/audio)
+//   v2, a2..aN / videoClips / audioClips: optional synced track clip arrays when syncedTracks is true
+//   syncedTracks: boolean (opt-in V2 overlay + A2..AN multi-track audio cutting)
 //   markers: {existing, probes} | null                          (markers on the clip's project item)
 //   file:    {loaded, error, name, matchesMedia} | null
 //   plan:    {clipsInside, clipsTotal, pending, gaps: {ok, problems[], text}} | null
@@ -15,6 +17,67 @@
 var LTGuard = (function () {
   function norm(p) { return String(p || "").replace(/\\/g, "/").toLowerCase(); }
   function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
+  function getTrackClips(f, kind, idx) {
+    if (kind === "V") {
+      if (idx === 0) return f.v1 || [];
+      if (idx === 1 && f.v2 && f.v2.length) return f.v2;
+      return (f.videoClips && f.videoClips[idx]) || [];
+    }
+    if (idx === 0) return f.a1 || [];
+    var k = "a" + (idx + 1);
+    if (f[k] && f[k].length) return f[k];
+    return (f.audioClips && f.audioClips[idx]) || [];
+  }
+  function collectPopulatedSynced(video, audio) {
+    var out = [], i;
+    if (video.length > 1 && video[1] > 0) out.push({ kind: "V", idx: 1, name: "V2", count: video[1] });
+    for (i = 1; i < audio.length; i++) if (audio[i] > 0) out.push({ kind: "A", idx: i, name: "A" + (i + 1), count: audio[i] });
+    return out;
+  }
+  function clipsMatch(a, b, tol) {
+    return Math.abs(a.start - b.start) <= tol && Math.abs(a.end - b.end) <= tol &&
+      Math.abs(a.inPoint - b.inPoint) <= tol && Math.abs(a.outPoint - b.outPoint) <= tol;
+  }
+  function checkSyncedTracksHeader(video, audio, synced, emptyMsg, add) {
+    var others = [], syncedTracks = [], i;
+    if (!synced) {
+      for (i = 1; i < video.length; i++) if (video[i] > 0) others.push("V" + (i + 1) + " (" + video[i] + ")");
+      for (i = 1; i < audio.length; i++) if (audio[i] > 0) others.push("A" + (i + 1) + " (" + audio[i] + ")");
+      add(others.length === 0, "Nothing on V2+ or A2+.", "There are clips on " + others.join(", ") + ". " + emptyMsg);
+      return [];
+    }
+    for (i = 2; i < video.length; i++) if (video[i] > 0) others.push("V" + (i + 1) + " (" + video[i] + ")");
+    add(others.length === 0, "Nothing on V3+.", "There are clips on " + others.join(", ") + ". Synced-track mode only supports V2 and A2..AN.");
+    syncedTracks = collectPopulatedSynced(video, audio);
+    return syncedTracks;
+  }
+  function checkSyncedPieceCounts(syncedTracks, vLen, verb, add) {
+    var bad = false, i, st;
+    for (i = 0; i < syncedTracks.length; i++) {
+      st = syncedTracks[i];
+      add(st.count === vLen, st.name + " has the same number of pieces as V1 (" + vLen + ").",
+        "V1 has " + vLen + " pieces but " + st.name + " has " + st.count + ". A " + verb + " reached one track and not the other. Undo it (Ctrl+Z) or reopen the saved project.");
+      if (st.count !== vLen) bad = true;
+    }
+    return bad;
+  }
+  function checkSyncedPiecesMatch(f, fps, V, syncedTracks, add) {
+    var si, i, tr, T, sun, sfirstUn, d;
+    for (si = 0; si < syncedTracks.length; si++) {
+      tr = syncedTracks[si]; T = getTrackClips(f, tr.kind, tr.idx);
+      if (!T || T.length === 0) continue;
+      if (T.length !== V.length) {
+        add(false, tr.name + " and V1 match piece by piece.", tr.name + " clip list has " + T.length + " pieces, expected " + V.length + ".");
+        continue;
+      }
+      sun = 0; sfirstUn = "";
+      for (i = 0; i < V.length; i++) {
+        d = Math.max(Math.abs(V[i].start - T[i].start), Math.abs(V[i].end - T[i].end), Math.abs(V[i].inPoint - T[i].inPoint), Math.abs(V[i].outPoint - T[i].outPoint)) * fps;
+        if (d > CUT_TOL) { sun++; if (!sfirstUn) sfirstUn = "piece #" + (i + 1) + " (" + d.toFixed(3) + " frames)"; }
+      }
+      add(sun === 0, tr.name + " and V1 match piece by piece.", sun + " piece(s) differ between V1 and " + tr.name + ", first " + sfirstUn + ".");
+    }
+  }
 
   function evaluate(f) {
     f = f || {};
@@ -34,12 +97,24 @@ var LTGuard = (function () {
           : "The sequence uses drop-frame timecode (the playhead timecode has a \";\"). The cut maths is non-drop only, and a wrong cut is worse than no cut. Switch the sequence's timecode display to non-drop, or use a non-drop sequence.");
     }
 
-    // ---- nothing else on the timeline ----
-    var video = f.video || [], audio = f.audio || [], others = [], i;
-    for (i = 1; i < video.length; i++) if (video[i] > 0) others.push("V" + (i + 1) + " (" + plural(video[i], "clip", "clips") + ")");
-    for (i = 1; i < audio.length; i++) if (audio[i] > 0) others.push("A" + (i + 1) + " (" + plural(audio[i], "clip", "clips") + ")");
-    add("hard", others.length === 0, "Nothing on V2+ or A2+.",
-      "There are clips on " + others.join(", ") + ". Every track under a gap shifts when the gap is deleted, so this tool only runs on a timeline that holds just the source file. Remove them (or use a fresh sequence) and try again.");
+    // ---- nothing else on the timeline (unless syncedTracks is enabled for V2 and A2..AN) ----
+    var video = f.video || [], audio = f.audio || [], synced = !!f.syncedTracks, others = [], syncedTracks = [], i;
+    if (!synced) {
+      for (i = 1; i < video.length; i++) if (video[i] > 0) others.push("V" + (i + 1) + " (" + plural(video[i], "clip", "clips") + ")");
+      for (i = 1; i < audio.length; i++) if (audio[i] > 0) others.push("A" + (i + 1) + " (" + plural(audio[i], "clip", "clips") + ")");
+      add("hard", others.length === 0, "Nothing on V2+ or A2+.",
+        "There are clips on " + others.join(", ") + ". Every track under a gap shifts when the gap is deleted, so this tool only runs on a timeline that holds just the source file. Remove them (or use a fresh sequence) and try again.");
+    } else {
+      for (i = 2; i < video.length; i++) if (video[i] > 0) others.push("V" + (i + 1) + " (" + plural(video[i], "clip", "clips") + ")");
+      add("hard", others.length === 0, "Nothing on V3+.",
+        "There are clips on " + others.join(", ") + ". Synced-track mode only supports V2 (overlay) and A2..AN (audio). Remove them (or use a fresh sequence) and try again.");
+      syncedTracks = collectPopulatedSynced(video, audio);
+      for (i = 0; i < syncedTracks.length; i++) {
+        var st = syncedTracks[i];
+        add("hard", st.count === 1, st.name + " holds exactly one synced clip.",
+          st.name + " holds " + plural(st.count, "clip", "clips") + ". This tool starts from ONE uncut clip on each synced track. If a previous run stopped half way, undo it (Ctrl+Z) or reopen the saved project.");
+      }
+    }
 
     // ---- exactly one video clip and one audio clip, still whole ----
     var nv = video.length ? video[0] : 0, na = audio.length ? audio[0] : 0;
@@ -64,6 +139,20 @@ var LTGuard = (function () {
         "The audio clip does not match the video clip (V1 " + v.start.toFixed(3) + "-" + v.end.toFixed(3) + ", source " + v.inPoint.toFixed(3) + "-" + v.outPoint.toFixed(3) +
         "; A1 " + a.start.toFixed(3) + "-" + a.end.toFixed(3) + ", source " + a.inPoint.toFixed(3) + "-" + a.outPoint.toFixed(3) + ").");
       if (v.media && a.media) add("hard", norm(v.media) === norm(a.media), "V1 and A1 come from the same media file.", "V1 and A1 come from different media files (" + v.media + " and " + a.media + ").");
+    }
+    if (synced && v && frame) {
+      for (i = 0; i < syncedTracks.length; i++) {
+        var tr = syncedTracks[i];
+        if (tr.count !== 1) continue;
+        var scList = getTrackClips(f, tr.kind, tr.idx);
+        var sc = scList && scList[0] ? scList[0] : null;
+        var scOk = !!sc && clipsMatch(v, sc, frame);
+        add("hard", scOk, tr.name + " plays the same range as V1.",
+          !sc
+            ? tr.name + " clip timing could not be read."
+            : tr.name + " does not match V1 (V1 " + v.start.toFixed(3) + "-" + v.end.toFixed(3) + ", source " + v.inPoint.toFixed(3) + "-" + v.outPoint.toFixed(3) +
+              "; " + tr.name + " " + sc.start.toFixed(3) + "-" + sc.end.toFixed(3) + ", source " + sc.inPoint.toFixed(3) + "-" + sc.outPoint.toFixed(3) + ").");
+      }
     }
 
     // ---- the markers file ----
@@ -127,19 +216,19 @@ var LTGuard = (function () {
         : "The sequence uses drop-frame timecode. The cut maths is non-drop only.");
     if (!o || edges.length < 2) { add(false, "", "No cut plan to compare the timeline with."); return out(); }
 
-    // nothing else on the timeline
-    var video = f.video || [], audio = f.audio || [], others = [];
-    for (i = 1; i < video.length; i++) if (video[i] > 0) others.push("V" + (i + 1) + " (" + video[i] + ")");
-    for (i = 1; i < audio.length; i++) if (audio[i] > 0) others.push("A" + (i + 1) + " (" + audio[i] + ")");
-    add(others.length === 0, "Nothing on V2+ or A2+.", "There are clips on " + others.join(", ") + ". Every track under a gap shifts when a gap is deleted; this tool only runs on a timeline that holds just the source file.");
+    // nothing else on the timeline (unless syncedTracks is enabled for V2 and A2..AN)
+    var video = f.video || [], audio = f.audio || [], synced = !!f.syncedTracks;
+    var syncedTracks = checkSyncedTracksHeader(video, audio, synced,
+      "Every track under a gap shifts when a gap is deleted; this tool only runs on a timeline that holds just the source file.", add);
 
     // piece counts
-    var maxPieces = edges.length - 1;
+    var maxPieces = edges.length - 1, syncedCountBad = false;
     add(V.length >= 1 && V.length === A.length, "V1 and A1 have the same number of pieces (" + V.length + ").",
       "V1 has " + V.length + " pieces but A1 has " + A.length + ". A razor reached one track and not the other. Undo it (Ctrl+Z) or reopen the saved project.");
+    if (synced && V.length >= 1) syncedCountBad = checkSyncedPieceCounts(syncedTracks, V.length, "razor", add);
     if (f.mode === "complete") add(V.length === maxPieces, "V1 has all " + maxPieces + " planned pieces.", "V1 has " + V.length + " pieces, the plan needs " + maxPieces + ".");
     else add(V.length <= maxPieces, "V1 has " + V.length + " of at most " + maxPieces + " pieces.", "V1 has " + V.length + " pieces, more than the plan allows (" + maxPieces + "): something was cut that the plan did not ask for.");
-    if (!(V.length >= 1 && V.length === A.length)) return out();
+    if (!(V.length >= 1 && V.length === A.length) || syncedCountBad) return out();
 
     // every edge sits on a whole frame; no holes or overlaps; the pieces cover exactly the original clip
     var worst = 0, offGrid = 0, firstOff = "", holes = 0, firstHole = "", d;
@@ -178,6 +267,7 @@ var LTGuard = (function () {
       if (d > CUT_TOL) { unsync++; if (!firstUn) firstUn = "piece #" + (i + 1) + " (" + d.toFixed(3) + " frames)"; }
     }
     add(unsync === 0, "V1 and A1 match piece by piece.", unsync + " piece(s) differ between V1 and A1, first " + firstUn + ".");
+    if (synced) checkSyncedPiecesMatch(f, fps, V, syncedTracks, add);
 
     // which cuts exist, which are missing, which were never planned
     var want = {}, have = {}, unexpected = [], remaining = [];
@@ -235,14 +325,15 @@ var LTGuard = (function () {
         ? "Could not read the sequence's playhead timecode from Premiere (QE)."
         : "The sequence uses drop-frame timecode. The cut maths is non-drop only.");
 
-    var video = f.video || [], audio = f.audio || [], others = [];
-    for (i = 1; i < video.length; i++) if (video[i] > 0) others.push("V" + (i + 1) + " (" + video[i] + ")");
-    for (i = 1; i < audio.length; i++) if (audio[i] > 0) others.push("A" + (i + 1) + " (" + audio[i] + ")");
-    add(others.length === 0, "Nothing on V2+ or A2+.", "There are clips on " + others.join(", ") + ". A ripple delete shifts every track; this tool only runs on a timeline that holds just the source file.");
+    var video = f.video || [], audio = f.audio || [], synced = !!f.syncedTracks;
+    var syncedTracks = checkSyncedTracksHeader(video, audio, synced,
+      "A ripple delete shifts every track; this tool only runs on a timeline that holds just the source file.", add);
 
+    var syncedCountBad = false;
     add(V.length >= 1 && V.length === A.length, "V1 and A1 have the same number of pieces (" + V.length + ").",
       "V1 has " + V.length + " pieces but A1 has " + A.length + ". A delete reached one track and not the other. Undo it (Ctrl+Z) or reopen the saved project.");
-    if (!(V.length >= 1 && V.length === A.length)) return out();
+    if (synced && V.length >= 1) syncedCountBad = checkSyncedPieceCounts(syncedTracks, V.length, "delete", add);
+    if (!(V.length >= 1 && V.length === A.length) || syncedCountBad) return out();
 
     var worst = 0, off = 0, firstOff = "", holes = 0, firstHole = "", speed = 0, firstSp = "", back = 0, firstBack = "", un = 0, firstUn = "";
     for (i = 0; i < V.length; i++) {
@@ -267,6 +358,7 @@ var LTGuard = (function () {
     add(speed === 0, "Every piece plays at normal speed.", speed + " piece(s) play at a changed speed, first: " + firstSp + ".");
     add(back === 0, "The source never goes backwards from piece to piece.", back + " piece(s) play source that goes backwards from where the previous piece ended, first: " + firstBack + ".");
     add(un === 0, "V1 and A1 match piece by piece.", un + " piece(s) differ between V1 and A1, first " + firstUn + ".");
+    if (synced) checkSyncedPiecesMatch(f, fps, V, syncedTracks, add);
     res.endSeconds = V[V.length - 1].end;
 
     var g = f.gaps;

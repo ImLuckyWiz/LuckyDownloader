@@ -85,6 +85,7 @@ const DEFAULT_SETTINGS = {
   recipeMarkers: true, // "Do it all": add the markers
   recipeCutClips: true, // "Do it all": cut at the start and end of every clip
   recipeCutChapters: false, // "Do it all": cut at every game / category change
+  syncedTracks: false, // opt-in: cut and ripple-delete matching V2 and A2..AN tracks alongside V1/A1
   minClips: 1, // pre-flight: at least this many clips of the file must fall inside what the timeline plays
   autoRun: false, // opt-in: run the recipe by itself, once, when a markers file is found
   recipeDeleteGaps: false, // "Do it all": ripple-delete the pieces between the clips, as the LAST step (the confirmation comes before the run starts)
@@ -191,6 +192,7 @@ function normalizeSettings(raw) {
     recipeMarkers: r.recipeMarkers === undefined ? d.recipeMarkers : !!r.recipeMarkers,
     recipeCutClips: r.recipeCutClips === undefined ? d.recipeCutClips : !!r.recipeCutClips,
     recipeCutChapters: r.recipeCutChapters === undefined ? d.recipeCutChapters : !!r.recipeCutChapters,
+    syncedTracks: r.syncedTracks === undefined ? d.syncedTracks : !!r.syncedTracks,
     minClips: Math.floor(count(r.minClips, d.minClips)),
     autoRun: r.autoRun === undefined ? d.autoRun : !!r.autoRun,
     recipeDeleteGaps: r.recipeDeleteGaps === undefined ? d.recipeDeleteGaps : !!r.recipeDeleteGaps,
